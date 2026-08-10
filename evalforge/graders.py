@@ -134,24 +134,42 @@ class RuleBasedGrader:
 
 class LLMJudgeGrader:
     """
-    Uses Claude as a real LLM judge to evaluate response quality.
+    Uses an LLM (Claude or GPT) as a real judge to evaluate response quality.
     Makes an actual API call to grade responses against criteria.
     """
 
-    def __init__(self):
-        """Initialize Anthropic client for judging."""
-        self.client = None
-        try:
-            from anthropic import Anthropic
-            api_key = os.getenv("ANTHROPIC_API_KEY")
-            if api_key:
-                self.client = Anthropic(api_key=api_key)
-        except Exception as e:
-            print(f"⚠ LLMJudgeGrader: Could not initialize Anthropic client: {e}")
+    def __init__(self, judge_model="claude"):
+        """
+        Initialize LLM judge client.
+
+        Args:
+            judge_model: "claude" (Anthropic) or "gpt" (OpenAI). Defaults to Claude.
+        """
+        self.judge_model = judge_model
+        self.anthropic_client = None
+        self.openai_client = None
+
+        if judge_model == "claude":
+            try:
+                from anthropic import Anthropic
+                api_key = os.getenv("ANTHROPIC_API_KEY")
+                if api_key:
+                    self.anthropic_client = Anthropic(api_key=api_key)
+            except Exception as e:
+                print(f"⚠ LLMJudgeGrader: Could not initialize Anthropic client: {e}")
+
+        elif judge_model == "gpt":
+            try:
+                from openai import OpenAI
+                api_key = os.getenv("OPENAI_API_KEY")
+                if api_key:
+                    self.openai_client = OpenAI(api_key=api_key)
+            except Exception as e:
+                print(f"⚠ LLMJudgeGrader: Could not initialize OpenAI client: {e}")
 
     def grade(self, expected, actual, category=None):
         """
-        Grade response using Claude as a real LLM judge.
+        Grade response using an LLM judge (Claude or GPT).
 
         Args:
             expected: Ground-truth answer (reference)
@@ -161,21 +179,43 @@ class LLMJudgeGrader:
         Returns:
             dict with score (0-1), passed (bool), and feedback
         """
-        if not self.client:
+        if self.judge_model == "claude":
+            if not self.anthropic_client:
+                return {
+                    "passed": False,
+                    "score": 0.0,
+                    "method": "llm_judge",
+                    "feedback": "Claude judge unavailable (Anthropic API not configured)",
+                    "details": "API key missing or client initialization failed"
+                }
+            return self._judge_with_claude(expected, actual, category)
+
+        elif self.judge_model == "gpt":
+            if not self.openai_client:
+                return {
+                    "passed": False,
+                    "score": 0.0,
+                    "method": "llm_judge",
+                    "feedback": "GPT judge unavailable (OpenAI API not configured)",
+                    "details": "API key missing or client initialization failed"
+                }
+            return self._judge_with_gpt(expected, actual, category)
+
+        else:
             return {
                 "passed": False,
                 "score": 0.0,
                 "method": "llm_judge",
-                "feedback": "LLM judge unavailable (Anthropic API not configured)",
-                "details": "API key missing or client initialization failed"
+                "feedback": f"Unknown judge model: {self.judge_model}",
+                "details": "Supported models: 'claude', 'gpt'"
             }
 
-        # Build the grading rubric
+    def _judge_with_claude(self, expected, actual, category):
+        """Grade using Claude as judge."""
         rubric = self._build_rubric(category)
 
-        # Call Claude to judge
         try:
-            message = self.client.messages.create(
+            message = self.anthropic_client.messages.create(
                 model="claude-haiku-4-5-20251001",
                 max_tokens=150,
                 messages=[
@@ -196,35 +236,75 @@ No other text."""
                 ]
             )
 
-            # Parse Claude's response
             response_text = message.content[0].text.strip()
-            import json as json_lib
-            try:
-                judgment = json_lib.loads(response_text)
-                score = float(judgment.get("score", 5)) / 10.0  # Convert 0-10 scale to 0-1
-                score = min(1.0, max(0.0, score))  # Clamp to [0, 1]
-                reason = judgment.get("reason", "")
-            except (json_lib.JSONDecodeError, ValueError):
-                # If Claude's response isn't valid JSON, extract score if present
-                score = 0.5
-                reason = response_text[:100]
-
-            return {
-                "passed": score >= 0.6,
-                "score": score,
-                "method": "llm_judge",
-                "feedback": reason,
-                "details": f"Claude-evaluated; raw score: {score:.2f}"
-            }
+            return self._parse_judgment(response_text, "claude")
 
         except Exception as e:
             return {
                 "passed": False,
                 "score": 0.0,
                 "method": "llm_judge",
-                "feedback": f"Judging error: {str(e)[:80]}",
+                "feedback": f"Claude judging error: {str(e)[:80]}",
                 "details": str(e)
             }
+
+    def _judge_with_gpt(self, expected, actual, category):
+        """Grade using GPT as judge."""
+        rubric = self._build_rubric(category)
+
+        try:
+            completion = self.openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": f"""You are an expert evaluation judge. Grade the following response.
+
+Question Category: {category or 'general'}
+Expected/Reference Answer: {expected}
+
+Actual Response: {actual}
+
+{rubric}
+
+Respond ONLY with a single JSON line: {{"score": <0-10>, "reason": "<brief reason>"}}
+No other text."""
+                    }
+                ],
+                max_tokens=150
+            )
+
+            response_text = completion.choices[0].message.content.strip()
+            return self._parse_judgment(response_text, "gpt")
+
+        except Exception as e:
+            return {
+                "passed": False,
+                "score": 0.0,
+                "method": "llm_judge",
+                "feedback": f"GPT judging error: {str(e)[:80]}",
+                "details": str(e)
+            }
+
+    def _parse_judgment(self, response_text, judge_name):
+        """Parse judgment JSON from model response."""
+        import json as json_lib
+        try:
+            judgment = json_lib.loads(response_text)
+            score = float(judgment.get("score", 5)) / 10.0  # Convert 0-10 scale to 0-1
+            score = min(1.0, max(0.0, score))  # Clamp to [0, 1]
+            reason = judgment.get("reason", "")
+        except (json_lib.JSONDecodeError, ValueError):
+            score = 0.5
+            reason = response_text[:100]
+
+        return {
+            "passed": score >= 0.6,
+            "score": score,
+            "method": "llm_judge",
+            "feedback": reason,
+            "details": f"{judge_name.capitalize()}-evaluated; raw score: {score:.2f}"
+        }
 
     def _build_rubric(self, category):
         """Build grading rubric based on question category."""

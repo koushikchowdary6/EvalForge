@@ -119,6 +119,25 @@ pytest tests/ -v
 ✅ "I have GitHub Actions running tests on every commit"
 ✅ "The README is technically honest about limitations"
 
+### 9. **Added GPT Support to LLMJudgeGrader** ✅
+**Status:** Complete — both Claude and GPT now supported
+
+**What Changed:**
+```python
+# Now accepts judge_model parameter:
+claude_judge = LLMJudgeGrader(judge_model="claude")  # Uses Anthropic API
+gpt_judge = LLMJudgeGrader(judge_model="gpt")        # Uses OpenAI API
+
+# grade() method routes to either _judge_with_claude() or _judge_with_gpt()
+# Both use identical rubric logic; only API calls differ
+```
+
+**Why It Matters:**
+- Interview talking point: "I implemented support for two major LLM APIs with the same rubric logic"
+- Shows architectural flexibility and understanding of API design
+- Demonstrates you're not locked into a single provider
+- Both Anthropic and OpenAI clients are optional—graceful degradation if API keys missing
+
 ---
 
 ## Running the Updated Code

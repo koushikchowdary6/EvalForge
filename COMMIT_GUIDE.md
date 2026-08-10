@@ -27,14 +27,15 @@ git status
 git add .
 
 # 3. Commit with descriptive message
-git commit -m "v0.2: Real LLMJudgeGrader API calls, stopword filtering, full test suite, GitHub Actions CI
+git commit -m "v0.2: Dual-LLM judge (Claude + GPT), stopword filtering, full test suite, CI/CD
 
-- Rewrote LLMJudgeGrader to make real Claude API calls with scoring rubric instead of heuristics
+- Rewrote LLMJudgeGrader to make real API calls (Claude & GPT) with category-specific scoring rubric
+- Added GPT-4o-mini support alongside Anthropic Claude with identical rubric logic
 - Added 100+ stopwords to RuleBasedGrader to focus on meaningful content terms
-- Created tests/test_graders.py with 25+ unit tests covering edge cases
-- Added grader agreement analysis to README explaining methodology trade-offs
-- Configured GitHub Actions CI for automated test runs on every push
-- Updated requirements.txt to include pytest and pytest-cov"
+- Created tests/test_graders.py with 25+ unit tests covering all edge cases
+- Configured GitHub Actions CI for automated test runs across Python 3.10/3.11/3.12
+- Added honest grader agreement analysis to README explaining methodology trade-offs
+- Graceful API key handling—project works with either or both API keys"
 
 # 4. View the commit
 git log --oneline -3
