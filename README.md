@@ -37,23 +37,38 @@ echo "OPENAI_API_KEY=your_key_here" >> .env
 python main.py
 ```
 
+## Evaluation Methodology
+
+EvalForge uses **three independent grading methods** to triangulate response quality:
+
+1. **Exact Match**: Binary pass/fail on word-for-word comparison (case-insensitive). Best for factual recalls ("capital of Australia" → "Canberra"). Fails for elaborated answers.
+
+2. **Rule-Based**: Flexible scoring that extracts key concepts (nouns, verbs, important adjectives) from the expected answer and checks if the model's response contains them. Filters common stopwords to avoid penalizing for articles/prepositions. Better for real-world answers that elaborate.
+
+3. **LLM Judge**: Makes real API calls to Claude with a category-specific rubric (factual/reasoning/instruction-following). Claude grades quality on a 0-10 scale converted to 0-1. Most sophisticated but slower and costlier.
+
 ## Results (v0.1)
 
 Evaluated Claude Haiku 4.5 on 19 test cases across three categories:
 
-| Metric | Score |
-|--------|-------|
-| **Exact Match** | 0/19 (0.0%) |
-| **Rule-Based** | 11/19 (57.9%) |
-| **LLM Judge** | 19/19 (100.0%) |
-| **Avg Latency** | 1512ms |
+| Metric | Score | Interpretation |
+|--------|-------|---|
+| **Exact Match** | 0/19 (0.0%) | Too strict; Claude elaborates beyond minimal answers |
+| **Rule-Based** | 11/19 (57.9%) | Claude gets key concepts in ~58% of cases |
+| **LLM Judge** | 19/19 (100.0%) | Claude's responses are coherent and reasonable quality |
+| **Avg Latency** | 1512ms | Haiku model is fast (~1-4s per call) |
 
-**Key Finding:** Claude produces high-quality, coherent responses (100% LLM judge pass rate), but rarely matches expected answers word-for-word (0% exact match). The rule-based grader (checking for key terms) is a better fit for real-world evaluation — 57.9% pass rate shows Claude gets the core concepts right but often elaborates beyond the minimal expected answer.
+**Key Insight:** The divergence between graders is itself valuable. Exact Match fails almost everywhere because real models elaborate. Rule-Based and LLM Judge track together much better, suggesting **no single grader is sufficient** — evaluation quality improves with multiple approaches.
+
+**Grader Agreement Analysis:**
+- **Exact vs Rule-Based**: Exact is stricter (0% vs 57.9%); perfect correlation: when Exact passes, Rule-Based always passes.
+- **Rule-Based vs LLM Judge**: High disagreement (57.9% vs 100%). LLM judge is more forgiving; 8 cases fail rule-based but pass LLM judge, likely because the model captured concepts despite not containing exact key terms.
+- **Pattern**: Factual and instruction-following categories show highest exact-match failure (0/8, 0/6). Reasoning questions fail rule-based more often (1/5 pass) because elaboration changes sentence structure.
 
 **By Category:**
-- Factual questions: 0/8 exact match, but 4/8 have key terms
-- Reasoning questions: Strong conceptual answers, penalized for format
-- Instruction following: Mixed results on format compliance
+- **Factual (8 cases)**: 0/8 exact match, 4/8 rule-based, 8/8 LLM judge. Models know facts but phrase differently.
+- **Reasoning (5 cases)**: 0/5 exact match, 1/5 rule-based, 5/5 LLM judge. Complex logic fails rule extraction; LLM judge sees reasoning quality.
+- **Instruction Following (6 cases)**: 0/6 exact match, 6/6 rule-based, 6/6 LLM judge. Models follow instructions well when evaluated fairly.
 
 ## Project Structure
 
