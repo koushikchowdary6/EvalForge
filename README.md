@@ -23,15 +23,37 @@ Think of it like a grading system for AI homework. You write the test questions,
 
 **v1.0 (Planned)**: RAG evaluation, multi-agent systems, safety evaluations.
 
-## Quick Start (Coming Soon)
+## Quick Start
 
 ```bash
 # Install dependencies
 pip install -r requirements.txt
 
+# Create a .env file with your API keys
+echo "ANTHROPIC_API_KEY=your_key_here" > .env
+echo "OPENAI_API_KEY=your_key_here" >> .env
+
 # Run an evaluation
-python -m evalforge run --dataset samples/basic.json
+python main.py
 ```
+
+## Results (v0.1)
+
+Evaluated Claude Haiku 4.5 on 19 test cases across three categories:
+
+| Metric | Score |
+|--------|-------|
+| **Exact Match** | 0/19 (0.0%) |
+| **Rule-Based** | 11/19 (57.9%) |
+| **LLM Judge** | 19/19 (100.0%) |
+| **Avg Latency** | 1512ms |
+
+**Key Finding:** Claude produces high-quality, coherent responses (100% LLM judge pass rate), but rarely matches expected answers word-for-word (0% exact match). The rule-based grader (checking for key terms) is a better fit for real-world evaluation — 57.9% pass rate shows Claude gets the core concepts right but often elaborates beyond the minimal expected answer.
+
+**By Category:**
+- Factual questions: 0/8 exact match, but 4/8 have key terms
+- Reasoning questions: Strong conceptual answers, penalized for format
+- Instruction following: Mixed results on format compliance
 
 ## Project Structure
 
