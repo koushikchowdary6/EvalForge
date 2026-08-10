@@ -1,0 +1,116 @@
+[
+  {
+    "id": "fact_001",
+    "question": "What is the capital of Australia?",
+    "expected_answer": "Canberra",
+    "category": "factual"
+  },
+  {
+    "id": "fact_002",
+    "question": "What is the chemical symbol for gold?",
+    "expected_answer": "Au",
+    "category": "factual"
+  },
+  {
+    "id": "fact_003",
+    "question": "In what year did the Titanic sink?",
+    "expected_answer": "1912",
+    "category": "factual"
+  },
+  {
+    "id": "fact_004",
+    "question": "Who wrote Romeo and Juliet?",
+    "expected_answer": "William Shakespeare",
+    "category": "factual"
+  },
+  {
+    "id": "fact_005",
+    "question": "What is the largest planet in our solar system?",
+    "expected_answer": "Jupiter",
+    "category": "factual"
+  },
+  {
+    "id": "reason_001",
+    "question": "If all birds can fly and penguins are birds, can penguins fly? Explain why or why not.",
+    "expected_answer": "No, penguins cannot fly. While the premise states all birds can fly, penguins are an exception. Penguins evolved flippers instead of wings for flying, adapted for swimming.",
+    "category": "reasoning"
+  },
+  {
+    "id": "reason_002",
+    "question": "A farmer has 12 apples. He gives 3 to his friend and sells half of the remaining apples. How many does he have left?",
+    "expected_answer": "4.5 apples or 4 apples (if rounding). After giving 3 away: 12 - 3 = 9. After selling half: 9 / 2 = 4.5.",
+    "category": "reasoning"
+  },
+  {
+    "id": "reason_003",
+    "question": "Why do we see the moon at night but not the sun during the day? Explain the astronomy behind this.",
+    "expected_answer": "The moon reflects sunlight and is visible at night when it is positioned in the sky away from the sun. During the day, the sun is too bright and overpowers the moon's reflected light. The moon orbits Earth while Earth orbits the sun, causing different visibility.",
+    "category": "reasoning"
+  },
+  {
+    "id": "instruct_001",
+    "question": "List exactly three colors. Use commas to separate them.",
+    "expected_answer": "red, blue, yellow",
+    "category": "instruction_following"
+  },
+  {
+    "id": "instruct_002",
+    "question": "Answer in exactly one sentence: What is photosynthesis?",
+    "expected_answer": "Photosynthesis is the process by which plants use sunlight, water, and carbon dioxide to produce oxygen and energy in the form of glucose.",
+    "category": "instruction_following"
+  },
+  {
+    "id": "instruct_003",
+    "question": "Write your response in ALL CAPS ONLY.",
+    "expected_answer": "UNDERSTOOD. I CAN ONLY WRITE IN CAPITAL LETTERS.",
+    "category": "instruction_following"
+  },
+  {
+    "id": "instruct_004",
+    "question": "Do not mention the word 'banana' in your response. What is a yellow fruit?",
+    "expected_answer": "A yellow fruit could be a mango, pineapple, or lemon.",
+    "category": "instruction_following"
+  },
+  {
+    "id": "fact_006",
+    "question": "What is the smallest country in the world by area?",
+    "expected_answer": "Vatican City",
+    "category": "factual"
+  },
+  {
+    "id": "fact_007",
+    "question": "How many strings does a standard violin have?",
+    "expected_answer": "4",
+    "category": "factual"
+  },
+  {
+    "id": "reason_004",
+    "question": "If it rains, the ground gets wet. The ground is wet. Does this mean it rained? Explain.",
+    "expected_answer": "No, not necessarily. While rain causes wet ground, other sources (sprinklers, a garden hose, etc.) could also wet the ground. This is a logical fallacy called 'affirming the consequent.'",
+    "category": "reasoning"
+  },
+  {
+    "id": "instruct_005",
+    "question": "Answer only with a number, no words.",
+    "expected_answer": "42",
+    "category": "instruction_following"
+  },
+  {
+    "id": "fact_008",
+    "question": "What is the freezing point of water in Celsius?",
+    "expected_answer": "0",
+    "category": "factual"
+  },
+  {
+    "id": "reason_005",
+    "question": "What would happen if the Earth stopped rotating? Describe the consequences.",
+    "expected_answer": "If Earth stopped rotating, one side would face the sun continuously (extremely hot) while the other faced away (extremely cold). Extreme weather patterns would develop, gravity effects would change, and life as we know it could not survive.",
+    "category": "reasoning"
+  },
+  {
+    "id": "instruct_006",
+    "question": "Translate the following to Spanish: Hello, my name is John.",
+    "expected_answer": "Hola, mi nombre es John.",
+    "category": "instruction_following"
+  }
+]
