@@ -10,7 +10,7 @@ from evalforge.runner import EvalForgeRunner
 
 def main():
     print("="*70)
-    print("EVALFORGE v0.1 - LLM Evaluation Platform")
+    print("EVALFORGE v0.2 - LLM Evaluation Platform")
     print("="*70)
 
     # Initialize runner with dataset
@@ -21,7 +21,7 @@ def main():
 
     # Load and evaluate
     runner.load_dataset()
-    runner.run_evaluation(models=["claude"])  # add "gpt" back once that account has credits
+    runner.run_evaluation(models=["claude", "gpt"])  # Dual-model comparison: Haiku vs GPT-4o-mini
 
     # Generate and print report
     runner.generate_report()
