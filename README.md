@@ -19,10 +19,10 @@ Think of it like a grading system for AI homework. You write the test questions,
 
 **v0.2 (Current)**: 
 - Real LLMJudgeGrader with actual Anthropic/OpenAI API calls (not fake heuristics)
-- Dual-model support: Claude and GPT with identical category-specific rubrics
+- Dual-model comparison: `main.py` runs Claude Haiku 4.5 and GPT-4o-mini head-to-head on the same dataset
 - RuleBasedGrader with stopword filtering for realistic key-term extraction
-- 25+ comprehensive unit tests with pytest
-- GitHub Actions CI/CD pipeline
+- 25+ comprehensive unit tests with pytest (API tests marked and skipped in CI)
+- GitHub Actions CI/CD pipeline (Python 3.10/3.11/3.12)
 
 **v0.3 (Planned)**: Agent evaluation with tool-call tracing.
 
@@ -50,41 +50,32 @@ EvalForge uses **three independent grading methods** to triangulate response qua
 
 2. **Rule-Based**: Flexible scoring that extracts key concepts (nouns, verbs, important adjectives) from the expected answer and checks if the model's response contains them. Filters common stopwords to avoid penalizing for articles/prepositions. Better for real-world answers that elaborate.
 
-3. **LLM Judge**: Makes real API calls to Claude with a category-specific rubric (factual/reasoning/instruction-following). Claude grades quality on a 0-10 scale converted to 0-1. Most sophisticated but slower and costlier.
+3. **LLM Judge**: Makes real API calls (Claude or GPT) with a category-specific rubric (factual/reasoning/instruction-following). The judge grades quality on a 0-10 scale converted to 0-1. Most sophisticated but slower and costlier.
 
-## Results (v0.2)
+## Results (v0.2) — Claude vs GPT
 
-Evaluated Claude Haiku 4.5 on 19 test cases across three categories. **All numbers regenerated after LLMJudgeGrader rewrite to use real API calls.**
+Ran a head-to-head evaluation of **Claude Haiku 4.5** and **GPT-4o-mini** on the same 19 test cases (38 total evaluations). All numbers come from an actual `python main.py` run committed to `results/report.json` — reproduce them yourself.
 
-| Metric | Score | Interpretation |
-|--------|-------|---|
-| **Exact Match** | 0/19 (0.0%) | Too strict; Claude elaborates beyond minimal answers |
-| **Rule-Based** | 11/19 (57.9%) | Claude gets key concepts in ~58% of cases |
-| **LLM Judge** | 16/19 (84.2%) | Claude's reasoning mostly sound; factual answers strong |
-| **Avg Latency** | 1584ms | Haiku model is fast (~1-4s per call; includes LLM judge API overhead) |
+| Grader | Claude Haiku 4.5 | GPT-4o-mini |
+|--------|------------------|-------------|
+| **Exact Match** | 0/19 (0.0%) | 0/19 (0.0%) |
+| **Rule-Based** | 11/19 (57.9%) | 9/19 (47.4%) |
+| **LLM Judge** | 13/19 (68.4%) | 13/19 (68.4%) |
+| **Avg Latency** | 1558ms | 1443ms |
 
-**By Category:**
+**What the head-to-head shows:**
 
-| Category | Exact | Rule | LLM Judge |
-|---|---|---|---|
-| **Factual (8)** | 0/8 (0%) | 8/8 (100%) | 8/8 (100%) |
-| **Reasoning (5)** | 0/5 (0%) | 0/5 (0%) | 4/5 (80%) |
-| **Instruction (6)** | 0/6 (0%) | 3/6 (50%) | 4/6 (67%) |
+1. **Exact match is useless for conversational models** — both score 0%. Both models elaborate ("The capital of Australia is Canberra..." instead of "Canberra"). This is expected, not a defect: it's exactly why rule-based and LLM-judge graders exist.
 
-**Grader Agreement Analysis:**
+2. **Claude edges out GPT on rule-based matching** (57.9% vs 47.4%). Claude's phrasing more often contains the expected key terms. This is a grading-method artifact, not necessarily a quality gap — the rule-based grader rewards lexical overlap, not correctness.
 
-1. **Exact Match is too strict across all categories** (0% pass rate). Claude elaborates beyond minimal answers—this isn't a failure, just the nature of conversational AI. Exact match is only useful for raw fact recall (capitals, symbols), not reasoning or instruction following.
+3. **The two models tie on the LLM judge** (both 68.4%) — the grader that actually assesses answer quality rather than word overlap. When judged on substance, Claude and GPT-4o-mini are neck-and-neck on this dataset.
 
-2. **Rule-Based grader is strongest on factual questions** (8/8) where key terms are easily identifiable. Fails completely on reasoning (0/5) because answers use different words than expected, and partial on instruction-following (50%) when instructions require exact formats.
+4. **GPT is slightly faster on average** (1443ms vs 1558ms), though both sit in the 0.5–4s range per call.
 
-3. **LLM Judge (real API calls) is most forgiving** but also most realistic:
-   - **Factual**: 8/8 (100%) — Claude knows facts and explains them clearly
-   - **Reasoning**: 4/5 (80%) — Fails on one logical fallacy question (wet ground → must have rained) where Claude explained the fallacy; LLM judge wanted simpler answer
-   - **Instruction**: 4/6 (67%) — Fails when exact matching is required (one question needed number "42", got "7"; another needed three specific colors, got "red, blue, green")
+**Why the LLM Judge and Rule-Based graders disagree:** rule-based punishes stylistic variation (a correct answer worded differently fails); the LLM judge rewards conceptual correctness. The gap between them (e.g. Claude 57.9% rule-based vs 68.4% judge) is the single most useful signal here — it quantifies how much a keyword grader *under*-credits models that paraphrase. **No single grader is sufficient; the divergence between them is the finding.**
 
-4. **Key divergence**: Rule-Based vs LLM Judge on reasoning (0% vs 80%). The real API judge recognizes that Claude's responses demonstrate sound reasoning even when they don't contain exact expected terms. The rule-based grader punishes stylistic variation; the LLM judge rewards conceptual correctness.
-
-**What this means**: No single grader captures the full picture. Exact Match fails on elaboration. Rule-Based fails on flexibility. LLM Judge requires API calls but gives nuanced scoring. **Using all three together provides richer signal.**
+> Note: `results/*.json` is gitignored to avoid committing API responses, but `results/report.json` (aggregate stats only, no raw model outputs) is tracked so these numbers are auditable.
 
 ## Project Structure
 

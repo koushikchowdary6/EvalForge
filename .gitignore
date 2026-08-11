@@ -60,5 +60,7 @@ Thumbs.db
 .AppleDouble
 
 # Results (we'll version control these selectively)
+# Ignore raw results (contain full model responses) but track aggregate report
 results/*.json
 results/*.csv
+!results/report.json
