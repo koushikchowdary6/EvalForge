@@ -92,10 +92,15 @@ class TestRuleBasedGrader:
         assert "too short" in result["details"]
 
     def test_rule_based_custom_rule_contains(self):
-        """Test custom contains rule."""
+        """Test custom contains rule.
+
+        Note: the default key-term check also runs, so the response must
+        contain the expected key term ('capital') in addition to satisfying
+        the custom 'contains' rule ('Australia').
+        """
         grader = RuleBasedGrader()
         rules = [{"type": "contains", "value": "Australia"}]
-        result = grader.grade("Capital", "Canberra is in Australia", rules=rules)
+        result = grader.grade("Capital", "Canberra is the capital, located in Australia", rules=rules)
         assert result["passed"] is True
 
     def test_rule_based_custom_rule_not_contains(self):

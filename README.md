@@ -80,22 +80,28 @@ Ran a head-to-head evaluation of **Claude Haiku 4.5** and **GPT-4o-mini** on the
 ## Project Structure
 
 ```
-evalforge/
-├── README.md           # This file
-├── requirements.txt    # Python dependencies
-├── evalforge/          # Main package
+EvalForge/
+├── README.md                # This file
+├── main.py                  # Entry point — runs the full evaluation
+├── requirements.txt         # Python dependencies
+├── pytest.ini               # Test configuration
+├── evalforge/               # Main package
 │   ├── __init__.py
-│   ├── runner.py       # Evaluation runner
-│   ├── graders.py      # Grading logic
-│   └── models.py       # Model integrations
-├── datasets/           # Test datasets
-├── results/            # Evaluation results
-└── tests/              # Unit tests
+│   ├── runner.py            # Evaluation runner + model API clients (RealModelClient)
+│   └── graders.py           # Grading logic (ExactMatch, RuleBased, LLMJudge)
+├── datasets/
+│   └── questions.json       # Test dataset
+├── results/
+│   └── report.json          # Aggregate stats (tracked; raw responses gitignored)
+├── tests/
+│   └── test_graders.py      # Unit tests
+└── .github/workflows/
+    └── tests.yml            # CI: runs pytest on push
 ```
 
 ## Contributing
 
-We're building this as a learning journey. All phases documented in `docs/phases.md`.
+Built as a learning project to demonstrate LLM-evaluation engineering. Contributions and issues welcome.
 
 ## License
 
