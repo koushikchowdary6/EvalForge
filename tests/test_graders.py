@@ -128,6 +128,7 @@ class TestLLMJudgeGrader:
     Real API calls are made; use with caution in CI.
     """
 
+    @pytest.mark.api
     def test_llm_judge_initialization_no_api(self, monkeypatch):
         """Test graceful handling when API is not configured."""
         # Remove API key
@@ -137,6 +138,7 @@ class TestLLMJudgeGrader:
         # Should still initialize (client may be None, handled in grade method)
         assert grader is not None
 
+    @pytest.mark.api
     def test_llm_judge_returns_dict(self):
         """Test that grade returns proper dictionary structure."""
         grader = LLMJudgeGrader()
@@ -152,6 +154,7 @@ class TestLLMJudgeGrader:
         assert 0.0 <= result["score"] <= 1.0
         assert result["method"] in ["llm_judge"]
 
+    @pytest.mark.api
     def test_llm_judge_respects_category(self):
         """Test that different categories produce reasonable scores."""
         grader = LLMJudgeGrader()
