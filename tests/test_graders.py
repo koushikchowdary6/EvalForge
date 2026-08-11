@@ -109,7 +109,7 @@ class TestRuleBasedGrader:
         rules = [{"type": "not_contains", "value": "banana"}]
         result = grader.grade("Yellow fruit", "A yellow fruit like banana", rules=rules)
         assert result["passed"] is False
-        assert "must NOT contain" in result["details"].lower()
+        assert "must not contain" in result["details"].lower()
 
     def test_rule_based_empty_expected(self):
         """Test behavior when expected has no words > 3 chars (no key terms)."""
