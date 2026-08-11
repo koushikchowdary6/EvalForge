@@ -177,6 +177,7 @@ class TestLLMJudgeGrader:
 class TestGraderConsistency:
     """Test consistency and expected behavior across graders."""
 
+    @pytest.mark.api
     def test_all_graders_return_required_fields(self):
         """Verify all graders return 'passed', 'score', 'method'."""
         expected = "Canberra"
@@ -194,6 +195,7 @@ class TestGraderConsistency:
             assert isinstance(result["score"], (int, float))
             assert 0.0 <= result["score"] <= 1.0
 
+    @pytest.mark.api
     def test_score_reflects_passed(self):
         """Test that score >= 0.6 generally means passed=True."""
         grader = RuleBasedGrader()
