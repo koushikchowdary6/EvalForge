@@ -1,0 +1,100 @@
+[
+  {
+    "id": "rag_001",
+    "question": "What is indirect prompt injection and why is it considered more dangerous than direct injection?",
+    "expected_answer": "Indirect prompt injection delivers the malicious instruction through content the model retrieves (a web page, PDF, or email) rather than through the user's message. It is more dangerous because the victim never sees the malicious text and the attack surface expands to every document the system can read.",
+    "relevant_doc_ids": ["sec_002"],
+    "answerable": true
+  },
+  {
+    "id": "rag_002",
+    "question": "How does a jailbreak differ from a prompt injection?",
+    "expected_answer": "A prompt injection hijacks an application's control flow by overriding developer instructions, while a jailbreak targets the model's safety training directly to elicit content it would normally refuse.",
+    "relevant_doc_ids": ["sec_003", "sec_001"],
+    "answerable": true
+  },
+  {
+    "id": "rag_003",
+    "question": "Why should recall be the primary metric for a PII redaction system?",
+    "expected_answer": "Because a false negative leaves real PII in the output, which is a privacy breach, and most compliance regimes weight false negatives far more heavily than false positives.",
+    "relevant_doc_ids": ["sec_005"],
+    "answerable": true
+  },
+  {
+    "id": "rag_004",
+    "question": "What is the difference between a direct identifier and a quasi-identifier?",
+    "expected_answer": "Direct identifiers such as names, SSNs, and email addresses identify a person on their own. Quasi-identifiers such as ZIP code, date of birth, and job title are individually non-identifying but can re-identify someone in combination through linkage attacks.",
+    "relevant_doc_ids": ["sec_004"],
+    "answerable": true
+  },
+  {
+    "id": "rag_005",
+    "question": "Why is reporting accuracy alone misleading when evaluating a prompt injection detector?",
+    "expected_answer": "Because on an imbalanced, mostly-benign dataset a detector that flags nothing still scores high accuracy. Precision, recall, and false positive rate on benign traffic are the informative metrics.",
+    "relevant_doc_ids": ["sec_006"],
+    "answerable": true
+  },
+  {
+    "id": "rag_006",
+    "question": "How can an attacker exfiltrate conversation data through markdown rendering?",
+    "expected_answer": "By inducing the model to emit a markdown image tag whose URL embeds conversation content as query parameters. The victim's browser requests that URL, leaking data with no visible click. Mitigations are a content security policy limiting outbound image domains and stripping image syntax from output.",
+    "relevant_doc_ids": ["sec_008"],
+    "answerable": true
+  },
+  {
+    "id": "rag_007",
+    "question": "Why should authorization for agent tool calls live outside the model?",
+    "expected_answer": "Because if the model decides both which tool to call and whether it is permitted, an injected instruction can trigger destructive actions. An external policy layer should check each call, require confirmation for irreversible operations, and log the trajectory.",
+    "relevant_doc_ids": ["sec_010"],
+    "answerable": true
+  },
+  {
+    "id": "rag_008",
+    "question": "Can an answer be factually correct but still ungrounded?",
+    "expected_answer": "Yes. Groundedness is evaluated against the retrieved context, so an answer can be true in the real world yet ungrounded if the retrieved documents do not support it. This signals a retrieval failure.",
+    "relevant_doc_ids": ["sec_011"],
+    "answerable": true
+  },
+  {
+    "id": "rag_009",
+    "question": "What happens to precision and recall as you increase k in retrieval?",
+    "expected_answer": "Increasing k generally raises recall and lowers precision. That tradeoff is the central tuning decision for a retriever.",
+    "relevant_doc_ids": ["sec_012"],
+    "answerable": true
+  },
+  {
+    "id": "rag_010",
+    "question": "What is the tradeoff in choosing a chunk size?",
+    "expected_answer": "Small chunks retrieve precisely but may omit information needed to answer. Large chunks carry more context but dilute the embedding so relevant passages rank lower. Overlap reduces the risk of splitting an answer across a boundary at the cost of storage and duplicate retrieval.",
+    "relevant_doc_ids": ["sec_013"],
+    "answerable": true
+  },
+  {
+    "id": "rag_011",
+    "question": "Why is cosine similarity used instead of raw distance for embedding search?",
+    "expected_answer": "Cosine similarity measures the angle between vectors and ignores magnitude, which makes it robust to differences in document length.",
+    "relevant_doc_ids": ["sec_014"],
+    "answerable": true
+  },
+  {
+    "id": "rag_012",
+    "question": "What is over-refusal and why does measuring it matter?",
+    "expected_answer": "Over-refusal is declining a benign request that merely resembles a harmful one, such as a security professional asking how an attack works for defensive purposes. Measuring only the harmful-request refusal rate hides it, and it severely degrades usefulness in security and medical domains.",
+    "relevant_doc_ids": ["sec_015"],
+    "answerable": true
+  },
+  {
+    "id": "rag_013",
+    "question": "What was the exact false positive rate of the Llama Guard 3 model on the ToxicChat benchmark?",
+    "expected_answer": "INSUFFICIENT_CONTEXT",
+    "relevant_doc_ids": [],
+    "answerable": false
+  },
+  {
+    "id": "rag_014",
+    "question": "Which specific CVE number was assigned to the first documented indirect prompt injection vulnerability?",
+    "expected_answer": "INSUFFICIENT_CONTEXT",
+    "relevant_doc_ids": [],
+    "answerable": false
+  }
+]

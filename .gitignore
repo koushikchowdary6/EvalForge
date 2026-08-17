@@ -64,3 +64,5 @@ Thumbs.db
 results/*.json
 results/*.csv
 !results/report.json
+!results/rag_report.json
+!results/agent_report.json
