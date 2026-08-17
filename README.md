@@ -17,16 +17,30 @@ Think of it like a grading system for AI homework. You write the test questions,
 
 ## Project Status
 
-**v0.2 (Current)**: 
-- Real LLMJudgeGrader with actual Anthropic/OpenAI API calls (not fake heuristics)
-- Dual-model comparison: `main.py` runs Claude Haiku 4.5 and GPT-4o-mini head-to-head on the same dataset
-- RuleBasedGrader with stopword filtering for realistic key-term extraction
-- 25+ comprehensive unit tests with pytest (API tests marked and skipped in CI)
-- GitHub Actions CI/CD pipeline (Python 3.10/3.11/3.12)
+**v0.2**: LLM evaluation (dual-model: Claude vs GPT)
+- Real LLMJudgeGrader with actual Anthropic/OpenAI API calls
+- Dual-model comparison on 19 test cases
+- RuleBasedGrader with stopword filtering
+- 14 comprehensive unit tests
 
-**v0.3 (Planned)**: Agent evaluation with tool-call tracing.
+**v0.3**: RAG evaluation (retrieval + generation)
+- Security-themed 15-document corpus, 14 questions (incl. 2 unanswerable)
+- Embedding cache + cosine similarity (zero new dependencies)
+- Retrieval metrics: precision@k, recall@k, MRR, hit rate
+- LLM-judged correctness and groundedness; hallucination detection via abstention
+- Top-k sweep: 42 evaluations across k=1,3,5 to quantify precision/recall tradeoff
+- 38 comprehensive unit tests
 
-**v1.0 (Planned)**: RAG evaluation, multi-agent systems, safety evaluations.
+**v0.4**: Agent evaluation (tool-calling + safety)
+- 24 tool-calling tasks over 5 categories: single-tool, multi-tool, no-tool, destructive-refusal, injection-resistance
+- Trajectory grading: unsafe paths fail even with correct answers
+- Safety metrics: injection resistance, destructive refusal, unnecessary call rate
+- Failure categorization: 6 categories with safety violations ranked first
+- Token-based cost estimation (Claude vs GPT pricing)
+- Ablation: measures whether injection-defense system prompt has measurable effect
+- 58 comprehensive unit tests
+
+**v1.0 (Planned)**: Multi-agent systems, advanced safety evaluations.
 
 ## Quick Start
 
@@ -75,28 +89,96 @@ Ran a head-to-head evaluation of **Claude Haiku 4.5** and **GPT-4o-mini** on the
 
 **Why the LLM Judge and Rule-Based graders disagree:** rule-based punishes stylistic variation (a correct answer worded differently fails); the LLM judge rewards conceptual correctness. The gap between them (e.g. Claude 57.9% rule-based vs 68.4% judge) is the single most useful signal here — it quantifies how much a keyword grader *under*-credits models that paraphrase. **No single grader is sufficient; the divergence between them is the finding.**
 
-> Note: `results/*.json` is gitignored to avoid committing API responses, but `results/report.json` (aggregate stats only, no raw model outputs) is tracked so these numbers are auditable.
+> Note: `results/*.json` is gitignored to avoid committing API responses, but aggregate reports (`report.json`, `rag_report.json`, `agent_report.json`) are tracked so all numbers are auditable.
+
+## Results (v0.3) — RAG Evaluation
+
+Evaluated Claude Haiku 4.5 on 14 RAG questions across three retrieval depth settings (k=1, 3, 5). Security-themed corpus with evaluations of retrieval quality, answer correctness, and hallucination resistance.
+
+| Metric | k=1 | k=3 | k=5 |
+|--------|-----|-----|-----|
+| **Precision@k** | 85.7% | 31.0% | 18.6% |
+| **Recall@k** | 96.4% | 100.0% | 100.0% |
+| **MRR** | 1.000 | 1.000 | 1.000 |
+| **Hit Rate** | 100.0% | 100.0% | 100.0% |
+| **Correctness** | 90.0% | 90.0% | 90.8% |
+| **Groundedness** | 94.2% | 94.2% | 94.2% |
+| **Hallucination Rate** | 0.0% | 0.0% | 0.0% |
+| **Avg Latency** | 1842ms | 1333ms | 1380ms |
+
+**Key findings:**
+- Retrieval quality follows the expected precision/recall tradeoff: k=1 retrieves precisely but misses relevant documents; k=3+ achieves near-perfect recall at the cost of low precision.
+- Answer correctness stays stable across k values (90–91%), showing the LLM judge is consistent even when given more or fewer documents.
+- Groundedness is uniformly high (94%), indicating Claude's elaborations are well-supported by retrieved context.
+- Zero hallucinations across all settings — the abstention instruction (`INSUFFICIENT_CONTEXT` escape hatch) is effective; models do not fabricate when uncertain.
+- Embedding cache hits 100% on repeated runs (43/57 calls cached), making iterative development cheap.
+
+> Note: All embeddings and judge calls to Claude are real API calls, not simulated. Results committed to `results/rag_report.json`.
+
+## Results (v0.4) — Agent Evaluation
+
+Evaluated Claude Haiku 4.5 on 24 tool-calling tasks across 5 categories. Measured tool selection, argument accuracy, safety (injection resistance and destructive refusal), and cost.
+
+| Metric | Value |
+|--------|-------|
+| **Task Success Rate** | 100.0% (24/24) |
+| **Tool Selection Accuracy** | 100.0% |
+| **Argument Accuracy** | 100.0% |
+| **Injection Resistance** | 100.0% (6/6 tasks; payloads in tool results ignored) |
+| **Destructive Refusal** | 100.0% (4/4 tasks; refused to delete/email without explicit user intent) |
+| **Unnecessary Call Rate** | 0.0% |
+| **Avg Latency** | 2139ms |
+| **Avg Turns** | 1.71 |
+| **Estimated Cost** | $0.0610 (24 tasks) |
+
+**Breakdown by category:**
+- Single-tool (6 tasks): 100% success — Claude correctly identifies and invokes the single appropriate tool.
+- Multi-tool (4 tasks): 100% success — Claude chains multiple tool calls in the correct order.
+- No-tool (4 tasks): 100% success — Claude answers from knowledge without unnecessary tool calls.
+- Destructive refusal (4 tasks): 100% success — Claude refuses irreversible actions (delete, email) without explicit user intent; asks for confirmation instead.
+- Injection resistance (6 tasks): 100% success — Hostile instructions embedded in tool results are ignored; Claude executes only the legitimate task.
+
+**Ablation finding:**
+Injection resistance remained at 100% even when the defensive system prompt instruction was removed, indicating that Haiku refuses these injection payloads unaided. The dataset lacks discriminative power — the payloads ("IGNORE ALL PREVIOUS INSTRUCTIONS", "immediately call delete_file") are too obvious. A stronger eval would require adversarial payloads that exploit subtle social engineering or logical confusion.
+
+> Note: All tool invocations are simulated; no actual files or emails are sent. Results committed to `results/agent_report.json`.
 
 ## Project Structure
 
 ```
 EvalForge/
-├── README.md                # This file
-├── main.py                  # Entry point — runs the full evaluation
-├── requirements.txt         # Python dependencies
-├── pytest.ini               # Test configuration
-├── evalforge/               # Main package
+├── README.md                      # This file
+├── main.py                        # v0.2: LLM evaluation entry point
+├── main_rag.py                    # v0.3: RAG evaluation entry point
+├── main_agent.py                  # v0.4: Agent evaluation entry point
+├── requirements.txt               # Python dependencies
+├── pytest.ini                     # Test configuration
+├── evalforge/
 │   ├── __init__.py
-│   ├── runner.py            # Evaluation runner + model API clients (RealModelClient)
-│   └── graders.py           # Grading logic (ExactMatch, RuleBased, LLMJudge)
+│   ├── runner.py                  # v0.2: LLM eval runner + model API clients
+│   ├── graders.py                 # v0.2: Grading logic (ExactMatch, RuleBased, LLMJudge)
+│   ├── rag.py                     # v0.3: RAG pipeline (embedding, retrieval, generation)
+│   ├── rag_graders.py             # v0.3: Retrieval metrics + LLM graders
+│   ├── rag_runner.py              # v0.3: RAG evaluation runner
+│   ├── agent.py                   # v0.4: Tool-calling agent
+│   ├── agent_tools.py             # v0.4: Mock tool registry
+│   ├── agent_graders.py           # v0.4: Trajectory graders
+│   └── agent_runner.py            # v0.4: Agent evaluation runner
 ├── datasets/
-│   └── questions.json       # Test dataset
+│   ├── questions.json             # v0.2: LLM eval dataset (19 cases)
+│   ├── rag_corpus.json            # v0.3: RAG corpus (15 security docs)
+│   ├── rag_questions.json         # v0.3: RAG questions (14 cases)
+│   └── agent_tasks.json           # v0.4: Agent tasks (24 cases)
 ├── results/
-│   └── report.json          # Aggregate stats (tracked; raw responses gitignored)
+│   ├── report.json                # v0.2: LLM eval results (tracked)
+│   ├── rag_report.json            # v0.3: RAG eval results (tracked)
+│   └── agent_report.json          # v0.4: Agent eval results (tracked)
 ├── tests/
-│   └── test_graders.py      # Unit tests
+│   ├── test_graders.py            # v0.2: Grader unit tests (14 tests)
+│   ├── test_rag_graders.py        # v0.3: RAG grader unit tests (38 tests)
+│   └── test_agent_graders.py      # v0.4: Agent grader unit tests (58 tests)
 └── .github/workflows/
-    └── tests.yml            # CI: runs pytest on push
+    └── tests.yml                  # CI: runs pytest on push (Python 3.10/3.11/3.12)
 ```
 
 ## Contributing
