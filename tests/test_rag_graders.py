@@ -56,6 +56,10 @@ class TestPrecisionAtK:
         """Only the top k should count, not the whole ranking."""
         assert precision_at_k(["a", "x", "y"], ["a"], k=1) == pytest.approx(1.0)
 
+    def test_duplicate_relevant_doc_does_not_inflate_precision(self):
+        """A retriever repeating one relevant chunk must not earn extra credit."""
+        assert precision_at_k(["a", "a", "x"], ["a"]) == pytest.approx(1.0 / 3.0)
+
 
 class TestRecallAtK:
     def test_found_all(self):
@@ -66,6 +70,9 @@ class TestRecallAtK:
 
     def test_found_none(self):
         assert recall_at_k(["x"], ["a"]) == 0.0
+
+    def test_duplicate_relevant_ids_do_not_inflate_recall(self):
+        assert recall_at_k(["a"], ["a", "a", "b"]) == pytest.approx(0.5)
 
     def test_no_relevant_docs_is_perfect(self):
         """Unanswerable questions must not penalise the retriever."""
