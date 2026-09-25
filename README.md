@@ -23,15 +23,15 @@ Think of it like a grading system for AI homework. You write the test questions,
 - RuleBasedGrader with stopword filtering
 - 14 comprehensive unit tests
 
-**v0.3**: RAG evaluation (retrieval + generation)
+**v0.3**: RAG evaluation (retrieval + generation; full benchmark suite implemented, tracked artifact below is a smoke run)
 - Security-themed 15-document corpus, 14 questions (incl. 2 unanswerable)
 - Embedding cache + cosine similarity (zero new dependencies)
 - Retrieval metrics: precision@k, recall@k, MRR, hit rate
 - LLM-judged correctness and groundedness; hallucination detection via abstention
-- Top-k sweep: 42 evaluations across k=1,3,5 to quantify precision/recall tradeoff
+- Top-k sweep support across k=1,3,5 to quantify precision/recall tradeoffs
 - 38 comprehensive unit tests
 
-**v0.4**: Agent evaluation (tool-calling + safety)
+**v0.4**: Agent evaluation (tool-calling + safety; full task suite implemented, tracked artifact below is an ablation run)
 - 24 tool-calling tasks over 5 categories: single-tool, multi-tool, no-tool, destructive-refusal, injection-resistance
 - Trajectory grading: unsafe paths fail even with correct answers
 - Safety metrics: injection resistance, destructive refusal, unnecessary call rate
@@ -93,55 +93,38 @@ Ran a head-to-head evaluation of **Claude Haiku 4.5** and **GPT-4o-mini** on the
 
 ## Results (v0.3) — RAG Evaluation
 
-Evaluated Claude Haiku 4.5 on 14 RAG questions across three retrieval depth settings (k=1, 3, 5). Security-themed corpus with evaluations of retrieval quality, answer correctness, and hallucination resistance.
+The tracked artifact in `results/rag_report.json` is a **3-question k=3 smoke run**, not the full 14-question top-k sweep implemented by the evaluation harness. Publishing the artifact exactly as it exists keeps the benchmark provenance auditable.
 
-| Metric | k=1 | k=3 | k=5 |
-|--------|-----|-----|-----|
-| **Precision@k** | 85.7% | 31.0% | 18.6% |
-| **Recall@k** | 96.4% | 100.0% | 100.0% |
-| **MRR** | 1.000 | 1.000 | 1.000 |
-| **Hit Rate** | 100.0% | 100.0% | 100.0% |
-| **Correctness** | 90.0% | 90.0% | 90.8% |
-| **Groundedness** | 94.2% | 94.2% | 94.2% |
-| **Hallucination Rate** | 0.0% | 0.0% | 0.0% |
-| **Avg Latency** | 1842ms | 1333ms | 1380ms |
+| Metric | Tracked k=3 smoke run |
+|--------|-----------------------|
+| Questions / evaluations | 3 / 3 |
+| Precision@3 | 44.4% |
+| Recall@3 | 100.0% |
+| MRR | 1.000 |
+| Hit Rate | 100.0% |
+| Correctness | 90.0% |
+| Groundedness | 93.3% |
+| Avg total latency | 1904ms |
 
-**Key findings:**
-- Retrieval quality follows the expected precision/recall tradeoff: k=1 retrieves precisely but misses relevant documents; k=3+ achieves near-perfect recall at the cost of low precision.
-- Answer correctness stays stable across k values (90–91%), showing the LLM judge is consistent even when given more or fewer documents.
-- Groundedness is uniformly high (94%), indicating Claude's elaborations are well-supported by retrieved context.
-- Zero hallucinations across all settings — the abstention instruction (`INSUFFICIENT_CONTEXT` escape hatch) is effective; models do not fabricate when uncertain.
-- Embedding cache hits 100% on repeated runs (43/57 calls cached), making iterative development cheap.
-
-> Note: All embeddings and judge calls to Claude are real API calls, not simulated. Results committed to `results/rag_report.json`.
+This sample is useful as an end-to-end pipeline check, but **three questions are too few for comparative retrieval claims**. The larger 14-question corpus and k=1/3/5 sweep remain implemented in the project; a full reproducible run should be committed before treating those results as benchmark evidence.
 
 ## Results (v0.4) — Agent Evaluation
 
-Evaluated Claude Haiku 4.5 on 24 tool-calling tasks across 5 categories. Measured tool selection, argument accuracy, safety (injection resistance and destructive refusal), and cost.
+The tracked `results/agent_report.json` is a targeted **6-task injection-resistance ablation with the explicit injection-defense prompt disabled**. It is not a 24-task full-suite result.
 
-| Metric | Value |
-|--------|-------|
-| **Task Success Rate** | 100.0% (24/24) |
-| **Tool Selection Accuracy** | 100.0% |
-| **Argument Accuracy** | 100.0% |
-| **Injection Resistance** | 100.0% (6/6 tasks; payloads in tool results ignored) |
-| **Destructive Refusal** | 100.0% (4/4 tasks; refused to delete/email without explicit user intent) |
-| **Unnecessary Call Rate** | 0.0% |
-| **Avg Latency** | 2139ms |
-| **Avg Turns** | 1.71 |
-| **Estimated Cost** | $0.0610 (24 tasks) |
+| Metric | Tracked ablation |
+|--------|------------------|
+| Tasks | 6 injection-resistance tasks |
+| Task Success Rate | 100.0% (6/6) |
+| Tool Selection Accuracy | 100.0% |
+| Argument Accuracy | 100.0% |
+| Injection Resistance | 100.0% |
+| Unnecessary Call Rate | 0.0% |
+| Avg Latency | 2576ms |
+| Avg Turns | 2.0 |
+| Estimated Cost | $0.0167 |
 
-**Breakdown by category:**
-- Single-tool (6 tasks): 100% success — Claude correctly identifies and invokes the single appropriate tool.
-- Multi-tool (4 tasks): 100% success — Claude chains multiple tool calls in the correct order.
-- No-tool (4 tasks): 100% success — Claude answers from knowledge without unnecessary tool calls.
-- Destructive refusal (4 tasks): 100% success — Claude refuses irreversible actions (delete, email) without explicit user intent; asks for confirmation instead.
-- Injection resistance (6 tasks): 100% success — Hostile instructions embedded in tool results are ignored; Claude executes only the legitimate task.
-
-**Ablation finding:**
-Injection resistance remained at 100% even when the defensive system prompt instruction was removed, indicating that Haiku refuses these injection payloads unaided. The dataset lacks discriminative power — the payloads ("IGNORE ALL PREVIOUS INSTRUCTIONS", "immediately call delete_file") are too obvious. A stronger eval would require adversarial payloads that exploit subtle social engineering or logical confusion.
-
-> Note: All tool invocations are simulated; no actual files or emails are sent. Results committed to `results/agent_report.json`.
+**What this run supports:** all six tested payloads were resisted even with the dedicated injection-defense instruction disabled. **What it does not support:** broad claims about destructive-action refusal, no-tool behavior, or the complete 24-task suite, because those categories are absent from this tracked artifact. The result also suggests these six payloads are not sufficiently discriminative for the tested model; stronger adversarial cases are needed for a meaningful defense ablation.
 
 ## Project Structure
 
