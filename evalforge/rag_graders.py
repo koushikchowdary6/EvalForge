@@ -34,7 +34,10 @@ def precision_at_k(retrieved_ids, relevant_ids, k=None):
     if not retrieved_ids:
         return 0.0
     relevant_set = set(relevant_ids)
-    hits = sum(1 for doc_id in retrieved_ids if doc_id in relevant_set)
+    # Count each relevant document at most once. Duplicate retrievals still
+    # consume rank slots (and therefore remain in the denominator), but they
+    # must not inflate the number of relevant hits.
+    hits = len(set(retrieved_ids) & relevant_set)
     return hits / len(retrieved_ids)
 
 
@@ -47,11 +50,14 @@ def recall_at_k(retrieved_ids, relevant_ids, k=None):
     """
     if k is not None:
         retrieved_ids = retrieved_ids[:k]
-    if not relevant_ids:
+    relevant_set = set(relevant_ids)
+    if not relevant_set:
         return 1.0
     retrieved_set = set(retrieved_ids)
-    hits = sum(1 for doc_id in relevant_ids if doc_id in retrieved_set)
-    return hits / len(relevant_ids)
+    # Relevance labels identify documents, not occurrences. Deduplicating the
+    # ground-truth set prevents duplicate IDs from distorting recall.
+    hits = len(retrieved_set & relevant_set)
+    return hits / len(relevant_set)
 
 
 def reciprocal_rank(retrieved_ids, relevant_ids):
