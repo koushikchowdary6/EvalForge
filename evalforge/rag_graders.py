@@ -9,6 +9,7 @@ Two families:
 """
 
 import json
+import math
 import os
 from dotenv import load_dotenv
 
@@ -195,7 +196,11 @@ class RAGJudge:
 
         try:
             parsed = json.loads(cleaned)
-            score = float(parsed.get("score", 5)) / 10.0
+            if not isinstance(parsed, dict) or "score" not in parsed:
+                raise ValueError("judge response must contain a score")
+            score = float(parsed["score"]) / 10.0
+            if not math.isfinite(score):
+                raise ValueError("judge score must be finite")
             return {
                 "score": min(1.0, max(0.0, score)),
                 "reason": parsed.get("reason", ""),
