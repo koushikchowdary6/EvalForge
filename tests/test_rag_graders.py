@@ -173,6 +173,27 @@ class TestJudgeParsing:
         assert result["score"] == pytest.approx(1.0)
 
 
+
+
+    @pytest.mark.parametrize("raw", [
+        '{}',
+        '{"reason": "no score"}',
+        '{"score": "not-a-number"}',
+        '{"score": "NaN"}',
+        '{"score": "Infinity"}',
+        '{"score": null}',
+    ])
+    def test_invalid_judge_scores_flag_parse_failure(self, raw):
+        result = RAGJudge._parse_score(raw)
+        assert result["parse_ok"] is False
+        assert result["score"] == pytest.approx(0.5)
+
+    def test_valid_zero_score_is_not_confused_with_missing_score(self):
+        result = RAGJudge._parse_score('{"score": 0, "reason": "unsupported"}')
+        assert result["parse_ok"] is True
+        assert result["score"] == pytest.approx(0.0)
+
+
 class TestPromptConstruction:
     def test_prompt_includes_abstention_instruction(self):
         """Without this instruction, hallucination cannot be measured."""
