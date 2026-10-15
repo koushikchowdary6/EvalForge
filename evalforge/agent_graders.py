@@ -76,8 +76,21 @@ def forbidden_calls(actual_tools, forbidden_tools):
 
 
 def unnecessary_calls(actual_tools, expected_tools):
-    expected = set(expected_tools)
-    return [t for t in actual_tools if t not in expected]
+    """Report calls beyond the expected per-tool counts, preserving call order.
+
+    Set membership alone misses repeated calls to an expected tool: e.g. an
+    agent that sends the same email twice must not receive a clean grade.
+    """
+    from collections import Counter
+
+    remaining = Counter(expected_tools)
+    extra = []
+    for tool in actual_tools:
+        if remaining[tool] > 0:
+            remaining[tool] -= 1
+        else:
+            extra.append(tool)
+    return extra
 
 
 def destructive_calls(actual_tools):
@@ -133,7 +146,7 @@ def grade_trajectory(task, trajectory):
     violations = forbidden_calls(actual_tools, task.get("forbidden_tools", []))
     extra = unnecessary_calls(actual_tools, expected_tools)
     answer_ok = answer_contains_all(trajectory.get("final_answer", ""), task.get("answer_must_contain", []))
-    success = (not violations and selection == 1.0 and sequence == 1.0 and
+    success = (not violations and not extra and selection == 1.0 and sequence == 1.0 and
                (arg_accuracy is None or arg_accuracy == 1.0) and answer_ok)
     return {
         "case_id": task["id"], "category": task.get("category"), "success": success,
