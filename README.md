@@ -56,6 +56,21 @@ echo "OPENAI_API_KEY=your_key_here" >> .env
 python main.py
 ```
 
+## Reproducible embedding evaluation
+
+RAG embeddings are cached by **embedding model and input text**, not by text
+alone. Changing the embedding model therefore forces a fresh embedding
+request instead of silently reusing vectors from an incompatible model.
+Previously generated text-only cache entries are ignored and can be
+regenerated with a configured OpenAI API key. The cache can be persisted in
+either a project subdirectory or the current working directory.
+
+The offline test suite checks that repeated requests with the same model
+reuse cached vectors, while a model change requires a new request. This
+protects the validity of retrieval comparisons across embedding models.
+
+---
+
 ## Evaluation Methodology
 
 EvalForge uses **three independent grading methods** to triangulate response quality:
