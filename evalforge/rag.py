@@ -71,7 +71,9 @@ class EmbeddingClient:
         return {}
 
     def save_cache(self):
-        os.makedirs(os.path.dirname(self.cache_path), exist_ok=True)
+        directory = os.path.dirname(self.cache_path)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
         with open(self.cache_path, "w", encoding="utf-8") as f:
             json.dump(self.cache, f)
 
@@ -83,9 +85,12 @@ class EmbeddingClient:
         must not re-pay for embeddings, otherwise comparing retrieval
         settings costs money proportional to the number of settings.
         """
-        if text in self.cache:
+        # A cache entry must not be reused with a different embedding model.
+        # Older text-only cache keys are intentionally ignored.
+        cache_key = f"{EMBED_MODEL}:{text}"
+        if cache_key in self.cache:
             self.cache_hits += 1
-            return self.cache[text]
+            return self.cache[cache_key]
 
         if not self.client:
             raise RuntimeError(
@@ -95,7 +100,7 @@ class EmbeddingClient:
         response = self.client.embeddings.create(model=EMBED_MODEL, input=text)
         vector = response.data[0].embedding
         self.api_calls += 1
-        self.cache[text] = vector
+        self.cache[cache_key] = vector
         return vector
 
 
