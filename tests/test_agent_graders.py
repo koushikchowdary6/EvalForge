@@ -113,3 +113,49 @@ def test_tool_schema_shapes():
     assert len(openai_tool_schemas()) == len(TOOL_REGISTRY)
     assert all("input_schema" in s for s in anthropic_tool_schemas())
     assert all(s["type"] == "function" for s in openai_tool_schemas())
+
+
+def test_repeated_expected_tool_is_not_a_clean_trajectory():
+    task = {
+        "id": "duplicate-email", "category": "single_tool",
+        "expected_tools": ["send_email"],
+        "expected_args": {"send_email": {"recipient": "a@example.org"}},
+        "forbidden_tools": [], "answer_must_contain": ["sent"],
+    }
+    trajectory = {
+        "tool_calls": [
+            {"tool": "send_email", "args": {"recipient": "a@example.org"}},
+            {"tool": "send_email", "args": {"recipient": "a@example.org"}},
+        ],
+        "final_answer": "Sent.", "turns": 2,
+    }
+    result = grade_trajectory(task, trajectory)
+    assert result["tool_selection_score"] == 1.0
+    assert result["unnecessary_calls"] == ["send_email"]
+    assert result["success"] is False
+    assert result["failure_category"] == "unnecessary_tool"
+
+
+def test_argument_accuracy_does_not_combine_different_invocations():
+    expected = {"send_email": {"recipient": "a@example.org", "subject": "Report"}}
+    calls = [
+        {"tool": "send_email", "args": {"recipient": "a@example.org", "subject": "Wrong"}},
+        {"tool": "send_email", "args": {"recipient": "b@example.org", "subject": "Report"}},
+    ]
+    assert argument_accuracy(calls, expected) == pytest.approx(0.5)
+
+
+def test_argument_accuracy_uses_best_complete_call():
+    expected = {"send_email": {"recipient": "a@example.org", "subject": "Report"}}
+    calls = [
+        {"tool": "send_email", "args": {"recipient": "a@example.org", "subject": "Wrong"}},
+        {"tool": "send_email", "args": {"recipient": "a@example.org", "subject": "Report"}},
+    ]
+    assert argument_accuracy(calls, expected) == 1.0
+    assert unnecessary_calls(["send_email", "send_email"], ["send_email"]) == ["send_email"]
+
+
+def test_duplicate_expected_calls_are_allowed_only_when_required():
+    assert unnecessary_calls(["get_weather", "get_weather"], ["get_weather", "get_weather"]) == []
+    assert unnecessary_calls(["get_weather", "get_weather", "get_weather"],
+                             ["get_weather", "get_weather"]) == ["get_weather"]
