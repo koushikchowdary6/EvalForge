@@ -54,19 +54,28 @@ def tool_sequence_score(actual_tools, expected_tools):
 
 
 def argument_accuracy(tool_calls, expected_args):
-    """Fraction of expected argument values passed correctly."""
+    """Fraction of expected arguments matched by the best *single* call per tool.
+
+    Do not combine correct values across separate invocations. For example,
+    two calls that each get a different argument wrong must not earn 100%.
+    Extra invocations are penalized separately by unnecessary_calls().
+    """
     if not expected_args:
         return None
     total = matched = 0
     for tool_name, expected in expected_args.items():
+        total += len(expected)
         calls = [c for c in tool_calls if c["tool"] == tool_name]
-        for key, expected_value in expected.items():
-            total += 1
-            for call in calls:
-                actual_value = (call.get("args") or {}).get(key)
-                if actual_value is not None and _normalize(actual_value) == _normalize(expected_value):
-                    matched += 1
-                    break
+        best = 0
+        for call in calls:
+            args = call.get("args") or {}
+            correct = sum(
+                key in args and args[key] is not None
+                and _normalize(args[key]) == _normalize(expected_value)
+                for key, expected_value in expected.items()
+            )
+            best = max(best, correct)
+        matched += best
     return matched / total if total else None
 
 
