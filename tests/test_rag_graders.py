@@ -211,3 +211,34 @@ class TestPromptConstruction:
         docs = [{"doc_id": "d1", "title": "T", "text": "B"}]
         prompt = RAGPipeline.build_prompt("What is groundedness?", docs)
         assert "What is groundedness?" in prompt
+
+
+
+def test_embedding_cache_is_model_scoped(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    import evalforge.rag as rag
+
+    client = rag.EmbeddingClient(cache_path=str(tmp_path / "cache.json"))
+    calls = []
+
+    def create(model, input):
+        calls.append((model, input))
+        return SimpleNamespace(data=[SimpleNamespace(embedding=[1.0])])
+
+    client.client = SimpleNamespace(embeddings=SimpleNamespace(create=create))
+    monkeypatch.setattr(rag, "EMBED_MODEL", "model-a")
+    client.embed("sample")
+    client.embed("sample")
+    monkeypatch.setattr(rag, "EMBED_MODEL", "model-b")
+    client.embed("sample")
+    assert calls == [("model-a", "sample"), ("model-b", "sample")]
+
+
+def test_embedding_cache_flat_path(tmp_path, monkeypatch):
+    import evalforge.rag as rag
+
+    monkeypatch.chdir(tmp_path)
+    client = rag.EmbeddingClient(cache_path="cache.json")
+    client.cache["model-a:sample"] = [1.0]
+    client.save_cache()
+    assert rag.EmbeddingClient(cache_path="cache.json").cache == client.cache
