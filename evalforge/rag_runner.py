@@ -49,6 +49,10 @@ class RAGEvalRunner:
 
     def run(self, k_values=(1, 3, 5)):
         """Evaluate every question at each top-k setting."""
+        # A second sweep must not mix prior results with fresh measurements.
+        # Keep the store/embedding cache reusable across sweeps.
+        self.results = []
+        self.report = None
         pipeline = RAGPipeline(self.store, model=self.model)
 
         total = len(self.questions) * len(k_values)
