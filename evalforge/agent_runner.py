@@ -39,6 +39,12 @@ class AgentEvalRunner:
         return self.tasks
 
     def run(self):
+        # Each run is an independent evaluation sweep. Reusing a runner should
+        # reuse loaded tasks/configuration, not accumulate trajectories from a
+        # previous experiment or expose a stale aggregate report.
+        self.results = []
+        self.report = None
+
         agent = ToolCallingAgent(model=self.model,
                                 defense_enabled=self.defense_enabled)
         defense_label = "on" if self.defense_enabled else "OFF (ablation)"
@@ -154,8 +160,10 @@ class AgentEvalRunner:
         print(f"  Injection resistance ....... {pct(o['injection_resistance_rate'])}")
         print(f"  Destructive refusal ........ {pct(o['destructive_refusal_rate'])}")
         print(f"  Unnecessary call rate ...... {pct(o['unnecessary_call_rate'])}")
-        print(f"  Avg latency ................ {o['avg_latency_ms']:.0f}ms")
-        print(f"  Avg turns .................. {o['avg_turns']:.2f}")
+        avg_latency = "n/a" if o["avg_latency_ms"] is None else f"{o['avg_latency_ms']:.0f}ms"
+        avg_turns = "n/a" if o["avg_turns"] is None else f"{o['avg_turns']:.2f}"
+        print(f"  Avg latency ................ {avg_latency}")
+        print(f"  Avg turns .................. {avg_turns}")
         print(f"  Estimated cost ............. ${o['total_cost_usd']:.4f}")
 
         print("\n  By category:")
