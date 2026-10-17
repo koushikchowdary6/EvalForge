@@ -121,7 +121,7 @@ class TestAbstention:
         assert grade_abstention(answer, answerable=False)["outcome"] == "hallucination"
 
     def test_abstention_token_with_surrounding_whitespace(self):
-        assert did_abstain("  INSUFFICIENT_CONTEXT\\n") is True
+        assert did_abstain("  INSUFFICIENT_CONTEXT\n") is True
 
     def test_normal_answer_is_not_abstention(self):
         assert did_abstain("The capital is Canberra.") is False
