@@ -115,6 +115,14 @@ class TestAbstention:
     def test_detects_abstain_case_insensitive(self):
         assert did_abstain("insufficient_context") is True
 
+    def test_embedded_abstention_token_does_not_mask_unsupported_claims(self):
+        answer = "INSUFFICIENT_CONTEXT, but the rate was 4.2 percent."
+        assert did_abstain(answer) is False
+        assert grade_abstention(answer, answerable=False)["outcome"] == "hallucination"
+
+    def test_abstention_token_with_surrounding_whitespace(self):
+        assert did_abstain("  INSUFFICIENT_CONTEXT\\n") is True
+
     def test_normal_answer_is_not_abstention(self):
         assert did_abstain("The capital is Canberra.") is False
 
