@@ -91,7 +91,7 @@ def hit_rate(retrieved_ids, relevant_ids):
 
 def did_abstain(answer):
     """True if the model declined to answer for lack of context."""
-    return ABSTAIN_TOKEN.lower() in (answer or "").lower()
+    return isinstance(answer, str) and answer.strip().casefold() == ABSTAIN_TOKEN.casefold()
 
 
 def grade_abstention(answer, answerable):
