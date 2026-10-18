@@ -74,21 +74,32 @@ class RAGEvalRunner:
                     "hit_rate": hit_rate(retrieved_ids, relevant_ids),
                 }
 
-                abstention = grade_abstention(outcome["answer"], answerable)
+                # A transport/provider failure is not a model answer. Keep its
+                # retrieval measurements, but exclude it from answer-quality rates.
+                generation_error = outcome.get("error")
+                if generation_error:
+                    abstention = {"outcome": "generation_error", "passed": None,
+                                  "abstained": None, "reason": "generation failed"}
+                else:
+                    abstention = grade_abstention(outcome["answer"], answerable)
 
                 # Only judge answers the model actually attempted. Grading a
                 # correct abstention for correctness would penalise the right
                 # behaviour, so those are scored by abstention alone.
-                if answerable and not abstention["abstained"]:
+                if not generation_error and answerable and not abstention["abstained"]:
                     correctness = self.judge.grade_correctness(
                         case["question"], case["expected_answer"], outcome["answer"])
                     groundedness = self.judge.grade_groundedness(
                         outcome["answer"], outcome["retrieved"])
                 else:
                     correctness = {"metric": "correctness", "score": None,
-                                   "passed": None, "reason": "skipped (abstention case)"}
+                                   "passed": None, "reason": (
+                                       "skipped (generation failed)" if generation_error
+                                       else "skipped (abstention case)")}
                     groundedness = {"metric": "groundedness", "score": None,
-                                    "passed": None, "reason": "skipped (abstention case)"}
+                                    "passed": None, "reason": (
+                                        "skipped (generation failed)" if generation_error
+                                        else "skipped (abstention case)")}
 
                 self.results.append({
                     "case_id": case["id"],
@@ -98,6 +109,7 @@ class RAGEvalRunner:
                     "answerable": answerable,
                     "expected": case["expected_answer"],
                     "answer": outcome["answer"],
+                    "generation_error": generation_error,
                     "retrieved_ids": retrieved_ids,
                     "relevant_ids": relevant_ids,
                     "retrieval": retrieval_scores,
@@ -112,7 +124,7 @@ class RAGEvalRunner:
                     "timestamp": datetime.now().isoformat(),
                 })
 
-                flag = "OK " if abstention["passed"] else "FAIL"
+                flag = "ERR" if generation_error else ("OK " if abstention["passed"] else "FAIL")
                 print(f"  {flag} {case['id']:9} | hit={retrieval_scores['hit_rate']:.0f} "
                       f"| {outcome['total_ms']:.0f}ms")
 
@@ -141,8 +153,10 @@ class RAGEvalRunner:
         }
 
         for k, rows in sorted(by_k.items()):
-            answerable = [r for r in rows if r["answerable"]]
-            unanswerable = [r for r in rows if not r["answerable"]]
+            successful = [r for r in rows if not r.get("generation_error")]
+            generation_errors = len(rows) - len(successful)
+            answerable = [r for r in successful if r["answerable"]]
+            unanswerable = [r for r in successful if not r["answerable"]]
             hallucinations = [r for r in unanswerable
                               if r["abstention"]["outcome"] == "hallucination"]
             over_abstentions = [r for r in answerable
@@ -156,6 +170,9 @@ class RAGEvalRunner:
                     "hit_rate": self._mean([r["retrieval"]["hit_rate"] for r in rows]),
                 },
                 "generation": {
+                    "successful": len(successful),
+                    "errors": generation_errors,
+                    "error_rate": generation_errors / len(rows) if rows else None,
                     "correctness": self._mean([r["correctness"]["score"] for r in rows]),
                     "groundedness": self._mean([r["groundedness"]["score"] for r in rows]),
                 },
