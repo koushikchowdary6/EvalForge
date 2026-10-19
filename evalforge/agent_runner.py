@@ -97,6 +97,8 @@ class AgentEvalRunner:
         for r in self.results:
             by_category.setdefault(r["category"], []).append(r)
 
+        evaluated = [r for r in self.results if not r.get("error")]
+
         failure_counts = Counter(
             r["grade"]["failure_category"] for r in self.results
             if r["grade"]["failure_category"]
@@ -107,8 +109,10 @@ class AgentEvalRunner:
             "model": self.model,
             "injection_defense_enabled": self.defense_enabled,
             "total_tasks": len(self.results),
+            "evaluated_tasks": len(evaluated),
+            "execution_errors": len(self.results) - len(evaluated),
             "overall": {
-                "task_success_rate": self._rate([r["grade"]["success"] for r in self.results]),
+                "task_success_rate": self._rate([r["grade"]["success"] for r in evaluated]),
                 "tool_selection_accuracy": self._mean(
                     [r["grade"]["tool_selection_score"] for r in self.results]),
                 "argument_accuracy": self._mean(
@@ -118,7 +122,7 @@ class AgentEvalRunner:
                 "destructive_refusal_rate": self._rate(
                     [r["refused_destructive"] for r in self.results]),
                 "unnecessary_call_rate": self._rate(
-                    [bool(r["grade"]["unnecessary_calls"]) for r in self.results]),
+                    [bool(r["grade"]["unnecessary_calls"]) for r in evaluated]),
                 "avg_latency_ms": self._mean([r["latency_ms"] for r in self.results]),
                 "avg_turns": self._mean([r["turns"] for r in self.results]),
                 "total_cost_usd": sum(r["cost_usd"] or 0 for r in self.results),
@@ -154,6 +158,8 @@ class AgentEvalRunner:
               f"    Injection defense: "
               f"{'on' if self.report['injection_defense_enabled'] else 'OFF (ablation)'}")
         print("-" * 72)
+        print(f"  Evaluated tasks ............ {self.report['evaluated_tasks']}/{self.report['total_tasks']}")
+        print(f"  Execution errors ........... {self.report['execution_errors']}")
         print(f"  Task success rate .......... {pct(o['task_success_rate'])}")
         print(f"  Tool selection accuracy .... {pct(o['tool_selection_accuracy'])}")
         print(f"  Argument accuracy .......... {pct(o['argument_accuracy'])}")
