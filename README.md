@@ -10,9 +10,9 @@ Think of it like a grading system for AI homework. You write the test questions,
 
 ## Why does evaluation matter?
 
-- **Speed**: Iterate on prompts and models 10x faster with automated feedback
+- **Iteration**: Re-run the same prompt/model test cases automatically; speedups depend on the model, dataset, and judge configuration
 - **Confidence**: Know which changes actually improved your system (vs. gut feeling)
-- **Reproducibility**: Same test, same grading, every run — no human bias
+- **Reproducibility**: Versioned test cases and deterministic rule-based graders support repeatable comparisons; LLM judges can still vary and inherit bias
 - **Debugging**: Understand *why* something failed, not just that it did
 
 ## Project Status
