@@ -49,6 +49,9 @@ class RealModelClient:
         Returns:
             dict with response and metadata
         """
+        if model_name not in ("claude", "gpt"):
+            raise ValueError(f"Unsupported model: {model_name!r}. Choose 'claude' or 'gpt'.")
+
         start_time = time.time()
 
         try:
@@ -129,6 +132,7 @@ class EvalForgeRunner:
         self.output_dir = output_dir
         self.dataset = []
         self.results = []
+        self.report = None
         self.model_client = RealModelClient()
 
         os.makedirs(output_dir, exist_ok=True)
@@ -149,6 +153,12 @@ class EvalForgeRunner:
         """
         if models is None:
             models = ["claude", "gpt"]
+        if not models or any(model not in ("claude", "gpt") for model in models):
+            raise ValueError("models must be a non-empty list containing only 'claude' or 'gpt'")
+
+        # Every sweep is independent; previous scores and reports must not leak.
+        self.results = []
+        self.report = None
 
         if not self.dataset:
             self.load_dataset()
@@ -208,8 +218,9 @@ class EvalForgeRunner:
     def generate_report(self):
         """Generate evaluation report with statistics."""
         if not self.results:
+            self.report = None
             print("No results to report. Run evaluation first.")
-            return
+            return None
 
         # Group by model
         by_model = {}
@@ -282,7 +293,7 @@ class EvalForgeRunner:
         print(f"Saved detailed results to {results_file}")
 
         # Save report
-        if hasattr(self, 'report'):
+        if self.report is not None:
             report_file = os.path.join(self.output_dir, "report.json")
             with open(report_file, 'w') as f:
                 json.dump(self.report, f, indent=2)
@@ -290,8 +301,8 @@ class EvalForgeRunner:
 
     def print_report(self):
         """Print a human-readable report."""
-        if not hasattr(self, 'report'):
-            self.generate_report()
+        if self.report is None and self.generate_report() is None:
+            return
 
         print("\n" + "="*70)
         print("EVALFORGE EVALUATION REPORT")
