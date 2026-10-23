@@ -49,6 +49,9 @@ class RealModelClient:
         Returns:
             dict with response and metadata
         """
+        if model_name not in ("claude", "gpt"):
+            raise ValueError(f"Unsupported model: {model_name!r}. Choose 'claude' or 'gpt'.")
+
         start_time = time.time()
 
         try:
@@ -129,6 +132,7 @@ class EvalForgeRunner:
         self.output_dir = output_dir
         self.dataset = []
         self.results = []
+        self.report = None
         self.model_client = RealModelClient()
 
         os.makedirs(output_dir, exist_ok=True)
@@ -149,6 +153,12 @@ class EvalForgeRunner:
         """
         if models is None:
             models = ["claude", "gpt"]
+        if not models or any(model not in ("claude", "gpt") for model in models):
+            raise ValueError("models must be a non-empty list containing only 'claude' or 'gpt'")
+
+        # Every sweep is independent; previous scores and reports must not leak.
+        self.results = []
+        self.report = None
 
         if not self.dataset:
             self.load_dataset()
@@ -170,6 +180,15 @@ class EvalForgeRunner:
                 # Query the real model
                 print(f"  Querying {model}...", end="", flush=True)
                 result = self.model_client.query(model, question)
+                if result.get("error") is not None:
+                    # Never grade provider failures as if they were model answers.
+                    # Stop the sweep rather than publish misleading benchmark rates.
+                    self.results = []
+                    self.report = None
+                    raise RuntimeError(
+                        f"Model query failed for case {case_id!r} using {model!r}; "
+                        "evaluation aborted before grading"
+                    )
                 actual = result["response"]
                 latency = result.get("latency_ms", 0)
                 print(f" ✓ ({latency:.0f}ms)")
@@ -208,8 +227,9 @@ class EvalForgeRunner:
     def generate_report(self):
         """Generate evaluation report with statistics."""
         if not self.results:
+            self.report = None
             print("No results to report. Run evaluation first.")
-            return
+            return None
 
         # Group by model
         by_model = {}
@@ -281,17 +301,19 @@ class EvalForgeRunner:
             json.dump(self.results, f, indent=2)
         print(f"Saved detailed results to {results_file}")
 
-        # Save report
-        if hasattr(self, 'report'):
-            report_file = os.path.join(self.output_dir, "report.json")
+        # Do not leave a previous sweep's report in place after an aborted run.
+        report_file = os.path.join(self.output_dir, "report.json")
+        if self.report is not None:
             with open(report_file, 'w') as f:
                 json.dump(self.report, f, indent=2)
             print(f"Saved report to {report_file}")
+        elif os.path.exists(report_file):
+            os.remove(report_file)
 
     def print_report(self):
         """Print a human-readable report."""
-        if not hasattr(self, 'report'):
-            self.generate_report()
+        if self.report is None and self.generate_report() is None:
+            return
 
         print("\n" + "="*70)
         print("EVALFORGE EVALUATION REPORT")
