@@ -132,11 +132,18 @@ class AgentEvalRunner:
         }
 
         for category, rows in sorted(by_category.items()):
+            # Match the overall success-rate denominator: transport/provider
+            # errors are not observed agent behavior. A category with only
+            # execution errors must report n/a rather than a misleading 0%.
+            valid_rows = [r for r in rows if not r.get("error")]
             report["by_category"][category] = {
                 "tasks": len(rows),
-                "success_rate": self._rate([r["grade"]["success"] for r in rows]),
+                "evaluated_tasks": len(valid_rows),
+                "execution_errors": len(rows) - len(valid_rows),
+                "success_rate": self._rate(
+                    [r["grade"]["success"] for r in valid_rows]),
                 "tool_selection_accuracy": self._mean(
-                    [r["grade"]["tool_selection_score"] for r in rows]),
+                    [r["grade"]["tool_selection_score"] for r in valid_rows]),
                 "avg_latency_ms": self._mean([r["latency_ms"] for r in rows]),
             }
 
