@@ -83,3 +83,17 @@ def test_successful_model_response_is_still_graded(tmp_path, monkeypatch):
     assert len(results) == 1
     assert grader.calls == 3
     assert runner.generate_report()["by_model"]["gpt"]["total_cases"] == 1
+
+
+def test_save_results_removes_stale_report_after_provider_failure(tmp_path, monkeypatch):
+    runner, _ = _runner(
+        tmp_path, monkeypatch,
+        [{"model": "gpt", "response": "[API Error]", "error": "timeout", "latency_ms": 1}],
+    )
+    report_path = tmp_path / "out" / "report.json"
+    report_path.write_text('{"obsolete": true}', encoding="utf-8")
+    with pytest.raises(RuntimeError, match="aborted before grading"):
+        runner.run_evaluation(models=["gpt"])
+    runner.save_results()
+    assert not report_path.exists()
+    assert json.loads((tmp_path / "out" / "results.json").read_text()) == []
