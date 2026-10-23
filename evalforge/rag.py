@@ -125,12 +125,31 @@ class VectorStore:
 
     def load_corpus(self, corpus_path):
         with open(corpus_path, "r", encoding="utf-8") as f:
-            self.documents = json.load(f)
+            documents = json.load(f)
+        if not isinstance(documents, list):
+            raise ValueError("RAG corpus must be a list of documents")
+        seen_ids = set()
+        for index, doc in enumerate(documents):
+            if not isinstance(doc, dict):
+                raise ValueError(f"Document #{index} must be an object")
+            doc_id = doc.get("doc_id")
+            if not isinstance(doc_id, str) or not doc_id.strip():
+                raise ValueError(f"Document #{index} needs a non-empty string doc_id")
+            if doc_id in seen_ids:
+                raise ValueError(f"Duplicate RAG doc_id: {doc_id}")
+            seen_ids.add(doc_id)
+            for field in ("title", "text"):
+                if not isinstance(doc.get(field), str):
+                    raise ValueError(f"Document {doc_id}: {field} must be a string")
+        # Never allow vectors from a previous corpus to be queried as current.
+        self.documents = documents
+        self.vectors = {}
         print(f"Loaded {len(self.documents)} documents from {corpus_path}")
         return self.documents
 
     def build_index(self):
         """Embed every document. Cached embeddings make repeat runs free."""
+        self.vectors = {}
         print(f"Embedding {len(self.documents)} documents...")
         for doc in self.documents:
             content = f"{doc['title']}\n{doc['text']}"
@@ -148,6 +167,8 @@ class VectorStore:
         Returns a list of dicts with doc_id, title, text, and score,
         ordered by descending cosine similarity.
         """
+        if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k < 1:
+            raise ValueError("top_k must be a positive integer")
         if not self.vectors:
             raise RuntimeError("Index is empty - call build_index() first.")
 
