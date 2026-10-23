@@ -116,3 +116,26 @@ def test_generation_errors_do_not_count_as_hallucinations(monkeypatch):
     assert report["hallucination"]["hallucinations"] == 0
     assert report["hallucination"]["hallucination_rate"] == 0.0
     assert report["retrieval"]["hit_rate"] == 1.0
+
+
+def test_save_removes_stale_report_when_new_sweep_has_no_aggregate(tmp_path):
+    """Detailed results may be fresh while a prior summary is obsolete."""
+    import json
+
+    runner = rag_runner.RAGEvalRunner.__new__(rag_runner.RAGEvalRunner)
+    runner.output_dir = tmp_path
+    runner.results = [{"case_id": "first", "top_k": 1}]
+    runner.report = {"total_evaluations": 1}
+    runner.save()
+
+    report_path = tmp_path / "rag_report.json"
+    assert json.loads(report_path.read_text(encoding="utf-8"))["total_evaluations"] == 1
+
+    # Simulate a second sweep that has not generated an aggregate report yet.
+    runner.results = [{"case_id": "second", "top_k": 5}]
+    runner.report = None
+    runner.save()
+
+    assert not report_path.exists()
+    saved = json.loads((tmp_path / "rag_results.json").read_text(encoding="utf-8"))
+    assert saved == [{"case_id": "second", "top_k": 5}]

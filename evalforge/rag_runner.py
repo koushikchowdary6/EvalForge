@@ -239,8 +239,12 @@ class RAGEvalRunner:
             json.dump(self.results, f, indent=2)
         print(f"Saved detailed results to {detail_path}")
 
-        if self.report:
-            report_path = os.path.join(self.output_dir, "rag_report.json")
+        report_path = os.path.join(self.output_dir, "rag_report.json")
+        if self.report is not None:
             with open(report_path, "w", encoding="utf-8") as f:
                 json.dump(self.report, f, indent=2)
             print(f"Saved report to {report_path}")
+        elif os.path.exists(report_path):
+            # A new sweep without aggregation must not expose a previous
+            # sweep's report as if it belonged to the current results.
+            os.remove(report_path)
