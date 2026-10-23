@@ -10,6 +10,13 @@ from evalforge.agent_graders import answer_contains_all, grade_trajectory
     "The result is 120.",
     "The result is 12.5.",
     "The result is 1,200.",
+    "The result is -12.",
+    "The result is −12.",
+    "The result is 1e12.",
+    "The result is 12e3.",
+    "The result is 12E+3.",
+    "The result is 0x12.",
+    "The result is v12.",
 ])
 def test_required_number_is_not_a_substring_of_another_value(response):
     assert not answer_contains_all(response, ["12"])
@@ -18,6 +25,8 @@ def test_required_number_is_not_a_substring_of_another_value(response):
 @pytest.mark.parametrize("response", [
     "The result is 12.",
     "The temperature is 12C.",
+    "The balance is +12.",
+    "The rate is 12%.",
     "The total is 1,081.",
 ])
 def test_numeric_answer_preserves_legitimate_formats(response):
