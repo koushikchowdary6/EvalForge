@@ -173,6 +173,12 @@ class RAGEvalRunner:
                     "successful": len(successful),
                     "errors": generation_errors,
                     "error_rate": generation_errors / len(rows) if rows else None,
+                    # Judge outages and malformed responses are not low-quality
+                    # model answers. Track coverage separately from score.
+                    "correctness_judged": sum(r["correctness"]["score"] is not None for r in rows),
+                    "groundedness_judged": sum(r["groundedness"]["score"] is not None for r in rows),
+                    "correctness_judge_errors": sum(r["correctness"].get("parse_ok") is False for r in rows),
+                    "groundedness_judge_errors": sum(r["groundedness"].get("parse_ok") is False for r in rows),
                     "correctness": self._mean([r["correctness"]["score"] for r in rows]),
                     "groundedness": self._mean([r["groundedness"]["score"] for r in rows]),
                 },

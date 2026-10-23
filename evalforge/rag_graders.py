@@ -182,8 +182,8 @@ class RAGJudge:
 
         Tolerates markdown code fences, which judges emit often enough that
         naive json.loads fails on otherwise-valid responses. A parse failure
-        returns a neutral 0.5 and surfaces the raw text so the failure is
-        visible in results rather than silently scored.
+        returns a neutral placeholder with parse_ok=False so callers can exclude
+        invalid responses from aggregate quality metrics.
         """
         cleaned = raw_text.strip()
         if cleaned.startswith("```"):
@@ -198,11 +198,13 @@ class RAGJudge:
             parsed = json.loads(cleaned)
             if not isinstance(parsed, dict) or "score" not in parsed:
                 raise ValueError("judge response must contain a score")
+            if isinstance(parsed["score"], bool):
+                raise ValueError("judge score must be numeric, not boolean")
             score = float(parsed["score"]) / 10.0
-            if not math.isfinite(score):
-                raise ValueError("judge score must be finite")
+            if not math.isfinite(score) or not 0.0 <= score <= 1.0:
+                raise ValueError("judge score must be finite and between 0 and 10")
             return {
-                "score": min(1.0, max(0.0, score)),
+                "score": score,
                 "reason": parsed.get("reason", ""),
                 "parse_ok": True,
             }
@@ -226,13 +228,13 @@ class RAGJudge:
             result = self._parse_score(self._call(prompt))
             return {
                 "metric": "correctness",
-                "score": result["score"],
-                "passed": result["score"] >= 0.6,
+                "score": result["score"] if result["parse_ok"] else None,
+                "passed": result["score"] >= 0.6 if result["parse_ok"] else None,
                 "reason": result["reason"],
                 "parse_ok": result["parse_ok"],
             }
         except Exception as e:
-            return {"metric": "correctness", "score": 0.0, "passed": False,
+            return {"metric": "correctness", "score": None, "passed": None,
                     "reason": f"judge error: {str(e)[:80]}", "parse_ok": False}
 
     def grade_groundedness(self, answer, retrieved_docs):
@@ -261,11 +263,11 @@ class RAGJudge:
             result = self._parse_score(self._call(prompt))
             return {
                 "metric": "groundedness",
-                "score": result["score"],
-                "passed": result["score"] >= 0.6,
+                "score": result["score"] if result["parse_ok"] else None,
+                "passed": result["score"] >= 0.6 if result["parse_ok"] else None,
                 "reason": result["reason"],
                 "parse_ok": result["parse_ok"],
             }
         except Exception as e:
-            return {"metric": "groundedness", "score": 0.0, "passed": False,
+            return {"metric": "groundedness", "score": None, "passed": None,
                     "reason": f"judge error: {str(e)[:80]}", "parse_ok": False}

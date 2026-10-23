@@ -176,9 +176,11 @@ class TestJudgeParsing:
         assert result["score"] == pytest.approx(0.5)
         assert result["parse_ok"] is False
 
-    def test_clamps_out_of_range_score(self):
-        result = RAGJudge._parse_score('{"score": 50}')
-        assert result["score"] == pytest.approx(1.0)
+    @pytest.mark.parametrize("raw", ['{"score": 50}', '{"score": -1}', '{"score": true}'])
+    def test_out_of_range_or_boolean_scores_are_rejected(self, raw):
+        result = RAGJudge._parse_score(raw)
+        assert result["parse_ok"] is False
+        assert result["score"] == pytest.approx(0.5)
 
 
 
@@ -250,3 +252,68 @@ def test_embedding_cache_flat_path(tmp_path, monkeypatch):
     client.cache["model-a:sample"] = [1.0]
     client.save_cache()
     assert rag.EmbeddingClient(cache_path="cache.json").cache == client.cache
+
+
+
+def test_judge_parse_failures_are_not_treated_as_answer_quality(monkeypatch):
+    """An unavailable/malformed judge must not count as a failed RAG answer."""
+    judge = RAGJudge.__new__(RAGJudge)
+    monkeypatch.setattr(judge, "_call", lambda prompt: "not valid JSON")
+    correctness = judge.grade_correctness("Question", "expected", "actual")
+    groundedness = judge.grade_groundedness("actual", [{"doc_id": "d", "text": "context"}])
+    for result in (correctness, groundedness):
+        assert result["parse_ok"] is False
+        assert result["score"] is None
+        assert result["passed"] is None
+
+
+def test_judge_api_failure_is_not_treated_as_answer_quality(monkeypatch):
+    judge = RAGJudge.__new__(RAGJudge)
+
+    def unavailable(prompt):
+        raise RuntimeError("judge API unavailable")
+
+    monkeypatch.setattr(judge, "_call", unavailable)
+    result = judge.grade_correctness("Question", "expected", "actual")
+    assert result["parse_ok"] is False
+    assert result["score"] is None
+    assert result["passed"] is None
+
+
+def test_rag_report_excludes_judge_failures_and_tracks_coverage():
+    from types import SimpleNamespace
+    from evalforge.rag_runner import RAGEvalRunner
+
+    runner = RAGEvalRunner.__new__(RAGEvalRunner)
+    runner.model = "offline-test"
+    runner.questions = [{"id": "q"}]
+    runner.embedder = SimpleNamespace(api_calls=0, cache_hits=0)
+
+    def row(score, parse_ok):
+        return {
+            "top_k": 1,
+            "generation_error": None,
+            "answerable": True,
+            "retrieval": {
+                "precision_at_k": 1.0, "recall_at_k": 1.0,
+                "reciprocal_rank": 1.0, "hit_rate": 1.0,
+            },
+            "abstention": {"outcome": "correct_answer"},
+            "correctness": {"score": score, "parse_ok": parse_ok},
+            "groundedness": {"score": score, "parse_ok": parse_ok},
+            "latency": {"retrieval_ms": 1, "generation_ms": 1, "total_ms": 2},
+        }
+
+    runner.results = [row(None, False), row(0.8, True)]
+    generation = runner.generate_report()["by_top_k"]["1"]["generation"]
+    assert generation["correctness"] == pytest.approx(0.8)
+    assert generation["groundedness"] == pytest.approx(0.8)
+    assert generation["correctness_judged"] == 1
+    assert generation["groundedness_judged"] == 1
+    assert generation["correctness_judge_errors"] == 1
+    assert generation["groundedness_judge_errors"] == 1
+
+    runner.results = [row(None, False)]
+    generation = runner.generate_report()["by_top_k"]["1"]["generation"]
+    assert generation["correctness"] is None
+    assert generation["groundedness"] is None
