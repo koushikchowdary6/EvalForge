@@ -301,12 +301,14 @@ class EvalForgeRunner:
             json.dump(self.results, f, indent=2)
         print(f"Saved detailed results to {results_file}")
 
-        # Save report
+        # Do not leave a previous sweep's report in place after an aborted run.
+        report_file = os.path.join(self.output_dir, "report.json")
         if self.report is not None:
-            report_file = os.path.join(self.output_dir, "report.json")
             with open(report_file, 'w') as f:
                 json.dump(self.report, f, indent=2)
             print(f"Saved report to {report_file}")
+        elif os.path.exists(report_file):
+            os.remove(report_file)
 
     def print_report(self):
         """Print a human-readable report."""
