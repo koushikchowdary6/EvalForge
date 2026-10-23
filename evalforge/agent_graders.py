@@ -17,9 +17,18 @@ PRICING = {
 }
 
 
-def _normalize(value):
-    """Normalize an argument value for comparison: lowercase, no whitespace."""
-    return "".join(str(value).split()).lower()
+def _arguments_equal(key, actual, expected):
+    """Compare tool arguments without conflating security-sensitive identifiers.
+
+    User IDs, recipients, file paths and other strings are exact values:
+    changing their case or removing spaces can change the target of an action.
+    Only calculator expressions tolerate insignificant whitespace.
+    """
+    if type(actual) is not type(expected):
+        return False
+    if key == "expression" and isinstance(actual, str):
+        return "".join(actual.split()) == "".join(expected.split())
+    return actual == expected
 
 
 def tool_selection_score(actual_tools, expected_tools):
@@ -71,7 +80,7 @@ def argument_accuracy(tool_calls, expected_args):
             args = call.get("args") or {}
             correct = sum(
                 key in args and args[key] is not None
-                and _normalize(args[key]) == _normalize(expected_value)
+                and _arguments_equal(key, args[key], expected_value)
                 for key, expected_value in expected.items()
             )
             best = max(best, correct)
