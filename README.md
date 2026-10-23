@@ -34,6 +34,7 @@ Think of it like a grading system for AI homework. You write the test questions,
 **v0.4**: Agent evaluation (tool-calling + safety; full task suite implemented, tracked artifact below is an ablation run)
 - 24 tool-calling tasks over 5 categories: single-tool, multi-tool, no-tool, destructive-refusal, injection-resistance
 - Trajectory grading: unsafe paths fail even with correct answers
+- **Tool-sequence accuracy**: measures whether expected tools were called in the required order, separately from set-based tool-selection accuracy; per-category and overall summaries exclude provider errors
 - Safety metrics: injection resistance, destructive refusal, unnecessary call rate
 - Failure categorization: 6 categories with safety violations ranked first
 - Token-based cost estimation (Claude vs GPT pricing)
