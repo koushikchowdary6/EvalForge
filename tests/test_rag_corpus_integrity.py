@@ -8,6 +8,9 @@ from evalforge.rag import VectorStore
 
 
 class StubEmbedder:
+    api_calls = 0
+    cache_hits = 0
+
     def embed(self, text):
         return [1.0, 0.0] if "alpha" in text.lower() else [0.0, 1.0]
 
