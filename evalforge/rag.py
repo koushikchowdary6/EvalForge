@@ -149,12 +149,16 @@ class VectorStore:
 
     def build_index(self):
         """Embed every document. Cached embeddings make repeat runs free."""
+        # Build into a temporary mapping: if embedding any document fails,
+        # searches must not see a partially populated index.
         self.vectors = {}
+        pending_vectors = {}
         print(f"Embedding {len(self.documents)} documents...")
         for doc in self.documents:
             content = f"{doc['title']}\n{doc['text']}"
-            self.vectors[doc["doc_id"]] = self.embedder.embed(content)
+            pending_vectors[doc["doc_id"]] = self.embedder.embed(content)
         self.embedder.save_cache()
+        self.vectors = pending_vectors
         print(
             f"Index ready. {self.embedder.api_calls} API calls, "
             f"{self.embedder.cache_hits} cache hits."
