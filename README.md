@@ -72,6 +72,20 @@ protects the validity of retrieval comparisons across embedding models.
 
 ---
 
+## RAG prompt-injection trust boundaries
+
+Retrieved documents and generated answers can contain adversarial text. The
+RAG generator now sends explicit untrusted-context rules in the **system**
+message for both Claude and GPT, rather than relying only on instructions
+embedded in the same user prompt as the retrieved content. The LLM judge
+likewise receives a higher-priority instruction to treat documents and model
+answers as evidence, not grading directives. API-free regression tests verify
+that these boundaries are present in both providers' request payloads.
+
+These controls are **defense in depth, not proof of prompt-injection immunity**.
+The project does not claim measured attack resistance without an adversarial
+benchmark and actual model-run results.
+
 ## Evaluation Methodology
 
 EvalForge uses **three independent grading methods** to triangulate response quality:
