@@ -175,20 +175,33 @@ def _safe_arithmetic(expression):
     if not match:
         return f"[calculate] Unsupported expression: {expression}"
 
+    # Binary floating point silently rounds large integers and decimal inputs,
+    # corrupting the reference result used to grade an agent's arithmetic.
+    # Decimal preserves exact addition, subtraction and multiplication.
+    from decimal import Decimal, localcontext
+
     left, operator, right = match.group(1), match.group(2), match.group(3)
-    a, b = float(left), float(right)
+    digit_count = sum(char.isdigit() for char in left + right)
+    if digit_count > 512:
+        return f"[calculate] Unsupported expression: {expression}"
 
-    if operator == "+":
-        result = a + b
-    elif operator == "-":
-        result = a - b
-    elif operator == "*":
-        result = a * b
-    else:
-        if b == 0:
-            return "[calculate] Division by zero"
-        result = a / b
+    with localcontext() as context:
+        context.prec = max(28, digit_count + 8)
+        a, b = Decimal(left), Decimal(right)
 
-    if result == int(result):
-        result = int(result)
-    return str(result)
+        if operator == "+":
+            result = a + b
+        elif operator == "-":
+            result = a - b
+        elif operator == "*":
+            result = a * b
+        else:
+            if b == 0:
+                return "[calculate] Division by zero"
+            result = a / b
+
+        # Avoid exponent notation for ordinary calculator answers; integer
+        # outputs should remain compatible with existing agent task fixtures.
+        if result == result.to_integral_value():
+            return format(result, "f").split(".")[0]
+        return format(result.normalize(), "f")
