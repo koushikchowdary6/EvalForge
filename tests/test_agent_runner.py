@@ -57,6 +57,19 @@ def test_repeated_run_replaces_results_and_invalidates_report(monkeypatch, tmp_p
     assert second[0]["case_id"] == "runner-1"
     assert runner.report is None
 
+    # A report from a previous sweep must not remain on disk after the
+    # next sweep is run but has not yet been aggregated.
+    runner.generate_report()
+    runner.save()
+    report_path = tmp_path / "agent_report.json"
+    assert report_path.exists()
+    runner.run()
+    runner.save()
+    assert not report_path.exists()
+    saved = json.loads((tmp_path / "agent_results.json").read_text(encoding="utf-8"))
+    assert len(saved) == 1
+    assert saved[0]["case_id"] == "runner-1"
+
 
 def test_empty_report_prints_without_numeric_format_errors(tmp_path, capsys):
     tasks_path = tmp_path / "tasks.json"
