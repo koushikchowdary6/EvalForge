@@ -114,9 +114,11 @@ class AgentEvalRunner:
             "overall": {
                 "task_success_rate": self._rate([r["grade"]["success"] for r in evaluated]),
                 "tool_selection_accuracy": self._mean(
-                    [r["grade"]["tool_selection_score"] for r in self.results]),
+                    [r["grade"]["tool_selection_score"] for r in evaluated]),
+                "tool_sequence_accuracy": self._mean(
+                    [r["grade"].get("tool_sequence_score") for r in evaluated]),
                 "argument_accuracy": self._mean(
-                    [r["grade"]["argument_accuracy"] for r in self.results]),
+                    [r["grade"]["argument_accuracy"] for r in evaluated]),
                 "injection_resistance_rate": self._rate(
                     [r["injection_resisted"] for r in self.results]),
                 "destructive_refusal_rate": self._rate(
@@ -144,6 +146,8 @@ class AgentEvalRunner:
                     [r["grade"]["success"] for r in valid_rows]),
                 "tool_selection_accuracy": self._mean(
                     [r["grade"]["tool_selection_score"] for r in valid_rows]),
+                "tool_sequence_accuracy": self._mean(
+                    [r["grade"].get("tool_sequence_score") for r in valid_rows]),
                 "avg_latency_ms": self._mean([r["latency_ms"] for r in rows]),
             }
 
@@ -169,6 +173,7 @@ class AgentEvalRunner:
         print(f"  Execution errors ........... {self.report['execution_errors']}")
         print(f"  Task success rate .......... {pct(o['task_success_rate'])}")
         print(f"  Tool selection accuracy .... {pct(o['tool_selection_accuracy'])}")
+        print(f"  Tool sequence accuracy ..... {pct(o['tool_sequence_accuracy'])}")
         print(f"  Argument accuracy .......... {pct(o['argument_accuracy'])}")
         print(f"  Injection resistance ....... {pct(o['injection_resistance_rate'])}")
         print(f"  Destructive refusal ........ {pct(o['destructive_refusal_rate'])}")
@@ -180,11 +185,12 @@ class AgentEvalRunner:
         print(f"  Estimated cost ............. ${o['total_cost_usd']:.4f}")
 
         print("\n  By category:")
-        print(f"    {'category':24}{'tasks':>7}{'success':>10}{'tool_acc':>10}")
+        print(f"    {'category':24}{'tasks':>7}{'success':>10}{'tool_acc':>10}{'seq_acc':>10}")
         for category, stats in self.report["by_category"].items():
             print(f"    {category:24}{stats['tasks']:>7}"
                   f"{pct(stats['success_rate']):>10}"
-                  f"{pct(stats['tool_selection_accuracy']):>10}")
+                  f"{pct(stats['tool_selection_accuracy']):>10}"
+                  f"{pct(stats['tool_sequence_accuracy']):>10}")
 
         if self.report["failure_categories"]:
             print("\n  Failure breakdown:")
