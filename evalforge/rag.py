@@ -14,6 +14,7 @@ approximate-nearest-neighbour scaling, which matters at ~100k+ vectors.
 import json
 import math
 import os
+import tempfile
 import time
 from dotenv import load_dotenv
 
@@ -96,7 +97,9 @@ class EmbeddingClient:
         if os.path.exists(self.cache_path):
             try:
                 with open(self.cache_path, "r", encoding="utf-8") as f:
-                    return json.load(f)
+                    loaded = json.load(f)
+                # A valid JSON array is not a usable key/value embedding cache.
+                return loaded if isinstance(loaded, dict) else {}
             except (json.JSONDecodeError, OSError):
                 return {}
         return {}
@@ -105,8 +108,20 @@ class EmbeddingClient:
         directory = os.path.dirname(self.cache_path)
         if directory:
             os.makedirs(directory, exist_ok=True)
-        with open(self.cache_path, "w", encoding="utf-8") as f:
-            json.dump(self.cache, f)
+        # A process crash during a direct write can truncate the only cache.
+        # Stage in the same directory and atomically replace on success.
+        fd, temporary_path = tempfile.mkstemp(
+            prefix=".embedding-cache-", suffix=".tmp", dir=directory or "."
+        )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(self.cache, f, allow_nan=False)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(temporary_path, self.cache_path)
+        finally:
+            if os.path.exists(temporary_path):
+                os.unlink(temporary_path)
 
     def embed(self, text):
         """
@@ -120,8 +135,16 @@ class EmbeddingClient:
         # Older text-only cache keys are intentionally ignored.
         cache_key = f"{EMBED_MODEL}:{text}"
         if cache_key in self.cache:
-            self.cache_hits += 1
-            return self.cache[cache_key]
+            try:
+                cached_vector = _validated_embedding(
+                    self.cache[cache_key], label="cached embedding"
+                )
+            except ValueError:
+                # Do not silently reuse a poisoned or incomplete cache entry.
+                del self.cache[cache_key]
+            else:
+                self.cache_hits += 1
+                return cached_vector
 
         if not self.client:
             raise RuntimeError(
@@ -129,7 +152,9 @@ class EmbeddingClient:
             )
 
         response = self.client.embeddings.create(model=EMBED_MODEL, input=text)
-        vector = response.data[0].embedding
+        vector = _validated_embedding(
+            response.data[0].embedding, label="API embedding"
+        )
         self.api_calls += 1
         self.cache[cache_key] = vector
         return vector
