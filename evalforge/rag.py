@@ -55,6 +55,26 @@ def cosine_similarity(vec_a, vec_b):
     return dot / (norm_a * norm_b)
 
 
+def _validated_embedding(vector, *, label, expected_dim=None):
+    """Reject malformed API/cache vectors before they affect retrieval rankings.
+
+    A NaN cosine score silently changes sorting order; mismatched dimensions
+    can fail halfway through a query. Neither is a valid evaluation result.
+    """
+    if not isinstance(vector, (list, tuple)) or not vector:
+        raise ValueError(f"{label}: embedding must be a non-empty numeric vector")
+    if any(isinstance(value, bool) or not isinstance(value, (int, float))
+           or not math.isfinite(value) for value in vector):
+        raise ValueError(f"{label}: embedding contains non-finite or non-numeric values")
+    if not any(value != 0 for value in vector):
+        raise ValueError(f"{label}: embedding must not be a zero vector")
+    if expected_dim is not None and len(vector) != expected_dim:
+        raise ValueError(
+            f"{label}: embedding dimension mismatch ({len(vector)} vs {expected_dim})"
+        )
+    return vector
+
+
 class EmbeddingClient:
     """Wraps the OpenAI embeddings API with an on-disk cache."""
 
@@ -153,10 +173,18 @@ class VectorStore:
         # searches must not see a partially populated index.
         self.vectors = {}
         pending_vectors = {}
+        expected_dim = None
         print(f"Embedding {len(self.documents)} documents...")
         for doc in self.documents:
             content = f"{doc['title']}\n{doc['text']}"
-            pending_vectors[doc["doc_id"]] = self.embedder.embed(content)
+            vector = _validated_embedding(
+                self.embedder.embed(content),
+                label=f"document {doc['doc_id']}",
+                expected_dim=expected_dim,
+            )
+            if expected_dim is None:
+                expected_dim = len(vector)
+            pending_vectors[doc["doc_id"]] = vector
         self.embedder.save_cache()
         self.vectors = pending_vectors
         print(
@@ -176,7 +204,11 @@ class VectorStore:
         if not self.vectors:
             raise RuntimeError("Index is empty - call build_index() first.")
 
-        query_vector = self.embedder.embed(query)
+        query_vector = _validated_embedding(
+            self.embedder.embed(query),
+            label="query",
+            expected_dim=len(next(iter(self.vectors.values()))),
+        )
 
         scored = []
         for doc in self.documents:
