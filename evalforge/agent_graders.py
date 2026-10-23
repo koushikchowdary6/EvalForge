@@ -129,7 +129,7 @@ def answer_contains_all(final_answer, required_substrings):
             # A required numeric answer must be a complete number, not part
             # of a different value (e.g. 12 in 312, 120 or 12.5).
             # Comma grouping remains tolerated (1,081 matches 1081).
-            if not re.search(r"(?<!\\d)" + re.escape(compact) + r"(?!\\d|\\.\\d)",
+            if not re.search(r"(?<!\d)" + re.escape(compact) + r"(?!\d|\.\d)",
                              text_no_separators):
                 return False
         elif needle not in text and compact not in text_no_separators:
