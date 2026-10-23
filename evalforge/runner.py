@@ -180,6 +180,15 @@ class EvalForgeRunner:
                 # Query the real model
                 print(f"  Querying {model}...", end="", flush=True)
                 result = self.model_client.query(model, question)
+                if result.get("error") is not None:
+                    # Never grade provider failures as if they were model answers.
+                    # Stop the sweep rather than publish misleading benchmark rates.
+                    self.results = []
+                    self.report = None
+                    raise RuntimeError(
+                        f"Model query failed for case {case_id!r} using {model!r}; "
+                        "evaluation aborted before grading"
+                    )
                 actual = result["response"]
                 latency = result.get("latency_ms", 0)
                 print(f" ✓ ({latency:.0f}ms)")
