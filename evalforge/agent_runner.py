@@ -200,8 +200,12 @@ class AgentEvalRunner:
             json.dump(self.results, f, indent=2)
         print(f"Saved trajectories to {detail_path}")
 
-        if self.report:
-            report_path = os.path.join(self.output_dir, "agent_report.json")
+        report_path = os.path.join(self.output_dir, "agent_report.json")
+        if self.report is not None:
             with open(report_path, "w", encoding="utf-8") as f:
                 json.dump(self.report, f, indent=2)
             print(f"Saved report to {report_path}")
+        elif os.path.exists(report_path):
+            # An incomplete or unreported sweep must not leave a stale
+            # benchmark artifact that looks like the current run.
+            os.remove(report_path)
