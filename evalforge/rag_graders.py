@@ -237,7 +237,7 @@ class RAGJudge:
                 "reason": parsed.get("reason", ""),
                 "parse_ok": True,
             }
-        except (json.JSONDecodeError, ValueError, TypeError):
+        except (json.JSONDecodeError, ValueError, TypeError, OverflowError):
             return {"score": 0.5, "reason": raw_text[:150], "parse_ok": False}
 
     def grade_correctness(self, question, expected, actual):
