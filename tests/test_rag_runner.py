@@ -139,3 +139,60 @@ def test_save_removes_stale_report_when_new_sweep_has_no_aggregate(tmp_path):
     assert not report_path.exists()
     saved = json.loads((tmp_path / "rag_results.json").read_text(encoding="utf-8"))
     assert saved == [{"case_id": "second", "top_k": 5}]
+
+
+def test_unanswerable_cases_do_not_inflate_retrieval_scores(monkeypatch):
+    """Unanswerable queries have no retrieval target; report coverage separately."""
+
+    class StubPipeline:
+        def __init__(self, store, model):
+            pass
+
+        def query(self, question, top_k):
+            return {
+                "retrieved": [{"doc_id": "unrelated"}],
+                "answer": "INSUFFICIENT_CONTEXT",
+                "retrieval_ms": 1.0,
+                "generation_ms": 2.0,
+                "total_ms": 3.0,
+            }
+
+    monkeypatch.setattr(rag_runner, "RAGPipeline", StubPipeline)
+    runner = rag_runner.RAGEvalRunner.__new__(rag_runner.RAGEvalRunner)
+    runner.store = object()
+    runner.model = "claude"
+    runner.questions = [
+        {
+            "id": "answerable", "question": "Where is the evidence?",
+            "expected_answer": "The relevant evidence", "answerable": True,
+            "relevant_doc_ids": ["missing-evidence"],
+        },
+        {
+            "id": "unanswerable", "question": "Unknown fact",
+            "expected_answer": "INSUFFICIENT_CONTEXT", "answerable": False,
+            "relevant_doc_ids": [],
+        },
+    ]
+    runner.embedder = SimpleNamespace(api_calls=0, cache_hits=0)
+    runner.judge = object()
+    runner.results = []
+    runner.report = None
+    # Both queries abstain; only the answerable query contributes retrieval
+    # metrics. Empty-ground-truth conventions must not boost hit/MRR/recall.
+    runner.run(k_values=(1,))
+    retrieval = runner.generate_report()["by_top_k"]["1"]["retrieval"]
+    assert retrieval["evaluated_queries"] == 1
+    assert retrieval["excluded_unanswerable"] == 1
+    assert retrieval["precision_at_k"] == 0.0
+    assert retrieval["recall_at_k"] == 0.0
+    assert retrieval["mrr"] == 0.0
+    assert retrieval["hit_rate"] == 0.0
+
+    runner.questions = runner.questions[1:]
+    runner.run(k_values=(1,))
+    retrieval = runner.generate_report()["by_top_k"]["1"]["retrieval"]
+    assert retrieval["evaluated_queries"] == 0
+    assert retrieval["excluded_unanswerable"] == 1
+    assert all(retrieval[key] is None for key in (
+        "precision_at_k", "recall_at_k", "mrr", "hit_rate"
+    ))
