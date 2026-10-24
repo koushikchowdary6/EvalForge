@@ -175,9 +175,9 @@ class TestJudgeParsing:
         'Here is my grade: {"score": 6, "reason": "partial"} - hope that helps',
         '{"score": 10, "reason": "perfect"} trailing commentary',
         '{"score": 10} {"score": 0}',
-        '```json\\n{"score": 10}\\n``` trailing commentary',
-        '```python\\n{"score": 10}\\n```',
-        '```json\\n{"score": 10}',
+        '```json\n{"score": 10}\n``` trailing commentary',
+        '```python\n{"score": 10}\n```',
+        '```json\n{"score": 10}',
     ])
     def test_rejects_json_with_extra_text_or_incomplete_fences(self, raw):
         result = RAGJudge._parse_score(raw)
