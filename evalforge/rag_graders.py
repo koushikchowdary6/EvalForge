@@ -204,14 +204,21 @@ class RAGJudge:
         returns a neutral placeholder with parse_ok=False so callers can exclude
         invalid responses from aggregate quality metrics.
         """
+        # A judge response is an evaluation artifact, not free-form chat.
+        # Accept a single JSON object (optionally inside a complete JSON
+        # code fence), but never extract a score from surrounding prose or
+        # a partially closed fence. Otherwise malformed judge responses
+        # can silently become valid benchmark measurements.
+        if not isinstance(raw_text, str):
+            return {"score": 0.5, "reason": repr(raw_text)[:150], "parse_ok": False}
         cleaned = raw_text.strip()
         if cleaned.startswith("```"):
-            lines = [ln for ln in cleaned.splitlines() if not ln.strip().startswith("```")]
-            cleaned = "\n".join(lines).strip()
-
-        start, end = cleaned.find("{"), cleaned.rfind("}")
-        if start != -1 and end > start:
-            cleaned = cleaned[start:end + 1]
+            lines = cleaned.splitlines()
+            if (len(lines) < 3
+                    or lines[0].strip().lower() not in ("```", "```json")
+                    or lines[-1].strip() != "```"):
+                return {"score": 0.5, "reason": raw_text[:150], "parse_ok": False}
+            cleaned = "\n".join(lines[1:-1]).strip()
 
         def reject_duplicate_keys(pairs):
             # A judge emitting {"score": 0, "score": 10} has not supplied
