@@ -159,7 +159,7 @@ class RAGJudge:
                 if key:
                     self.anthropic_client = Anthropic(api_key=key)
             except Exception as e:
-                print(f"[warn] RAGJudge: could not init Anthropic client: {e}")
+                print(f"[warn] RAGJudge: could not init Anthropic client ({type(e).__name__})")
         elif judge_model == "gpt":
             try:
                 from openai import OpenAI
@@ -167,7 +167,7 @@ class RAGJudge:
                 if key:
                     self.openai_client = OpenAI(api_key=key)
             except Exception as e:
-                print(f"[warn] RAGJudge: could not init OpenAI client: {e}")
+                print(f"[warn] RAGJudge: could not init OpenAI client ({type(e).__name__})")
 
     def _call(self, prompt):
         """Send a prompt to the configured judge, return raw text."""
@@ -218,14 +218,14 @@ class RAGJudge:
         # a partially closed fence. Otherwise malformed judge responses
         # can silently become valid benchmark measurements.
         if not isinstance(raw_text, str):
-            return {"score": 0.5, "reason": repr(raw_text)[:150], "parse_ok": False}
+            return {"score": 0.5, "reason": "invalid judge response", "parse_ok": False}
         cleaned = raw_text.strip()
         if cleaned.startswith("```"):
             lines = cleaned.splitlines()
             if (len(lines) < 3
                     or lines[0].strip().lower() not in ("```", "```json")
                     or lines[-1].strip() != "```"):
-                return {"score": 0.5, "reason": raw_text[:150], "parse_ok": False}
+                return {"score": 0.5, "reason": "invalid judge response", "parse_ok": False}
             cleaned = "\n".join(lines[1:-1]).strip()
 
         def reject_duplicate_keys(pairs):
@@ -258,7 +258,7 @@ class RAGJudge:
                 "parse_ok": True,
             }
         except (json.JSONDecodeError, ValueError, TypeError, OverflowError):
-            return {"score": 0.5, "reason": raw_text[:150], "parse_ok": False}
+            return {"score": 0.5, "reason": "invalid judge response", "parse_ok": False}
 
     def grade_correctness(self, question, expected, actual):
         """Score the answer against the reference answer (0-1)."""
@@ -284,7 +284,7 @@ class RAGJudge:
             }
         except Exception as e:
             return {"metric": "correctness", "score": None, "passed": None,
-                    "reason": f"judge error: {str(e)[:80]}", "parse_ok": False}
+                    "reason": f"judge error ({type(e).__name__})", "parse_ok": False}
 
     def grade_groundedness(self, answer, retrieved_docs):
         """
@@ -319,4 +319,4 @@ class RAGJudge:
             }
         except Exception as e:
             return {"metric": "groundedness", "score": None, "passed": None,
-                    "reason": f"judge error: {str(e)[:80]}", "parse_ok": False}
+                    "reason": f"judge error ({type(e).__name__})", "parse_ok": False}
