@@ -133,12 +133,20 @@ class RAGEvalRunner:
                 relevant_ids = case.get("relevant_doc_ids", [])
                 answerable = case.get("answerable", True)
 
-                retrieval_scores = {
-                    "precision_at_k": precision_at_k(retrieved_ids, relevant_ids),
-                    "recall_at_k": recall_at_k(retrieved_ids, relevant_ids),
-                    "reciprocal_rank": reciprocal_rank(retrieved_ids, relevant_ids),
-                    "hit_rate": hit_rate(retrieved_ids, relevant_ids),
-                }
+                retrieval_error = outcome.get("error_stage") == "retrieval"
+                # A failed retrieval has no measured ranking. Recording zeros
+                # would silently misrepresent an outage as model quality.
+                retrieval_scores = (
+                    {name: None for name in (
+                        "precision_at_k", "recall_at_k", "reciprocal_rank", "hit_rate"
+                    )}
+                    if retrieval_error else {
+                        "precision_at_k": precision_at_k(retrieved_ids, relevant_ids),
+                        "recall_at_k": recall_at_k(retrieved_ids, relevant_ids),
+                        "reciprocal_rank": reciprocal_rank(retrieved_ids, relevant_ids),
+                        "hit_rate": hit_rate(retrieved_ids, relevant_ids),
+                    }
+                )
 
                 # A transport/provider failure is not a model answer. Keep its
                 # retrieval measurements, but exclude it from answer-quality rates.
@@ -177,7 +185,8 @@ class RAGEvalRunner:
                     "answerable": answerable,
                     "expected": case["expected_answer"],
                     "answer": outcome["answer"],
-                    "generation_error": generation_error,
+                    "generation_error": generation_error if not retrieval_error else None,
+                    "retrieval_error": outcome.get("error") if retrieval_error else None,
                     "retrieved_ids": retrieved_ids,
                     "relevant_ids": relevant_ids,
                     "retrieval": retrieval_scores,
@@ -193,7 +202,9 @@ class RAGEvalRunner:
                 })
 
                 flag = "ERR" if generation_error else ("OK " if abstention["passed"] else "FAIL")
-                print(f"  {flag} {case['id']:9} | hit={retrieval_scores['hit_rate']:.0f} "
+                hit = retrieval_scores["hit_rate"]
+                hit_text = f"{hit:.0f}" if hit is not None else "n/a"
+                print(f"  {flag} {case['id']:9} | hit={hit_text} "
                       f"| {outcome['total_ms']:.0f}ms")
 
         print(f"\nComplete. {len(self.results)} evaluations.")
@@ -221,8 +232,10 @@ class RAGEvalRunner:
         }
 
         for k, rows in sorted(by_k.items()):
-            successful = [r for r in rows if not r.get("generation_error")]
-            generation_errors = len(rows) - len(successful)
+            retrieval_errors = [r for r in rows if r.get("retrieval_error")]
+            attempted_generation = [r for r in rows if not r.get("retrieval_error")]
+            successful = [r for r in attempted_generation if not r.get("generation_error")]
+            generation_errors = len(attempted_generation) - len(successful)
             answerable = [r for r in successful if r["answerable"]]
             unanswerable = [r for r in successful if not r["answerable"]]
             empty_answers = [r for r in successful
@@ -243,20 +256,24 @@ class RAGEvalRunner:
             # queries. The pure graders use empty-set conventions, but those
             # synthetic perfect recall/MRR/hit scores must not inflate a
             # mixed benchmark's retrieval metrics.
-            retrieval_rows = [r for r in rows if r["answerable"]]
+            retrieval_rows = [r for r in rows
+                              if r["answerable"] and not r.get("retrieval_error")]
             report["by_top_k"][str(k)] = {
                 "retrieval": {
                     "evaluated_queries": len(retrieval_rows),
-                    "excluded_unanswerable": len(rows) - len(retrieval_rows),
+                    "excluded_unanswerable": sum(not r["answerable"] for r in rows),
+                    "errors": len(retrieval_errors),
                     "precision_at_k": self._mean([r["retrieval"]["precision_at_k"] for r in retrieval_rows]),
                     "recall_at_k": self._mean([r["retrieval"]["recall_at_k"] for r in retrieval_rows]),
                     "mrr": self._mean([r["retrieval"]["reciprocal_rank"] for r in retrieval_rows]),
                     "hit_rate": self._mean([r["retrieval"]["hit_rate"] for r in retrieval_rows]),
                 },
                 "generation": {
+                    "attempted": len(attempted_generation),
                     "successful": len(successful),
                     "errors": generation_errors,
-                    "error_rate": generation_errors / len(rows) if rows else None,
+                    "error_rate": (generation_errors / len(attempted_generation)
+                                   if attempted_generation else None),
                     "empty_answers": len(empty_answers),
                     "empty_answer_rate": (len(empty_answers) / len(successful)
                                           if successful else None),
