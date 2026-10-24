@@ -59,16 +59,19 @@ python main.py
 
 ## Reproducible embedding evaluation
 
-RAG embeddings are cached by **embedding model and input text**, not by text
-alone. Changing the embedding model therefore forces a fresh embedding
-request instead of silently reusing vectors from an incompatible model.
-Previously generated text-only cache entries are ignored and can be
-regenerated with a configured OpenAI API key. The cache can be persisted in
-either a project subdirectory or the current working directory.
+RAG embedding cache keys are SHA-256 digests of the **embedding model
+and input text**, rather than raw document/query strings. This prevents
+plaintext corpus content from appearing in JSON cache keys while still
+avoiding cross-model vector reuse. Existing plaintext-key cache entries are
+ignored; delete old `results/embedding_cache.json` files to remove previously
+written plaintext, or run a fresh evaluation and save the migrated cache.
+Re-embedding discarded entries requires a configured OpenAI API key.
 
-The offline test suite checks that repeated requests with the same model
-reuse cached vectors, while a model change requires a new request. This
-protects the validity of retrieval comparisons across embedding models.
+**This is not encryption:** predictable text may be guessed from its hash, and
+the embedding vectors themselves may be sensitive. Protect cache files with
+appropriate filesystem permissions and do not commit them. Offline tests
+cover cache hits, model isolation, legacy-key rejection, and non-disclosure of
+raw text in newly written keys.
 
 ---
 

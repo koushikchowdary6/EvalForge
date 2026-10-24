@@ -26,7 +26,7 @@ def _client(tmp_path, *, api_vector=None, cache=None):
 
 
 def test_valid_cached_vector_avoids_api(tmp_path):
-    key = f"{rag.EMBED_MODEL}:hello"
+    key = rag._embedding_cache_key("hello")
     client, calls = _client(tmp_path, cache={key: [1.0, 0.0]})
     assert client.embed("hello") == [1.0, 0.0]
     assert client.cache_hits == 1
@@ -36,7 +36,7 @@ def test_valid_cached_vector_avoids_api(tmp_path):
 
 @pytest.mark.parametrize("bad", [[float("nan"), 0.0], [0.0, 0.0], "bad", []])
 def test_invalid_cached_vector_is_replaced_by_fresh_embedding(tmp_path, bad):
-    key = f"{rag.EMBED_MODEL}:hello"
+    key = rag._embedding_cache_key("hello")
     client, calls = _client(tmp_path, cache={key: bad}, api_vector=[0.0, 1.0])
     assert client.embed("hello") == [0.0, 1.0]
     assert client.cache[key] == [0.0, 1.0]
@@ -92,3 +92,40 @@ def test_failed_replace_preserves_previous_cache(tmp_path, monkeypatch):
         client.save_cache()
     assert json.loads(path.read_text()) == {"original": [1, 2]}
     assert not list(tmp_path.glob(".embedding-cache-*.tmp"))
+
+
+def test_cache_key_does_not_persist_raw_document_text(tmp_path):
+    secret_document = "Confidential case: patient alice@example.com"
+    client, calls = _client(tmp_path, api_vector=[1.0, 0.0])
+    assert client.embed(secret_document) == [1.0, 0.0]
+    assert len(calls) == 1
+    client.save_cache()
+
+    on_disk = (tmp_path / "embedding_cache.json").read_text(encoding="utf-8")
+    assert secret_document not in on_disk
+    assert "alice@example.com" not in on_disk
+    assert list(json.loads(on_disk)) == [rag._embedding_cache_key(secret_document)]
+
+    reloaded = rag.EmbeddingClient._load_cache(client)
+    assert reloaded == client.cache
+
+
+def test_legacy_plaintext_cache_keys_are_ignored_and_not_resaved(tmp_path):
+    path = tmp_path / "embedding_cache.json"
+    old_key = f"{rag.EMBED_MODEL}:sensitive customer note"
+    good_key = rag._embedding_cache_key("safe note")
+    path.write_text(
+        json.dumps({old_key: [1.0, 0.0], good_key: [0.0, 1.0]}),
+        encoding="utf-8",
+    )
+    client, _ = _client(tmp_path)
+    client.cache = rag.EmbeddingClient._load_cache(client)
+    assert client.cache == {good_key: [0.0, 1.0]}
+    client.save_cache()
+    assert "sensitive customer note" not in path.read_text(encoding="utf-8")
+
+
+def test_embedding_cache_keys_are_model_scoped(monkeypatch):
+    first = rag._embedding_cache_key("same input")
+    monkeypatch.setattr(rag, "EMBED_MODEL", "another-embedding-model")
+    assert rag._embedding_cache_key("same input") != first

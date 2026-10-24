@@ -249,7 +249,7 @@ def test_embedding_cache_flat_path(tmp_path, monkeypatch):
 
     monkeypatch.chdir(tmp_path)
     client = rag.EmbeddingClient(cache_path="cache.json")
-    client.cache["model-a:sample"] = [1.0]
+    client.cache[rag._embedding_cache_key("sample")] = [1.0]
     client.save_cache()
     assert rag.EmbeddingClient(cache_path="cache.json").cache == client.cache
 
