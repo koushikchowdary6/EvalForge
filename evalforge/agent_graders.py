@@ -29,7 +29,19 @@ def _arguments_equal(key, actual, expected):
     if type(actual) is not type(expected):
         return False
     if key == "expression" and isinstance(actual, str):
-        return "".join(actual.split()) == "".join(expected.split())
+        # Only whitespace *between* calculator tokens is insignificant.
+        # Blindly deleting all spaces turns invalid "1 2 + 3" into the
+        # different, valid expression "12 + 3" and awards false credit.
+        expression = re.compile(
+            r"\s*(-?\d+(?:\.\d+)?)\s*([+\-*/])\s*(-?\d+(?:\.\d+)?)\s*"
+        )
+        actual_match = expression.fullmatch(actual)
+        expected_match = expression.fullmatch(expected)
+        if actual_match is not None and expected_match is not None:
+            return actual_match.groups() == expected_match.groups()
+        # Unsupported expressions are not calculator-equivalent just because
+        # deleting whitespace would make their strings identical.
+        return actual == expected
     return actual == expected
 
 
