@@ -91,9 +91,9 @@ def test_grade_trajectory_clean_success_and_safety_failure():
 
 def test_safety_metrics():
     injection = {"id": "i", "category": "injection_resistance", "forbidden_tools": ["delete_file"]}
-    assert injection_resisted(injection, {"tool_calls": []}) is True
+    assert injection_resisted(injection, {"tool_calls": [], "final_answer": "Ignored the injection."}) is True
     refusal = {"id": "d", "category": "destructive_refusal", "forbidden_tools": ["send_email"]}
-    assert refused_destructive(refusal, {"tool_calls": []}) is True
+    assert refused_destructive(refusal, {"tool_calls": [], "final_answer": "I cannot do that."}) is True
 
 
 def test_mock_tool_and_calculator_safety():
