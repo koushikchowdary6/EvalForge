@@ -17,6 +17,42 @@ from evalforge.rag_graders import (
 )
 
 
+def validate_rag_questions(questions, document_ids):
+    """Fail closed on invalid ground truth before any paid embedding requests.
+
+    Bad references or duplicate case IDs silently distort retrieval metrics,
+    while missing answerability labels can misclassify hallucinations.
+    """
+    if not isinstance(questions, list) or not questions:
+        raise ValueError("RAG questions must be a non-empty list")
+    seen_ids = set()
+    for index, case in enumerate(questions):
+        if not isinstance(case, dict):
+            raise ValueError(f"RAG question #{index} must be an object")
+        case_id = case.get("id")
+        if not isinstance(case_id, str) or not case_id.strip():
+            raise ValueError(f"RAG question #{index}: id must be a non-empty string")
+        if case_id in seen_ids:
+            raise ValueError(f"Duplicate RAG question id: {case_id}")
+        seen_ids.add(case_id)
+        for field in ("question", "expected_answer"):
+            value = case.get(field)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"RAG question {case_id}: {field} must be a non-empty string")
+        if not isinstance(case.get("answerable"), bool):
+            raise ValueError(f"RAG question {case_id}: answerable must be a boolean")
+        relevant = case.get("relevant_doc_ids")
+        if not isinstance(relevant, list) or any(
+            not isinstance(doc_id, str) or not doc_id.strip() for doc_id in relevant
+        ):
+            raise ValueError(f"RAG question {case_id}: relevant_doc_ids must be a list of IDs")
+        if len(relevant) != len(set(relevant)):
+            raise ValueError(f"RAG question {case_id}: duplicate relevant_doc_ids")
+        unknown = set(relevant) - document_ids
+        if unknown:
+            raise ValueError(f"RAG question {case_id}: unknown document IDs: {sorted(unknown)}")
+
+
 class RAGEvalRunner:
     """Runs RAG evaluation across retrieval configurations."""
 
@@ -42,8 +78,13 @@ class RAGEvalRunner:
 
     def load(self):
         self.store.load_corpus(self.corpus_path)
+        self.questions = []
         with open(self.questions_path, "r", encoding="utf-8") as f:
-            self.questions = json.load(f)
+            questions = json.load(f)
+        validate_rag_questions(
+            questions, {doc["doc_id"] for doc in self.store.documents}
+        )
+        self.questions = questions
         print(f"Loaded {len(self.questions)} RAG questions")
         self.store.build_index()
 
@@ -53,6 +94,11 @@ class RAGEvalRunner:
         # Keep the store/embedding cache reusable across sweeps.
         self.results = []
         self.report = None
+        if (not isinstance(k_values, (list, tuple)) or not k_values
+                or any(isinstance(k, bool) or not isinstance(k, int) or k < 1
+                       for k in k_values)
+                or len(k_values) != len(set(k_values))):
+            raise ValueError("k_values must be unique positive integers")
         pipeline = RAGPipeline(self.store, model=self.model)
 
         total = len(self.questions) * len(k_values)
