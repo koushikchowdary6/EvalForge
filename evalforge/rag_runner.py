@@ -51,6 +51,13 @@ def validate_rag_questions(questions, document_ids):
         unknown = set(relevant) - document_ids
         if unknown:
             raise ValueError(f"RAG question {case_id}: unknown document IDs: {sorted(unknown)}")
+        # Retrieval quality cannot be measured for an answerable question
+        # without at least one labeled evidence document. Otherwise recall,
+        # MRR and hit rate can appear perfect by empty-set convention.
+        if case["answerable"] and not relevant:
+            raise ValueError(
+                f"RAG question {case_id}: answerable questions require relevant_doc_ids"
+            )
 
 
 class RAGEvalRunner:
@@ -208,12 +215,19 @@ class RAGEvalRunner:
             over_abstentions = [r for r in answerable
                                 if r["abstention"]["outcome"] == "over_abstention"]
 
+            # No ground-truth relevant documents exist for unanswerable
+            # queries. The pure graders use empty-set conventions, but those
+            # synthetic perfect recall/MRR/hit scores must not inflate a
+            # mixed benchmark's retrieval metrics.
+            retrieval_rows = [r for r in rows if r["answerable"]]
             report["by_top_k"][str(k)] = {
                 "retrieval": {
-                    "precision_at_k": self._mean([r["retrieval"]["precision_at_k"] for r in rows]),
-                    "recall_at_k": self._mean([r["retrieval"]["recall_at_k"] for r in rows]),
-                    "mrr": self._mean([r["retrieval"]["reciprocal_rank"] for r in rows]),
-                    "hit_rate": self._mean([r["retrieval"]["hit_rate"] for r in rows]),
+                    "evaluated_queries": len(retrieval_rows),
+                    "excluded_unanswerable": len(rows) - len(retrieval_rows),
+                    "precision_at_k": self._mean([r["retrieval"]["precision_at_k"] for r in retrieval_rows]),
+                    "recall_at_k": self._mean([r["retrieval"]["recall_at_k"] for r in retrieval_rows]),
+                    "mrr": self._mean([r["retrieval"]["reciprocal_rank"] for r in retrieval_rows]),
+                    "hit_rate": self._mean([r["retrieval"]["hit_rate"] for r in retrieval_rows]),
                 },
                 "generation": {
                     "successful": len(successful),
