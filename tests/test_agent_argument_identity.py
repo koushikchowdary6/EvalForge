@@ -60,3 +60,39 @@ def test_wrong_recipient_cannot_be_reported_as_agent_success():
     assert result["argument_accuracy"] == 0.0
     assert result["success"] is False
     assert result["failure_category"] == "bad_arguments"
+
+
+def test_calculator_expression_whitespace_cannot_merge_numeric_tokens():
+    expected = {"calculate": {"expression": "12 + 3"}}
+    for invalid in ("1 2 + 3", "12 +  3 0", "1\t2+3", "12 + +3"):
+        assert argument_accuracy(
+            [{"tool": "calculate", "args": {"expression": invalid}}], expected,
+        ) == 0.0
+
+
+def test_calculator_expression_preserves_operator_and_operand_identity():
+    expected = {"calculate": {"expression": "-12.5 / 2"}}
+    for equivalent in (" -12.5/2 ", "-12.5   /   2"):
+        assert argument_accuracy(
+            [{"tool": "calculate", "args": {"expression": equivalent}}], expected,
+        ) == 1.0
+    for wrong in ("-1 2.5/2", "12.5/2", "-12.5*2", "-12.5/20"):
+        assert argument_accuracy(
+            [{"tool": "calculate", "args": {"expression": wrong}}], expected,
+        ) == 0.0
+
+
+def test_malformed_calculator_expression_cannot_earn_task_success():
+    task = {
+        "id": "calculator-argument-boundary", "category": "single_tool",
+        "expected_tools": ["calculate"],
+        "expected_args": {"calculate": {"expression": "12 + 3"}},
+        "answer_must_contain": ["15"],
+    }
+    result = grade_trajectory(task, {
+        "tool_calls": [{"tool": "calculate", "args": {"expression": "1 2+3"}}],
+        "final_answer": "15", "turns": 2,
+    })
+    assert result["argument_accuracy"] == 0.0
+    assert result["success"] is False
+    assert result["failure_category"] == "bad_arguments"
