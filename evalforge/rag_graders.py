@@ -113,10 +113,15 @@ def grade_abstention(answer, answerable):
       correct_abstain  - unanswerable, model abstained (the win condition)
       hallucination    - unanswerable, model answered anyway
       over_abstention  - answerable, model refused unnecessarily
+      empty_answer     - model returned no usable answer (either label)
 
-    Hallucination and over-abstention are tracked separately because they
-    have opposite fixes: one needs stricter grounding, the other looser.
+    Empty responses are not legitimate abstentions or factual answers. Track
+    them separately so they cannot receive passing abstention credit or
+    dilute hallucination and over-abstention rates.
     """
+    if not isinstance(answer, str) or not answer.strip():
+        return {"outcome": "empty_answer", "abstained": False, "passed": False}
+
     abstained = did_abstain(answer)
 
     if answerable and not abstained:

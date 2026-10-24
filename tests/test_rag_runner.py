@@ -199,3 +199,69 @@ def test_unanswerable_cases_do_not_inflate_retrieval_scores(monkeypatch):
     assert all(retrieval[key] is None for key in (
         "precision_at_k", "recall_at_k", "mrr", "hit_rate"
     ))
+
+def test_empty_generations_are_reported_without_diluting_hallucination_rates(monkeypatch):
+    """Blank model outputs fail and never trigger paid judge calls."""
+
+    class StubPipeline:
+        def __init__(self, store, model):
+            pass
+
+        def query(self, question, top_k):
+            answers = {
+                "answerable-empty": "",
+                "unanswerable-empty": "  \t\n",
+                "unanswerable-hallucination": "An unsupported fact",
+                "unanswerable-refusal": "INSUFFICIENT_CONTEXT",
+            }
+            return {
+                "retrieved": [{"doc_id": "doc-1"}],
+                "answer": answers[question],
+                "retrieval_ms": 1.0,
+                "generation_ms": 2.0,
+                "total_ms": 3.0,
+            }
+
+    class NoJudge:
+        def grade_correctness(self, *args):
+            raise AssertionError("blank outputs must not be sent to judge")
+
+        def grade_groundedness(self, *args):
+            raise AssertionError("blank outputs must not be sent to judge")
+
+    monkeypatch.setattr(rag_runner, "RAGPipeline", StubPipeline)
+    runner = rag_runner.RAGEvalRunner.__new__(rag_runner.RAGEvalRunner)
+    runner.store = object()
+    runner.model = "claude"
+    runner.questions = [
+        {
+            "id": name, "question": name,
+            "expected_answer": "known" if answerable else "INSUFFICIENT_CONTEXT",
+            "answerable": answerable,
+            "relevant_doc_ids": ["doc-1"] if answerable else [],
+        }
+        for name, answerable in [
+            ("answerable-empty", True),
+            ("unanswerable-empty", False),
+            ("unanswerable-hallucination", False),
+            ("unanswerable-refusal", False),
+        ]
+    ]
+    runner.embedder = SimpleNamespace(api_calls=0, cache_hits=0)
+    runner.judge = NoJudge()
+    runner.results = []
+    runner.report = None
+
+    results = runner.run(k_values=(1,))
+    stats = runner.generate_report()["by_top_k"]["1"]
+    assert [r["abstention"]["outcome"] for r in results] == [
+        "empty_answer", "empty_answer", "hallucination", "correct_abstain",
+    ]
+    assert all(r["correctness"]["score"] is None for r in results)
+    assert stats["generation"]["empty_answers"] == 2
+    assert stats["generation"]["empty_answer_rate"] == 0.5
+    assert stats["hallucination"]["unanswerable_questions"] == 3
+    assert stats["hallucination"]["hallucination_evaluated"] == 2
+    assert stats["hallucination"]["hallucination_rate"] == 0.5
+    assert stats["hallucination"]["over_abstention_evaluated"] == 0
+    assert stats["hallucination"]["over_abstention_rate"] is None

@@ -152,20 +152,22 @@ class RAGEvalRunner:
                 # Only judge answers the model actually attempted. Grading a
                 # correct abstention for correctness would penalise the right
                 # behaviour, so those are scored by abstention alone.
-                if not generation_error and answerable and not abstention["abstained"]:
+                if (not generation_error and answerable and not abstention["abstained"]
+                        and abstention["outcome"] != "empty_answer"):
                     correctness = self.judge.grade_correctness(
                         case["question"], case["expected_answer"], outcome["answer"])
                     groundedness = self.judge.grade_groundedness(
                         outcome["answer"], outcome["retrieved"])
                 else:
+                    skip_reason = (
+                        "skipped (generation failed)" if generation_error
+                        else "skipped (empty answer)" if abstention["outcome"] == "empty_answer"
+                        else "skipped (abstention case)"
+                    )
                     correctness = {"metric": "correctness", "score": None,
-                                   "passed": None, "reason": (
-                                       "skipped (generation failed)" if generation_error
-                                       else "skipped (abstention case)")}
+                                   "passed": None, "reason": skip_reason}
                     groundedness = {"metric": "groundedness", "score": None,
-                                    "passed": None, "reason": (
-                                        "skipped (generation failed)" if generation_error
-                                        else "skipped (abstention case)")}
+                                    "passed": None, "reason": skip_reason}
 
                 self.results.append({
                     "case_id": case["id"],
@@ -223,6 +225,15 @@ class RAGEvalRunner:
             generation_errors = len(rows) - len(successful)
             answerable = [r for r in successful if r["answerable"]]
             unanswerable = [r for r in successful if not r["answerable"]]
+            empty_answers = [r for r in successful
+                             if r["abstention"]["outcome"] == "empty_answer"]
+            # Blank outputs are failed generations, but are neither factual
+            # hallucinations nor explicit refusals. Keep them out of those
+            # rates' denominators and report their prevalence separately.
+            evaluated_unanswerable = [r for r in unanswerable
+                                      if r["abstention"]["outcome"] != "empty_answer"]
+            evaluated_answerable = [r for r in answerable
+                                    if r["abstention"]["outcome"] != "empty_answer"]
             hallucinations = [r for r in unanswerable
                               if r["abstention"]["outcome"] == "hallucination"]
             over_abstentions = [r for r in answerable
@@ -246,6 +257,9 @@ class RAGEvalRunner:
                     "successful": len(successful),
                     "errors": generation_errors,
                     "error_rate": generation_errors / len(rows) if rows else None,
+                    "empty_answers": len(empty_answers),
+                    "empty_answer_rate": (len(empty_answers) / len(successful)
+                                          if successful else None),
                     # Judge outages and malformed responses are not low-quality
                     # model answers. Track coverage separately from score.
                     "correctness_judged": sum(r["correctness"]["score"] is not None for r in rows),
@@ -257,12 +271,14 @@ class RAGEvalRunner:
                 },
                 "hallucination": {
                     "unanswerable_questions": len(unanswerable),
+                    "hallucination_evaluated": len(evaluated_unanswerable),
                     "hallucinations": len(hallucinations),
-                    "hallucination_rate": (len(hallucinations) / len(unanswerable)
-                                           if unanswerable else None),
+                    "hallucination_rate": (len(hallucinations) / len(evaluated_unanswerable)
+                                           if evaluated_unanswerable else None),
+                    "over_abstention_evaluated": len(evaluated_answerable),
                     "over_abstentions": len(over_abstentions),
-                    "over_abstention_rate": (len(over_abstentions) / len(answerable)
-                                             if answerable else None),
+                    "over_abstention_rate": (len(over_abstentions) / len(evaluated_answerable)
+                                             if evaluated_answerable else None),
                 },
                 "latency": {
                     "avg_retrieval_ms": self._mean([r["latency"]["retrieval_ms"] for r in rows]),
