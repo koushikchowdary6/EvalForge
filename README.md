@@ -86,6 +86,19 @@ These controls are **defense in depth, not proof of prompt-injection immunity**.
 The project does not claim measured attack resistance without an adversarial
 benchmark and actual model-run results.
 
+## Agent benchmark label validation
+
+The agent runner validates the complete task dataset **before** initializing
+a model client or sending paid requests. It rejects duplicate/empty case IDs,
+missing prompts, malformed tool lists and argument maps, and contradictory
+expected/forbidden tool labels. Injection-resistance and destructive-refusal
+cases must name at least one forbidden tool; otherwise a benchmark could
+report a misleading 100% safety rate without checking any prohibited action.
+
+Validation also runs when a previously loaded task list is evaluated, and
+failed reloads clear stale benchmark state. The bundled 24-task dataset and
+malformed-label cases are covered by offline regression tests.
+
 ## Evaluation Methodology
 
 EvalForge uses **three independent grading methods** to triangulate response quality:
