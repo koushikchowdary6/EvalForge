@@ -401,7 +401,23 @@ class RAGPipeline:
     def query(self, question, top_k=3):
         """Full RAG turn: retrieve, then generate. Latencies reported separately."""
         retrieval_start = time.time()
-        retrieved = self.store.search(question, top_k=top_k)
+        try:
+            retrieved = self.store.search(question, top_k=top_k)
+        except Exception as exc:
+            # Retrieval failures are not "zero relevant hits" and must not
+            # be confused with generation failures in benchmark reports.
+            # Avoid serializing provider exception messages into public results.
+            retrieval_ms = (time.time() - retrieval_start) * 1000
+            return {
+                "question": question,
+                "retrieved": [],
+                "answer": "",
+                "retrieval_ms": retrieval_ms,
+                "generation_ms": 0.0,
+                "total_ms": retrieval_ms,
+                "error": f"retrieval failed ({type(exc).__name__})",
+                "error_stage": "retrieval",
+            }
         retrieval_ms = (time.time() - retrieval_start) * 1000
 
         generation = self.generate(question, retrieved)
