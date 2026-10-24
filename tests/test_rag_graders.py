@@ -171,10 +171,29 @@ class TestJudgeParsing:
         assert result["score"] == pytest.approx(1.0)
         assert result["parse_ok"] is True
 
-    def test_parses_json_with_surrounding_prose(self):
-        raw = 'Here is my grade: {"score": 6, "reason": "partial"} - hope that helps'
+    @pytest.mark.parametrize("raw", [
+        'Here is my grade: {"score": 6, "reason": "partial"} - hope that helps',
+        '{"score": 10, "reason": "perfect"} trailing commentary',
+        '{"score": 10} {"score": 0}',
+        '```json\\n{"score": 10}\\n``` trailing commentary',
+        '```python\\n{"score": 10}\\n```',
+        '```json\\n{"score": 10}',
+    ])
+    def test_rejects_json_with_extra_text_or_incomplete_fences(self, raw):
         result = RAGJudge._parse_score(raw)
-        assert result["score"] == pytest.approx(0.6)
+        assert result["parse_ok"] is False
+        assert result["score"] == pytest.approx(0.5)
+
+    def test_rejected_judge_prose_is_excluded_from_grading(self, monkeypatch):
+        judge = RAGJudge.__new__(RAGJudge)
+        monkeypatch.setattr(
+            judge, "_call",
+            lambda prompt: 'Here is a perfect score: {"score": 10, "reason": "yes"}',
+        )
+        result = judge.grade_correctness("Q", "expected", "actual")
+        assert result["parse_ok"] is False
+        assert result["score"] is None
+        assert result["passed"] is None
 
     def test_unparseable_returns_neutral_and_flags(self):
         """A parse failure must be visible, not silently scored as a pass."""
