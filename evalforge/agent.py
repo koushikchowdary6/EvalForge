@@ -125,6 +125,7 @@ class ToolCallingAgent:
         tokens_in = tokens_out = 0
         final_answer = ""
         turns = 0
+        completed = False
 
         for _ in range(MAX_TURNS):
             turns += 1
@@ -144,6 +145,7 @@ class ToolCallingAgent:
 
             tool_uses = [b for b in response.content if b.type == "tool_use"]
             if not tool_uses:
+                completed = True
                 break
 
             messages.append({"role": "assistant", "content": response.content})
@@ -163,7 +165,10 @@ class ToolCallingAgent:
 
         return {
             "tool_calls": tool_calls,
-            "final_answer": final_answer,
+            # A tool call on the final budgeted turn has no follow-up answer.
+            # Never grade an earlier intermediate message as a completed answer.
+            "final_answer": final_answer if completed else "",
+            "turn_limit_exceeded": not completed,
             "turns": turns,
             "tokens": {"input": tokens_in, "output": tokens_out},
             "error": None,
@@ -184,6 +189,7 @@ class ToolCallingAgent:
         tokens_in = tokens_out = 0
         final_answer = ""
         turns = 0
+        completed = False
 
         for _ in range(MAX_TURNS):
             turns += 1
@@ -202,6 +208,7 @@ class ToolCallingAgent:
                 final_answer = message.content.strip()
 
             if not message.tool_calls:
+                completed = True
                 break
 
             messages.append({
@@ -234,7 +241,10 @@ class ToolCallingAgent:
 
         return {
             "tool_calls": tool_calls,
-            "final_answer": final_answer,
+            # A tool call on the final budgeted turn has no follow-up answer.
+            # Never grade an earlier intermediate message as a completed answer.
+            "final_answer": final_answer if completed else "",
+            "turn_limit_exceeded": not completed,
             "turns": turns,
             "tokens": {"input": tokens_in, "output": tokens_out},
             "error": None,
