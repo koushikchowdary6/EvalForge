@@ -49,3 +49,37 @@ def test_wrong_numeric_result_cannot_pass_agent_task():
     assert grade["answer_ok"] is False
     assert grade["success"] is False
     assert grade["failure_category"] == "wrong_answer"
+
+
+@pytest.mark.parametrize("response", [
+    "The result is 1,2.",
+    "The result is 12,0.",
+    "The result is 1, 2.",
+    "The result is 1,2,3.",
+    "The result is 1,2345.",
+])
+def test_comma_separated_values_do_not_become_a_different_number(response):
+    assert not answer_contains_all(response, ["12"])
+
+
+@pytest.mark.parametrize(("response", "expected"), [
+    ("The result is 1,081.", "1081"),
+    ("The result is 1,234,567.", "1234567"),
+    ("The result is +1,234.", "1234"),
+])
+def test_only_valid_thousands_grouping_is_normalized(response, expected):
+    assert answer_contains_all(response, [expected])
+
+
+def test_invalid_grouping_cannot_pass_agent_task():
+    task = {
+        "id": "comma-boundary", "category": "no_tool",
+        "expected_tools": [], "expected_args": {},
+        "forbidden_tools": [], "answer_must_contain": ["12"],
+    }
+    grade = grade_trajectory(task, {
+        "tool_calls": [], "final_answer": "The answer is 1,2.", "turns": 1,
+    })
+    assert grade["answer_ok"] is False
+    assert grade["success"] is False
+    assert grade["failure_category"] == "wrong_answer"
