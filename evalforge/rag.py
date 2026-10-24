@@ -137,12 +137,21 @@ class EmbeddingClient:
                 # using the v2 digest-based key format.
                 if not isinstance(loaded, dict):
                     return {}
-                return {
-                    key: vector for key, vector in loaded.items()
-                    if isinstance(key, str) and len(key) == 67
-                    and key.startswith("v2:")
-                    and all(ch in "0123456789abcdef" for ch in key[3:])
-                }
+                validated = {}
+                for key, vector in loaded.items():
+                    if (not isinstance(key, str) or len(key) != 67
+                            or not key.startswith("v2:")
+                            or any(ch not in "0123456789abcdef" for ch in key[3:])):
+                        continue
+                    try:
+                        validated[key] = _validated_embedding(
+                            vector, label="cached embedding"
+                        )
+                    except ValueError:
+                        # One corrupt entry must not poison an otherwise
+                        # healthy cache or block saving fresh embeddings.
+                        continue
+                return validated
             except (json.JSONDecodeError, OSError):
                 return {}
         return {}
