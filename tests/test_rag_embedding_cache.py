@@ -62,6 +62,42 @@ def test_valid_json_non_mapping_cache_is_ignored(tmp_path, monkeypatch):
     assert client.cache == {}
 
 
+def test_cache_load_discards_corrupt_entries_before_saving(tmp_path):
+    """Unrelated corrupt entries must not poison a valid cache on disk."""
+    path = tmp_path / "embedding_cache.json"
+    good_key = rag._embedding_cache_key("good")
+    bad_key = rag._embedding_cache_key("bad")
+    huge_key = rag._embedding_cache_key("huge")
+    zero_key = rag._embedding_cache_key("zero")
+    path.write_text(
+        json.dumps({
+            good_key: [1.0, 0.0],
+            bad_key: [float("nan"), 1.0],
+            huge_key: [10 ** 400, 1],
+            zero_key: [0, 0],
+        }),
+        encoding="utf-8",
+    )
+    client, _ = _client(tmp_path)
+    client.cache = rag.EmbeddingClient._load_cache(client)
+    assert client.cache == {good_key: [1.0, 0.0]}
+    client.save_cache()
+    assert json.loads(path.read_text(encoding="utf-8")) == client.cache
+
+
+def test_cache_load_rejects_wrong_type_and_empty_vectors(tmp_path):
+    path = tmp_path / "embedding_cache.json"
+    valid = rag._embedding_cache_key("valid")
+    invalid = rag._embedding_cache_key("invalid")
+    path.write_text(
+        json.dumps({valid: [1.0, 2.0], invalid: ["not numeric", 2.0]}),
+        encoding="utf-8",
+    )
+    client, _ = _client(tmp_path)
+    client.cache = rag.EmbeddingClient._load_cache(client)
+    assert client.cache == {valid: [1.0, 2.0]}
+
+
 def test_successful_cache_write_is_valid_json(tmp_path):
     client, _ = _client(tmp_path, cache={"test": [1.0, 2.0]})
     client.save_cache()
