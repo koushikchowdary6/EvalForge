@@ -46,14 +46,22 @@ def cosine_similarity(vec_a, vec_b):
     if len(vec_a) != len(vec_b):
         raise ValueError(f"Vector length mismatch: {len(vec_a)} vs {len(vec_b)}")
 
-    dot = sum(a * b for a, b in zip(vec_a, vec_b))
-    norm_a = math.sqrt(sum(a * a for a in vec_a))
-    norm_b = math.sqrt(sum(b * b for b in vec_b))
-
-    if norm_a == 0.0 or norm_b == 0.0:
+    # Squaring or multiplying finite but large embedding components can
+    # overflow to infinity; tiny components can underflow to zero. Either
+    # produces invalid similarity scores and corrupts the retrieval ranking.
+    # Scale each vector independently before taking its norm and dot product.
+    scale_a = max((abs(value) for value in vec_a), default=0.0)
+    scale_b = max((abs(value) for value in vec_b), default=0.0)
+    if scale_a == 0.0 or scale_b == 0.0:
         return 0.0
 
-    return dot / (norm_a * norm_b)
+    normalized_a = [value / scale_a for value in vec_a]
+    normalized_b = [value / scale_b for value in vec_b]
+    dot = math.fsum(a * b for a, b in zip(normalized_a, normalized_b))
+    norm_a = math.sqrt(math.fsum(a * a for a in normalized_a))
+    norm_b = math.sqrt(math.fsum(b * b for b in normalized_b))
+    # Roundoff can put a mathematically unit-bounded cosine just outside [-1, 1].
+    return max(-1.0, min(1.0, dot / (norm_a * norm_b)))
 
 
 def _validated_embedding(vector, *, label, expected_dim=None):
