@@ -45,6 +45,20 @@ RAG_SYSTEM_INSTRUCTIONS = (
 )
 
 
+def _finite_number(value):
+    """Accept only finite, representable numeric embedding components.
+
+    math.isfinite() raises OverflowError for arbitrarily large Python ints
+    loaded from JSON, even though they pass isinstance(value, int).
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
+
+
 def cosine_similarity(vec_a, vec_b):
     """
     Cosine similarity between two equal-length vectors.
@@ -55,6 +69,9 @@ def cosine_similarity(vec_a, vec_b):
     """
     if len(vec_a) != len(vec_b):
         raise ValueError(f"Vector length mismatch: {len(vec_a)} vs {len(vec_b)}")
+    if (not all(_finite_number(value) for value in vec_a)
+            or not all(_finite_number(value) for value in vec_b)):
+        raise ValueError("Cosine vectors must contain finite numeric components")
 
     # Squaring or multiplying finite but large embedding components can
     # overflow to infinity; tiny components can underflow to zero. Either
@@ -82,8 +99,7 @@ def _validated_embedding(vector, *, label, expected_dim=None):
     """
     if not isinstance(vector, (list, tuple)) or not vector:
         raise ValueError(f"{label}: embedding must be a non-empty numeric vector")
-    if any(isinstance(value, bool) or not isinstance(value, (int, float))
-           or not math.isfinite(value) for value in vector):
+    if any(not _finite_number(value) for value in vector):
         raise ValueError(f"{label}: embedding contains non-finite or non-numeric values")
     if not any(value != 0 for value in vector):
         raise ValueError(f"{label}: embedding must not be a zero vector")
