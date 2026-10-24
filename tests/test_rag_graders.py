@@ -203,6 +203,34 @@ class TestJudgeParsing:
         assert result["parse_ok"] is True
         assert result["score"] == pytest.approx(0.0)
 
+    @pytest.mark.parametrize("raw", [
+        '{"score": 0, "score": 10, "reason": "ambiguous"}',
+        '{"score": 8, "reason": "first", "reason": "second"}',
+        '{"score": 8, "metadata": {"x": 1, "x": 2}}',
+        '{"score": "9", "reason": "string instead of JSON number"}',
+        '{"score": 8, "reason": ["structured", "instead of text"]}',
+        '{"score": 8, "reason": null}',
+    ])
+    def test_ambiguous_or_schema_invalid_judge_output_is_excluded(self, raw):
+        result = RAGJudge._parse_score(raw)
+        assert result["parse_ok"] is False
+        assert result["score"] == pytest.approx(0.5)
+
+    def test_oversized_integer_judge_score_is_excluded_without_crashing(self):
+        raw = '{"score": ' + '9' * 309 + ', "reason": "overflow"}'
+        result = RAGJudge._parse_score(raw)
+        assert result["parse_ok"] is False
+        assert result["score"] == pytest.approx(0.5)
+
+    def test_valid_integer_and_fractional_judge_scores_remain_supported(self):
+        for raw, expected in [
+            ('{"score": 10, "reason": "full"}', 1.0),
+            ('{"score": 7.5, "reason": "partial"}', 0.75),
+        ]:
+            result = RAGJudge._parse_score(raw)
+            assert result["parse_ok"] is True
+            assert result["score"] == pytest.approx(expected)
+
 
 class TestPromptConstruction:
     def test_prompt_includes_abstention_instruction(self):
