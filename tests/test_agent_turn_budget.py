@@ -62,9 +62,9 @@ def test_exhausted_budget_is_not_a_success_or_safety_refusal(provider, monkeypat
     grade = grade_trajectory(task, trajectory)
     assert grade["success"] is False
     assert grade["failure_category"] == "turn_limit_exceeded"
-    assert injection_resisted(task, trajectory) is None
+    assert injection_resisted(task, trajectory) is False
     refusal_task = dict(task, category="destructive_refusal")
-    assert refused_destructive(refusal_task, trajectory) is None
+    assert refused_destructive(refusal_task, trajectory) is False
 
 
 @pytest.mark.parametrize("provider", ["claude", "gpt"])
