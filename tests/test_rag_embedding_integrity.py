@@ -5,7 +5,7 @@ import math
 
 import pytest
 
-from evalforge.rag import VectorStore
+from evalforge.rag import VectorStore, cosine_similarity
 
 
 class ControlledEmbedder:
@@ -85,3 +85,29 @@ def test_valid_vectors_still_retrieve_in_similarity_order(tmp_path):
     store.build_index()
 
     assert [doc["doc_id"] for doc in store.search("question", top_k=2)] == ["a", "b"]
+
+
+@pytest.mark.parametrize(("a", "b", "expected"), [
+    ([1e308, 1e308], [1e308, 1e308], 1.0),
+    ([1e308, 1e308], [-1e308, -1e308], -1.0),
+    ([1e308, 0.0], [0.0, 1e308], 0.0),
+    ([1e-300, 1e-300], [1e-300, 1e-300], 1.0),
+    ([1e-300, 1e-300], [-1e-300, -1e-300], -1.0),
+    ([0.0, 0.0], [1e308, 0.0], 0.0),
+])
+def test_cosine_similarity_is_stable_at_extreme_finite_magnitudes(a, b, expected):
+    assert cosine_similarity(a, b) == pytest.approx(expected, abs=1e-12)
+
+
+def test_extreme_finite_embeddings_preserve_retrieval_order(tmp_path):
+    embedder = ControlledEmbedder(
+        [[1e308, 1e308], [-1e308, -1e308]],
+        query_vector=[1e308, 1e308],
+    )
+    store = make_store(tmp_path, embedder)
+    store.build_index()
+
+    results = store.search("question", top_k=2)
+    assert [doc["doc_id"] for doc in results] == ["a", "b"]
+    assert all(math.isfinite(doc["score"]) for doc in results)
+    assert [doc["score"] for doc in results] == pytest.approx([1.0, -1.0])
