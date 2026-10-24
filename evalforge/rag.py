@@ -11,6 +11,7 @@ math is identical to what a vector DB computes; the only thing given up is
 approximate-nearest-neighbour scaling, which matters at ~100k+ vectors.
 """
 
+import hashlib
 import json
 import math
 import os
@@ -22,6 +23,15 @@ load_dotenv()
 
 EMBED_MODEL = "text-embedding-3-small"
 EMBED_CACHE_PATH = "results/embedding_cache.json"
+
+def _embedding_cache_key(text):
+    """Hash model and input so cached keys never contain raw document text.
+
+    A deterministic digest is not encryption: low-entropy inputs may still
+    be guessed. Protect the cache file as sensitive application data.
+    """
+    payload = (EMBED_MODEL + "\0" + text).encode("utf-8")
+    return "v2:" + hashlib.sha256(payload).hexdigest()
 
 # Defense in depth: retrieved documents can contain adversarial instructions.
 # A higher-priority system message keeps the trust boundary explicit for both APIs.
@@ -106,8 +116,17 @@ class EmbeddingClient:
             try:
                 with open(self.cache_path, "r", encoding="utf-8") as f:
                     loaded = json.load(f)
-                # A valid JSON array is not a usable key/value embedding cache.
-                return loaded if isinstance(loaded, dict) else {}
+                # Legacy keys contained raw document/query text. Do not
+                # load or re-persist those entries; regenerate embeddings
+                # using the v2 digest-based key format.
+                if not isinstance(loaded, dict):
+                    return {}
+                return {
+                    key: vector for key, vector in loaded.items()
+                    if isinstance(key, str) and len(key) == 67
+                    and key.startswith("v2:")
+                    and all(ch in "0123456789abcdef" for ch in key[3:])
+                }
             except (json.JSONDecodeError, OSError):
                 return {}
         return {}
@@ -139,9 +158,9 @@ class EmbeddingClient:
         must not re-pay for embeddings, otherwise comparing retrieval
         settings costs money proportional to the number of settings.
         """
-        # A cache entry must not be reused with a different embedding model.
-        # Older text-only cache keys are intentionally ignored.
-        cache_key = f"{EMBED_MODEL}:{text}"
+        # Include the model in the digest to avoid cross-model cache reuse.
+        # Unlike the legacy key, this does not serialize raw input text.
+        cache_key = _embedding_cache_key(text)
         if cache_key in self.cache:
             try:
                 cached_vector = _validated_embedding(
