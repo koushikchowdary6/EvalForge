@@ -69,7 +69,8 @@ def cosine_similarity(vec_a, vec_b):
     """
     if len(vec_a) != len(vec_b):
         raise ValueError(f"Vector length mismatch: {len(vec_a)} vs {len(vec_b)}")
-    if not all(_finite_number(value) for value in (*vec_a, *vec_b)):
+    if (not all(_finite_number(value) for value in vec_a)
+            or not all(_finite_number(value) for value in vec_b)):
         raise ValueError("Cosine vectors must contain finite numeric components")
 
     # Squaring or multiplying finite but large embedding components can
