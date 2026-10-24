@@ -61,7 +61,10 @@ def test_rag_judge_keeps_grading_policy_outside_untrusted_content(provider):
         if provider == "claude":
             return SimpleNamespace(content=[SimpleNamespace(text='{"score": 4}')])
         return SimpleNamespace(
-            choices=[SimpleNamespace(message=SimpleNamespace(content='{"score": 4}'))]
+            choices=[SimpleNamespace(
+                finish_reason="stop",
+                message=SimpleNamespace(content='{"score": 4}'),
+            )]
         )
 
     judge = RAGJudge.__new__(RAGJudge)
