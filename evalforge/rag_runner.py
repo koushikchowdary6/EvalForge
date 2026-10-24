@@ -13,7 +13,7 @@ from datetime import datetime
 from evalforge.rag import VectorStore, RAGPipeline, EmbeddingClient
 from evalforge.rag_graders import (
     precision_at_k, recall_at_k, reciprocal_rank, hit_rate,
-    grade_abstention, RAGJudge,
+    grade_abstention, RAGJudge, ABSTAIN_TOKEN,
 )
 
 
@@ -57,6 +57,19 @@ def validate_rag_questions(questions, document_ids):
         if case["answerable"] and not relevant:
             raise ValueError(
                 f"RAG question {case_id}: answerable questions require relevant_doc_ids"
+            )
+        if not case["answerable"] and relevant:
+            raise ValueError(
+                f"RAG question {case_id}: unanswerable questions cannot label relevant_doc_ids"
+            )
+        expected_abstention = case["expected_answer"].strip().casefold() == ABSTAIN_TOKEN.casefold()
+        if case["answerable"] and expected_abstention:
+            raise ValueError(
+                f"RAG question {case_id}: answerable question cannot expect abstention"
+            )
+        if not case["answerable"] and not expected_abstention:
+            raise ValueError(
+                f"RAG question {case_id}: unanswerable question must expect {ABSTAIN_TOKEN}"
             )
 
 

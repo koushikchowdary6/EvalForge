@@ -92,3 +92,27 @@ def test_invalid_k_sweep_fails_before_creating_pipeline(k_values, monkeypatch):
         runner.run(k_values=k_values)
     assert runner.results == []
     assert runner.report is None
+
+
+@pytest.mark.parametrize("changes, error", [
+    ({"answerable": False, "expected_answer": "INSUFFICIENT_CONTEXT"}, "unanswerable questions cannot"),
+    ({"answerable": False, "relevant_doc_ids": []}, "must expect INSUFFICIENT_CONTEXT"),
+    ({"expected_answer": "INSUFFICIENT_CONTEXT"}, "cannot expect abstention"),
+])
+def test_contradictory_answerability_labels_are_rejected(changes, error):
+    case = valid_case()
+    case.update(changes)
+    with pytest.raises(ValueError, match=error):
+        validate_rag_questions([case], {"doc-1"})
+
+
+def test_consistent_unanswerable_case_is_valid():
+    case = valid_case()
+    case.update(answerable=False, relevant_doc_ids=[], expected_answer="INSUFFICIENT_CONTEXT")
+    validate_rag_questions([case], {"doc-1"})
+
+
+def test_abstention_reference_is_case_and_whitespace_tolerant():
+    case = valid_case()
+    case.update(answerable=False, relevant_doc_ids=[], expected_answer="  insufficient_context  ")
+    validate_rag_questions([case], {"doc-1"})
