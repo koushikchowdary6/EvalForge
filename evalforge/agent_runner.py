@@ -18,6 +18,69 @@ from evalforge.agent_graders import (
 )
 
 
+def validate_agent_tasks(tasks):
+    """Reject invalid benchmark labels before making any model/API calls.
+
+    A malformed case can silently inflate safety metrics (for example, an
+    injection-resistance task with no forbidden tools always 'resists') or
+    crash halfway through an expensive evaluation sweep.
+    """
+    if not isinstance(tasks, list):
+        raise ValueError("agent dataset must be a JSON list of tasks")
+
+    seen_ids = set()
+    for index, task in enumerate(tasks):
+        location = f"agent task at index {index}"
+        if not isinstance(task, dict):
+            raise ValueError(f"{location} must be an object")
+
+        task_id = task.get("id")
+        if not isinstance(task_id, str) or not task_id.strip():
+            raise ValueError(f"{location} must have a non-empty string id")
+        if task_id in seen_ids:
+            raise ValueError(f"duplicate agent task id: {task_id}")
+        seen_ids.add(task_id)
+
+        if not isinstance(task.get("prompt"), str) or not task["prompt"].strip():
+            raise ValueError(f"{task_id}: prompt must be a non-empty string")
+        if "category" in task and (
+            not isinstance(task["category"], str) or not task["category"].strip()
+        ):
+            raise ValueError(f"{task_id}: category must be a non-empty string")
+
+        for field in ("expected_tools", "forbidden_tools", "answer_must_contain"):
+            values = task.get(field, [])
+            if not isinstance(values, list) or any(
+                not isinstance(value, str) or not value.strip() for value in values
+            ):
+                raise ValueError(f"{task_id}: {field} must be a list of non-empty strings")
+            if field != "answer_must_contain" and len(set(values)) != len(values):
+                raise ValueError(f"{task_id}: duplicate tool in {field}")
+
+        expected = set(task.get("expected_tools", []))
+        forbidden = set(task.get("forbidden_tools", []))
+        if expected & forbidden:
+            raise ValueError(f"{task_id}: expected and forbidden tools overlap")
+        if task.get("category") in ("injection_resistance", "destructive_refusal") and not forbidden:
+            raise ValueError(f"{task_id}: safety evaluation requires forbidden_tools")
+
+        expected_args = task.get("expected_args", {})
+        if not isinstance(expected_args, dict) or any(
+            not isinstance(name, str) or not isinstance(args, dict)
+            for name, args in expected_args.items()
+        ):
+            raise ValueError(f"{task_id}: expected_args must map tools to argument objects")
+        if set(expected_args) - expected:
+            raise ValueError(f"{task_id}: expected_args references an unexpected tool")
+
+        responses = task.get("mock_responses", {})
+        if not isinstance(responses, dict) or any(
+            not isinstance(name, str) or not isinstance(value, str)
+            for name, value in responses.items()
+        ):
+            raise ValueError(f"{task_id}: mock_responses must map tools to strings")
+
+
 class AgentEvalRunner:
     """Runs agent evaluation over a task dataset."""
 
@@ -33,12 +96,19 @@ class AgentEvalRunner:
         os.makedirs(output_dir, exist_ok=True)
 
     def load(self):
+        # Never retain a previous valid dataset if reloading fails validation.
+        self.tasks = []
+        self.results = []
+        self.report = None
         with open(self.tasks_path, "r", encoding="utf-8") as f:
-            self.tasks = json.load(f)
+            candidate = json.load(f)
+        validate_agent_tasks(candidate)
+        self.tasks = candidate
         print(f"Loaded {len(self.tasks)} agent tasks from {self.tasks_path}")
         return self.tasks
 
     def run(self):
+        validate_agent_tasks(self.tasks)
         # Each run is an independent evaluation sweep. Reusing a runner should
         # reuse loaded tasks/configuration, not accumulate trajectories from a
         # previous experiment or expose a stale aggregate report.
