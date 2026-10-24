@@ -156,7 +156,7 @@ def answer_contains_all(final_answer, required_substrings):
                 sign, digits = r"\+?", compact
             pattern = (
                 r"(?<![A-Za-z0-9_.,+−-])" + sign + re.escape(digits)
-                + r"(?![A-Za-z0-9_]|[.,]\d)"
+                + r"(?:°?[cCfFkK])?(?![A-Za-z0-9_]|[.,]\d)"
             )
             if not re.search(pattern, text_grouped):
                 return False
