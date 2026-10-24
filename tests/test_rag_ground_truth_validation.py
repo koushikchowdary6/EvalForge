@@ -26,6 +26,7 @@ def valid_case():
     (lambda cases: cases[0].update(expected_answer=""), "expected_answer"),
     (lambda cases: cases[0].update(question=None), "question must"),
     (lambda cases: cases[0].pop("relevant_doc_ids"), "relevant_doc_ids"),
+    (lambda cases: cases[0].update(relevant_doc_ids=[]), "answerable questions require"),
 ])
 def test_invalid_ground_truth_is_rejected(mutate, error):
     cases = [valid_case()]
