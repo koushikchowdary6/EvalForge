@@ -368,6 +368,11 @@ class RAGPipeline:
                     system=RAG_SYSTEM_INSTRUCTIONS,
                     messages=[{"role": "user", "content": prompt}],
                 )
+                # A token-limit stop is a partial answer, not a completed
+                # benchmark response. Never send it to the correctness judge.
+                if getattr(message, "stop_reason", None) == "max_tokens":
+                    return {"answer": "", "latency_ms": (time.time() - start) * 1000,
+                            "error": "generation truncated by token limit"}
                 answer = message.content[0].text
 
             elif self.model == "gpt":
@@ -382,6 +387,10 @@ class RAGPipeline:
                         {"role": "user", "content": prompt},
                     ],
                 )
+                # OpenAI reports the equivalent truncation as finish_reason=length.
+                if getattr(completion.choices[0], "finish_reason", None) == "length":
+                    return {"answer": "", "latency_ms": (time.time() - start) * 1000,
+                            "error": "generation truncated by token limit"}
                 answer = completion.choices[0].message.content
 
             else:
