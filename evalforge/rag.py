@@ -124,7 +124,7 @@ class EmbeddingClient:
             api_key = os.getenv("OPENAI_API_KEY")
             self.client = OpenAI(api_key=api_key) if api_key else None
         except Exception as e:
-            print(f"[warn] EmbeddingClient: could not init OpenAI client: {e}")
+            print(f"[warn] EmbeddingClient: could not init OpenAI client ({type(e).__name__})")
             self.client = None
 
     def _load_cache(self):
@@ -318,7 +318,7 @@ class RAGPipeline:
                 if key:
                     self.anthropic_client = Anthropic(api_key=key)
             except Exception as e:
-                print(f"[warn] RAGPipeline: could not init Anthropic client: {e}")
+                print(f"[warn] RAGPipeline: could not init Anthropic client ({type(e).__name__})")
         elif model == "gpt":
             try:
                 from openai import OpenAI
@@ -326,7 +326,7 @@ class RAGPipeline:
                 if key:
                     self.openai_client = OpenAI(api_key=key)
             except Exception as e:
-                print(f"[warn] RAGPipeline: could not init OpenAI client: {e}")
+                print(f"[warn] RAGPipeline: could not init OpenAI client ({type(e).__name__})")
 
     @staticmethod
     def build_prompt(question, retrieved_docs):
@@ -402,9 +402,12 @@ class RAGPipeline:
 
         except Exception as e:
             return {
-                "answer": f"[Generation error: {str(e)[:100]}]",
+                # Provider exception text can contain API keys, request payloads,
+                # or private document snippets. Reports are durable artifacts:
+                # record a diagnostic exception type, never the raw message.
+                "answer": "",
                 "latency_ms": (time.time() - start) * 1000,
-                "error": str(e),
+                "error": f"generation failed ({type(e).__name__})",
             }
 
     def query(self, question, top_k=3):
