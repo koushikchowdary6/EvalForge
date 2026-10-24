@@ -126,7 +126,7 @@ def answer_contains_all(final_answer, required_substrings):
     # Removing every comma would turn a list like "1,2" into the number "12"
     # and incorrectly credit an agent with a different numeric answer.
     text_grouped = re.sub(
-        r"(?<![\\w.,])\\d{1,3}(?:,\\d{3})+(?![\\d,])",
+        r"(?<![\w.,])\d{1,3}(?:,\d{3})+(?![\d,])",
         lambda match: match.group().replace(",", ""), text,
     )
     for sub in required_substrings:
@@ -136,7 +136,7 @@ def answer_contains_all(final_answer, required_substrings):
             # A required numeric answer must be a complete number, not part
             # of a different value (e.g. 12 in 312, 120 or 12.5).
             # Reject signed negatives, scientific notation, and identifier suffixes\n            # as distinct values. Comma grouping remains tolerated (1,081 = 1081).
-            if not re.search(r"(?<![A-Za-z0-9_.−-])" + re.escape(compact) + r"(?!\d|\.\d|[eE][+-]?\d)",
+            if not re.search(r"(?<![A-Za-z0-9_.−-])" + re.escape(compact) + r"(?!\d|,\d|\.\d|[eE][+-]?\d)",
                              text_grouped):
                 return False
         elif needle not in text and compact not in text_no_separators:
