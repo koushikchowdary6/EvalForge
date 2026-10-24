@@ -208,12 +208,27 @@ class RAGJudge:
         if start != -1 and end > start:
             cleaned = cleaned[start:end + 1]
 
+        def reject_duplicate_keys(pairs):
+            # A judge emitting {"score": 0, "score": 10} has not supplied
+            # an unambiguous grade. Python's default last-key-wins parser
+            # would silently count it as a perfect score.
+            result = {}
+            for key, value in pairs:
+                if key in result:
+                    raise ValueError(f"duplicate judge JSON key: {key}")
+                result[key] = value
+            return result
+
         try:
-            parsed = json.loads(cleaned)
+            parsed = json.loads(cleaned, object_pairs_hook=reject_duplicate_keys)
             if not isinstance(parsed, dict) or "score" not in parsed:
                 raise ValueError("judge response must contain a score")
-            if isinstance(parsed["score"], bool):
-                raise ValueError("judge score must be numeric, not boolean")
+            # Enforce the documented JSON contract: numeric strings, booleans,
+            # and structured reasons are malformed judge outputs, not grades.
+            if isinstance(parsed["score"], bool) or not isinstance(parsed["score"], (int, float)):
+                raise ValueError("judge score must be a JSON number")
+            if not isinstance(parsed.get("reason", ""), str):
+                raise ValueError("judge reason must be a string")
             score = float(parsed["score"]) / 10.0
             if not math.isfinite(score) or not 0.0 <= score <= 1.0:
                 raise ValueError("judge score must be finite and between 0 and 10")
