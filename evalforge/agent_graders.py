@@ -134,9 +134,8 @@ def answer_contains_all(final_answer, required_substrings):
         return True
     text = (final_answer or "").lower()
     text_no_separators = text.replace(",", "")
-    # Strip commas only from correctly grouped thousands (1,081 or 1,234,567).
-    # Removing every comma would turn a list like "1,2" into the number "12"
-    # and incorrectly credit an agent with a different numeric answer.
+    # Normalize only correctly grouped thousands (1,081 or 1,234,567).
+    # Never collapse arbitrary commas: "1,2" is not the number 12.
     text_grouped = re.sub(
         r"(?<![\w.,])\d{1,3}(?:,\d{3})+(?![\d,])",
         lambda match: match.group().replace(",", ""), text,
@@ -144,17 +143,26 @@ def answer_contains_all(final_answer, required_substrings):
     for sub in required_substrings:
         needle = sub.lower()
         compact = needle.replace(",", "")
-        if compact.isdecimal():
-            # A required numeric answer must be a complete number, not part
-            # of a different value (e.g. 12 in 312, 120 or 12.5).
-            # Reject signed negatives, scientific notation, and identifier suffixes\n            # as distinct values. Comma grouping remains tolerated (1,081 = 1081).
-            if not re.search(r"(?<![A-Za-z0-9_.−-])" + re.escape(compact) + r"(?!\d|,\d|\.\d|[eE][+-]?\d)",
-                             text_grouped):
+        if re.fullmatch(r"[+-]?\d+(?:\.\d+)?", compact):
+            # Match signed integers and decimals as *complete numeric tokens*.
+            # Substring matching incorrectly credits -12 for -120, 12.5 for
+            # 12.50, or 12.5 for -12.5. A positive unsigned reference still
+            # accepts an explicit '+' but must never accept a minus sign.
+            if compact.startswith("-"):
+                sign, digits = r"[-−]", compact[1:]
+            elif compact.startswith("+"):
+                sign, digits = r"\+", compact[1:]
+            else:
+                sign, digits = r"\+?", compact
+            pattern = (
+                r"(?<![A-Za-z0-9_.,+−-])" + sign + re.escape(digits)
+                + r"(?:°?[cCfFkK])?(?![A-Za-z0-9_]|[.,]\d)"
+            )
+            if not re.search(pattern, text_grouped):
                 return False
         elif needle not in text and compact not in text_no_separators:
             return False
     return True
-
 
 def estimate_cost(tokens, model):
     rates = PRICING.get(model)
