@@ -115,7 +115,10 @@ def test_generation_errors_do_not_count_as_hallucinations(monkeypatch):
     assert report["hallucination"]["unanswerable_questions"] == 1
     assert report["hallucination"]["hallucinations"] == 0
     assert report["hallucination"]["hallucination_rate"] == 0.0
-    assert report["retrieval"]["hit_rate"] == 1.0
+    # Both cases are unanswerable, so no retrieval ground truth is scored.
+    assert report["retrieval"]["evaluated_queries"] == 0
+    assert report["retrieval"]["excluded_unanswerable"] == 2
+    assert report["retrieval"]["hit_rate"] is None
 
 
 def test_save_removes_stale_report_when_new_sweep_has_no_aggregate(tmp_path):
