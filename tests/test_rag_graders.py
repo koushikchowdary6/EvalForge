@@ -129,7 +129,7 @@ class TestAbstention:
     def test_none_answer_is_safe(self):
         assert did_abstain(None) is False
 
-    @pytest.mark.parametrize("answer", ["", "  \\t\\n", None])
+    @pytest.mark.parametrize("answer", ["", "  \t\n", None])
     @pytest.mark.parametrize("answerable", [True, False])
     def test_empty_answer_is_a_failure_not_a_hallucination_or_refusal(self, answer, answerable):
         result = grade_abstention(answer, answerable=answerable)
