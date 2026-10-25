@@ -188,7 +188,17 @@ class RAGJudge:
                 raise RuntimeError("judge generation truncated by token limit")
             if stop_reason != "end_turn":
                 raise RuntimeError("judge generation did not complete normally")
-            return msg.content[0].text.strip()
+            # A completed turn can still contain multiple content blocks.
+            # Taking only the first would silently discard conflicting grades
+            # or accept a non-text block as an evaluation result.
+            blocks = getattr(msg, "content", None)
+            if not blocks or len(blocks) != 1:
+                raise RuntimeError("judge returned ambiguous content blocks")
+            block = blocks[0]
+            raw = getattr(block, "text", None)
+            if getattr(block, "type", "text") != "text" or not isinstance(raw, str) or not raw.strip():
+                raise RuntimeError("judge returned no single text grade")
+            return raw.strip()
 
         if not self.openai_client:
             raise RuntimeError("OpenAI judge not configured")
@@ -202,9 +212,16 @@ class RAGJudge:
         )
         # Length/content-filter stops are not completed grades, even when
         # their partial text happens to parse as a high-scoring JSON object.
-        if getattr(completion.choices[0], "finish_reason", None) != "stop":
+        # Never choose an arbitrary grade from multiple candidates.
+        choices = getattr(completion, "choices", None)
+        if not choices or len(choices) != 1:
+            raise RuntimeError("judge returned ambiguous choices")
+        if getattr(choices[0], "finish_reason", None) != "stop":
             raise RuntimeError("judge generation did not complete normally")
-        return completion.choices[0].message.content.strip()
+        raw = getattr(choices[0].message, "content", None)
+        if not isinstance(raw, str) or not raw.strip():
+            raise RuntimeError("judge returned no text grade")
+        return raw.strip()
 
     @staticmethod
     def _parse_score(raw_text):
