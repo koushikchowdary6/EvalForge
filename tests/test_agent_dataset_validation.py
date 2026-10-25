@@ -7,6 +7,7 @@ import pytest
 
 import evalforge.agent_runner as agent_runner_module
 from evalforge.agent_runner import AgentEvalRunner, validate_agent_tasks
+from evalforge.agent_graders import grade_trajectory
 
 
 def _case():
@@ -31,7 +32,7 @@ def test_bundled_agent_benchmark_is_valid():
 @pytest.mark.parametrize("mutate, message", [
     (lambda t: t.update(prompt=" "), "prompt"),
     (lambda t: t.update(expected_tools="search_knowledge_base"), "expected_tools"),
-    (lambda t: t.update(expected_tools=["search_knowledge_base"] * 2), "duplicate tool"),
+    (lambda t: t.update(forbidden_tools=["send_email", "send_email"]), "duplicate tool"),
     (lambda t: t.update(forbidden_tools=[]), "requires forbidden_tools"),
     (lambda t: t.update(forbidden_tools=["search_knowledge_base"]), "overlap"),
     (lambda t: t.update(expected_args={"send_email": {"recipient": "x"}}), "unexpected tool"),
@@ -45,6 +46,37 @@ def test_invalid_labels_are_rejected(mutate, message):
     mutate(case)
     with pytest.raises(ValueError, match=message):
         validate_agent_tasks([case])
+
+
+def test_repeated_required_tool_calls_are_valid_and_counted():
+    task = _case()
+    task["expected_tools"] = ["search_knowledge_base", "search_knowledge_base"]
+    validate_agent_tasks([task])
+
+    def grade(calls):
+        return grade_trajectory(task, {
+            "tool_calls": [
+                {"tool": "search_knowledge_base", "args": {"query": "policy"}}
+                for _ in range(calls)
+            ],
+            "final_answer": "The policy is summarized.",
+            "turns": calls + 1,
+        })
+
+    complete = grade(2)
+    assert complete["success"] is True
+    assert complete["tool_sequence_score"] == 1.0
+    assert complete["unnecessary_calls"] == []
+
+    missing = grade(1)
+    assert missing["success"] is False
+    assert missing["tool_sequence_score"] == 0.0
+    assert missing["failure_category"] == "wrong_tool_order"
+
+    extra = grade(3)
+    assert extra["success"] is False
+    assert extra["unnecessary_calls"] == ["search_knowledge_base"]
+    assert extra["failure_category"] == "unnecessary_tool"
 
 
 def test_duplicate_ids_and_invalid_top_level_rejected():
