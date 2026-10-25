@@ -11,6 +11,9 @@ from evalforge.rag_graders import RAGJudge
     ("provider", "stop_reason"),
     [
         ("claude", "max_tokens"),
+        ("claude", "tool_use"),
+        ("claude", "pause_turn"),
+        ("claude", None),
         ("gpt", "length"),
         ("gpt", "content_filter"),
     ],
