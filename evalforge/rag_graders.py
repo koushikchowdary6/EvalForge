@@ -180,10 +180,14 @@ class RAGJudge:
                 system=JUDGE_SYSTEM_INSTRUCTIONS,
                 messages=[{"role": "user", "content": prompt}],
             )
-            # A token-limited judge response may contain valid-looking JSON,
-            # but it is not a completed evaluation. Exclude it from scores.
-            if getattr(msg, "stop_reason", None) == "max_tokens":
+            # Only a normal final assistant turn is a valid judge grade.
+            # A tool handoff, paused turn, unknown status, or token limit may
+            # still contain plausible JSON, but none is a completed judgment.
+            stop_reason = getattr(msg, "stop_reason", None)
+            if stop_reason == "max_tokens":
                 raise RuntimeError("judge generation truncated by token limit")
+            if stop_reason != "end_turn":
+                raise RuntimeError("judge generation did not complete normally")
             return msg.content[0].text.strip()
 
         if not self.openai_client:
