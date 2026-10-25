@@ -8,9 +8,9 @@ separately so a failure can be attributed to the right stage.
 
 import json
 import os
-import tempfile
 from datetime import datetime
 
+from evalforge.artifacts import atomic_json_dump as _atomic_json_dump
 from evalforge.rag import VectorStore, RAGPipeline, EmbeddingClient
 from evalforge.rag_graders import (
     precision_at_k, recall_at_k, reciprocal_rank, hit_rate,
@@ -74,26 +74,6 @@ def validate_rag_questions(questions, document_ids):
             )
 
 
-
-def _atomic_json_dump(path, value):
-    """Publish complete JSON only; a failed write must preserve the previous file.
-
-    Use a temporary file in the destination directory so os.replace remains
-    atomic on the same filesystem. Remove leftovers after serialization errors.
-    """
-    directory = os.path.dirname(os.fspath(path)) or "."
-    fd, temporary = tempfile.mkstemp(
-        prefix=f".{os.path.basename(path)}.", suffix=".tmp", dir=directory
-    )
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            json.dump(value, handle, indent=2)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary, path)
-    finally:
-        if os.path.exists(temporary):
-            os.unlink(temporary)
 
 
 
