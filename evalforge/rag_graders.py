@@ -32,6 +32,12 @@ JUDGE_SYSTEM_INSTRUCTIONS = (
 # Retrieval metrics (pure, deterministic, no API)
 # ---------------------------------------------------------------------------
 
+def _validate_cutoff(k):
+    """Require a positive integer rank cutoff; negative slices inflate metrics."""
+    if k is not None and (isinstance(k, bool) or not isinstance(k, int) or k < 1):
+        raise ValueError("k must be a positive integer or None")
+
+
 def precision_at_k(retrieved_ids, relevant_ids, k=None):
     """
     Fraction of retrieved documents that are relevant.
@@ -40,6 +46,7 @@ def precision_at_k(retrieved_ids, relevant_ids, k=None):
     over an empty retrieval is defined as 0.0 here rather than undefined,
     so aggregate averages stay well-defined.
     """
+    _validate_cutoff(k)
     if k is not None:
         retrieved_ids = retrieved_ids[:k]
     if not retrieved_ids:
@@ -59,6 +66,7 @@ def recall_at_k(retrieved_ids, relevant_ids, k=None):
     Returns 1.0 when there are no relevant documents to find, since a
     retriever cannot be penalised for an unanswerable question.
     """
+    _validate_cutoff(k)
     if k is not None:
         retrieved_ids = retrieved_ids[:k]
     relevant_set = set(relevant_ids)
