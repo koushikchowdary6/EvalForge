@@ -63,7 +63,10 @@ def test_rag_judge_keeps_grading_policy_outside_untrusted_content(provider):
     def create(**kwargs):
         recorded.update(kwargs)
         if provider == "claude":
-            return SimpleNamespace(content=[SimpleNamespace(text='{"score": 4}')])
+            return SimpleNamespace(
+                stop_reason="end_turn",
+                content=[SimpleNamespace(text='{"score": 4}')],
+            )
         return SimpleNamespace(
             choices=[SimpleNamespace(
                 finish_reason="stop",
