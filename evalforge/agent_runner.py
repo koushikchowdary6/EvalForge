@@ -55,7 +55,11 @@ def validate_agent_tasks(tasks):
                 not isinstance(value, str) or not value.strip() for value in values
             ):
                 raise ValueError(f"{task_id}: {field} must be a list of non-empty strings")
-            if field != "answer_must_contain" and len(set(values)) != len(values):
+            # Expected tool calls are an ordered sequence: the same tool may
+            # legitimately be required more than once (for example, two
+            # independent lookups). Sequence and extra-call graders already
+            # account for multiplicity. Forbidden tools remain a set.
+            if field == "forbidden_tools" and len(set(values)) != len(values):
                 raise ValueError(f"{task_id}: duplicate tool in {field}")
 
         expected = set(task.get("expected_tools", []))
