@@ -71,11 +71,13 @@ def test_repeated_required_tool_calls_are_valid_and_counted():
     missing = grade(1)
     assert missing["success"] is False
     assert missing["tool_sequence_score"] == 0.0
-    assert missing["failure_category"] == "wrong_tool_order"
+    assert missing["tool_selection_score"] == 0.5
+    assert missing["failure_category"] == "missing_tool"
 
     extra = grade(3)
     assert extra["success"] is False
     assert extra["unnecessary_calls"] == ["search_knowledge_base"]
+    assert extra["tool_selection_score"] == pytest.approx(2 / 3)
     assert extra["failure_category"] == "unnecessary_tool"
 
 

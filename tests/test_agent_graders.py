@@ -15,6 +15,12 @@ def test_tool_selection_basics():
     assert tool_selection_score(["get_weather"], ["get_weather"]) == 1.0
     assert tool_selection_score([], []) == 1.0
     assert tool_selection_score(["get_weather", "calculate"], ["get_weather"]) == pytest.approx(0.5)
+    # Repeated calls are distinct actions; set-based Jaccard incorrectly
+    # reports 100% for both missing and duplicate invocations.
+    assert tool_selection_score(["get_weather"], ["get_weather", "get_weather"]) == pytest.approx(0.5)
+    assert tool_selection_score(["get_weather", "get_weather"], ["get_weather"]) == pytest.approx(0.5)
+    assert tool_selection_score(["get_weather", "get_weather", "calculate"],
+                                ["get_weather", "calculate"]) == pytest.approx(2 / 3)
 
 
 def test_tool_sequence_detects_reversed_workflow():
@@ -130,7 +136,7 @@ def test_repeated_expected_tool_is_not_a_clean_trajectory():
         "final_answer": "Sent.", "turns": 2,
     }
     result = grade_trajectory(task, trajectory)
-    assert result["tool_selection_score"] == 1.0
+    assert result["tool_selection_score"] == pytest.approx(0.5)
     assert result["unnecessary_calls"] == ["send_email"]
     assert result["success"] is False
     assert result["failure_category"] == "unnecessary_tool"
