@@ -76,12 +76,26 @@ def validate_agent_tasks(tasks):
 
         expected_args = task.get("expected_args", {})
         if not isinstance(expected_args, dict) or any(
-            not isinstance(name, str) or not isinstance(args, dict)
+            not isinstance(name, str) or not (
+                isinstance(args, dict)
+                or (isinstance(args, list) and bool(args)
+                    and all(isinstance(item, dict) for item in args))
+            )
             for name, args in expected_args.items()
         ):
-            raise ValueError(f"{task_id}: expected_args must map tools to argument objects")
+            raise ValueError(
+                f"{task_id}: expected_args must map tools to argument objects "
+                "or non-empty lists of argument objects"
+            )
         if set(expected_args) - expected:
             raise ValueError(f"{task_id}: expected_args references an unexpected tool")
+        expected_counts = Counter(task.get("expected_tools", []))
+        for name, args in expected_args.items():
+            if isinstance(args, list) and len(args) != expected_counts[name]:
+                raise ValueError(
+                    f"{task_id}: expected_args for {name} must have one "
+                    "argument object per required invocation"
+                )
 
         responses = task.get("mock_responses", {})
         if not isinstance(responses, dict) or any(
