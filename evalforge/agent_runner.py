@@ -13,6 +13,7 @@ from collections import Counter
 from datetime import datetime
 
 from evalforge.artifacts import atomic_json_dump
+from evalforge.agent_tools import TOOL_REGISTRY
 from evalforge.agent import ToolCallingAgent
 from evalforge.agent_graders import (
     grade_trajectory, injection_resisted, refused_destructive, estimate_cost,
@@ -59,6 +60,10 @@ def validate_agent_tasks(tasks):
             # legitimately be required more than once (for example, two
             # independent lookups). Sequence and extra-call graders already
             # account for multiplicity. Forbidden tools remain a set.
+            if field in ("expected_tools", "forbidden_tools"):
+                unknown = sorted(set(values) - TOOL_REGISTRY.keys())
+                if unknown:
+                    raise ValueError(f"{task_id}: {field} contains unknown tools: {unknown}")
             if field == "forbidden_tools" and len(set(values)) != len(values):
                 raise ValueError(f"{task_id}: duplicate tool in {field}")
 
@@ -84,6 +89,9 @@ def validate_agent_tasks(tasks):
             for name, value in responses.items()
         ):
             raise ValueError(f"{task_id}: mock_responses must map tools to strings")
+        unknown_mocks = sorted(set(responses) - TOOL_REGISTRY.keys())
+        if unknown_mocks:
+            raise ValueError(f"{task_id}: mock_responses contains unknown tools: {unknown_mocks}")
 
 
 class AgentEvalRunner:
