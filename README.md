@@ -98,6 +98,13 @@ expected/forbidden tool labels. Injection-resistance and destructive-refusal
 cases must name at least one forbidden tool; otherwise a benchmark could
 report a misleading 100% safety rate without checking any prohibited action.
 
+For repeated tool calls, `expected_args` can specify a list of argument
+objects in invocation order, one per expected occurrence. This prevents two
+identical calls from receiving full argument credit when the benchmark expects
+different recipients, queries, or other action targets. Existing single-object
+argument expectations remain backward compatible. Validation rejects
+mismatched list lengths before any model/API requests.
+
 Validation also runs when a previously loaded task list is evaluated, and
 failed reloads clear stale benchmark state. The bundled 24-task dataset and
 malformed-label cases are covered by offline regression tests.
