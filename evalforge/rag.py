@@ -370,9 +370,15 @@ class RAGPipeline:
                 )
                 # A token-limit stop is a partial answer, not a completed
                 # benchmark response. Never send it to the correctness judge.
-                if getattr(message, "stop_reason", None) == "max_tokens":
+                stop_reason = getattr(message, "stop_reason", None)
+                if stop_reason == "max_tokens":
                     return {"answer": "", "latency_ms": (time.time() - start) * 1000,
                             "error": "generation truncated by token limit"}
+                # A tool handoff or an unknown stop is not a completed answer,
+                # even if the response contains plausible-looking text.
+                if stop_reason != "end_turn":
+                    return {"answer": "", "latency_ms": (time.time() - start) * 1000,
+                            "error": "generation did not complete normally"}
                 answer = message.content[0].text
 
             elif self.model == "gpt":
@@ -388,9 +394,15 @@ class RAGPipeline:
                     ],
                 )
                 # OpenAI reports the equivalent truncation as finish_reason=length.
-                if getattr(completion.choices[0], "finish_reason", None) == "length":
+                finish_reason = getattr(completion.choices[0], "finish_reason", None)
+                if finish_reason == "length":
                     return {"answer": "", "latency_ms": (time.time() - start) * 1000,
                             "error": "generation truncated by token limit"}
+                # Content filtering and tool handoffs must not enter RAG
+                # correctness, groundedness, or abstention denominators.
+                if finish_reason != "stop":
+                    return {"answer": "", "latency_ms": (time.time() - start) * 1000,
+                            "error": "generation did not complete normally"}
                 answer = completion.choices[0].message.content
 
             else:

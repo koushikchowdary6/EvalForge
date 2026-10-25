@@ -18,10 +18,14 @@ def test_rag_generator_uses_higher_priority_untrusted_context_guardrail(provider
     def create(**kwargs):
         recorded.update(kwargs)
         if provider == "claude":
-            return SimpleNamespace(content=[SimpleNamespace(text="INSUFFICIENT_CONTEXT")])
+            return SimpleNamespace(
+                stop_reason="end_turn",
+                content=[SimpleNamespace(text="INSUFFICIENT_CONTEXT")],
+            )
         return SimpleNamespace(
             choices=[SimpleNamespace(
-                message=SimpleNamespace(content="INSUFFICIENT_CONTEXT")
+                finish_reason="stop",
+                message=SimpleNamespace(content="INSUFFICIENT_CONTEXT"),
             )]
         )
 
