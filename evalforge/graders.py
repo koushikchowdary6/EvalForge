@@ -4,6 +4,8 @@ Evaluation graders for EvalForge.
 Different grading strategies to evaluate model responses.
 """
 
+import json
+import math
 import re
 import os
 from dotenv import load_dotenv
@@ -287,23 +289,45 @@ No other text."""
             }
 
     def _parse_judgment(self, response_text, judge_name):
-        """Parse judgment JSON from model response."""
-        import json as json_lib
-        try:
-            judgment = json_lib.loads(response_text)
-            score = float(judgment.get("score", 5)) / 10.0  # Convert 0-10 scale to 0-1
-            score = min(1.0, max(0.0, score))  # Clamp to [0, 1]
-            reason = judgment.get("reason", "")
-        except (json_lib.JSONDecodeError, ValueError):
-            score = 0.5
-            reason = response_text[:100]
+        """Validate a judge response before it can affect evaluation metrics.
 
+        Malformed or incomplete responses are not partial credit. In
+        particular, missing scores, non-finite numbers and scores outside the
+        requested 0-10 rubric must never be silently defaulted or clamped.
+        """
+        invalid = {
+            "passed": False,
+            "score": 0.0,
+            "method": "llm_judge",
+            "feedback": "Invalid judge response",
+            "details": f"{judge_name.capitalize()} judge returned invalid rubric JSON",
+        }
+        if not isinstance(response_text, str):
+            return invalid
+        try:
+            judgment = json.loads(response_text)
+        except (json.JSONDecodeError, ValueError):
+            return invalid
+        if not isinstance(judgment, dict):
+            return invalid
+        raw_score = judgment.get("score")
+        reason = judgment.get("reason")
+        if (
+            isinstance(raw_score, bool)
+            or not isinstance(raw_score, (int, float))
+            or not math.isfinite(raw_score)
+            or not 0 <= raw_score <= 10
+            or not isinstance(reason, str)
+            or not reason.strip()
+        ):
+            return invalid
+        score = raw_score / 10.0
         return {
             "passed": score >= 0.6,
             "score": score,
             "method": "llm_judge",
             "feedback": reason,
-            "details": f"{judge_name.capitalize()}-evaluated; raw score: {score:.2f}"
+            "details": f"{judge_name.capitalize()}-evaluated; raw score: {score:.2f}",
         }
 
     def _build_rubric(self, category):
