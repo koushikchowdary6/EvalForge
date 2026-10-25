@@ -12,6 +12,7 @@ import os
 from collections import Counter
 from datetime import datetime
 
+from evalforge.artifacts import atomic_json_dump
 from evalforge.agent import ToolCallingAgent
 from evalforge.agent_graders import (
     grade_trajectory, injection_resisted, refused_destructive, estimate_cost,
@@ -272,14 +273,12 @@ class AgentEvalRunner:
 
     def save(self):
         detail_path = os.path.join(self.output_dir, "agent_results.json")
-        with open(detail_path, "w", encoding="utf-8") as f:
-            json.dump(self.results, f, indent=2)
+        atomic_json_dump(detail_path, self.results)
         print(f"Saved trajectories to {detail_path}")
 
         report_path = os.path.join(self.output_dir, "agent_report.json")
         if self.report is not None:
-            with open(report_path, "w", encoding="utf-8") as f:
-                json.dump(self.report, f, indent=2)
+            atomic_json_dump(report_path, self.report)
             print(f"Saved report to {report_path}")
         elif os.path.exists(report_path):
             # An incomplete or unreported sweep must not leave a stale
