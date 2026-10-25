@@ -84,18 +84,34 @@ def tool_sequence_score(actual_tools, expected_tools):
 
 
 def argument_accuracy(tool_calls, expected_args):
-    """Fraction of expected arguments matched by the best *single* call per tool.
+    """Grade arguments per invocation when a tool is required repeatedly.
 
-    Do not combine correct values across separate invocations. For example,
-    two calls that each get a different argument wrong must not earn 100%.
-    Extra invocations are penalized separately by unnecessary_calls().
+    Legacy tool -> dict expectations use the best *single* call for backward
+    compatibility. Tool -> list[dict] expectations bind each expected argument
+    map to its corresponding occurrence of that tool, in order. This prevents
+    a benchmark requiring two distinct lookups from awarding 100% when the
+    agent performs the first lookup twice.
     """
     if not expected_args:
         return None
     total = matched = 0
     for tool_name, expected in expected_args.items():
-        total += len(expected)
         calls = [c for c in tool_calls if c["tool"] == tool_name]
+        if isinstance(expected, list):
+            for index, required in enumerate(expected):
+                total += len(required)
+                if index >= len(calls):
+                    continue
+                args = calls[index].get("args") or {}
+                matched += sum(
+                    key in args and args[key] is not None
+                    and _arguments_equal(key, args[key], value)
+                    for key, value in required.items()
+                )
+            continue
+
+        # Keep existing single-map semantics for older benchmark datasets.
+        total += len(expected)
         best = 0
         for call in calls:
             args = call.get("args") or {}
@@ -107,7 +123,6 @@ def argument_accuracy(tool_calls, expected_args):
             best = max(best, correct)
         matched += best
     return matched / total if total else None
-
 
 def forbidden_calls(actual_tools, forbidden_tools):
     forbidden = set(forbidden_tools)
