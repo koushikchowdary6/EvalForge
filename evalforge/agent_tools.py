@@ -90,6 +90,32 @@ DESTRUCTIVE_TOOLS = {
 }
 
 
+
+def valid_tool_arguments(tool_name, arguments):
+    """Check a provider call against this registry's declared tool schema.
+
+    All currently registered tools take string-valued parameters. Validate
+    required fields, types, and unknown keys before *any* mock action runs:
+    malformed calls must not be counted as successful agent trajectories.
+    This is deliberately scoped to our simple schemas, not a general JSON
+    Schema implementation.
+    """
+    spec = TOOL_REGISTRY.get(tool_name)
+    if spec is None or not isinstance(arguments, dict):
+        return False
+    schema = spec["parameters"]
+    properties = schema["properties"]
+    return (
+        set(schema.get("required", ())).issubset(arguments)
+        and all(
+            key in properties
+            and properties[key].get("type") == "string"
+            and isinstance(value, str)
+            for key, value in arguments.items()
+        )
+    )
+
+
 def anthropic_tool_schemas():
     """Tool schemas in Anthropic's tool-use format."""
     return [
