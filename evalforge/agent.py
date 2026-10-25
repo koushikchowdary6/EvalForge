@@ -128,16 +128,23 @@ class ToolCallingAgent:
         turns = 0
         completed = False
         incomplete_response = False
+        provider_error = None
 
         for _ in range(MAX_TURNS):
             turns += 1
-            response = self.anthropic_client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=700,
-                system=self.system_prompt,
-                tools=tools,
-                messages=messages,
-            )
+            try:
+                response = self.anthropic_client.messages.create(
+                    model="claude-haiku-4-5-20251001",
+                    max_tokens=700,
+                    system=self.system_prompt,
+                    tools=tools,
+                    messages=messages,
+                )
+            except Exception as exc:
+                # A later provider outage must not erase tool calls already
+                # observed (especially destructive calls) from the audit trail.
+                provider_error = f"agent error: {str(exc)[:120]}"
+                break
             tokens_in += response.usage.input_tokens
             tokens_out += response.usage.output_tokens
 
@@ -184,11 +191,11 @@ class ToolCallingAgent:
             # A tool call on the final budgeted turn has no follow-up answer.
             # Never grade an earlier intermediate message as a completed answer.
             "final_answer": final_answer if completed else "",
-            "turn_limit_exceeded": not completed and not incomplete_response,
+            "turn_limit_exceeded": not completed and not incomplete_response and provider_error is None,
             "incomplete_response": incomplete_response,
             "turns": turns,
             "tokens": {"input": tokens_in, "output": tokens_out},
-            "error": None,
+            "error": provider_error,
         }
 
     # -- OpenAI ------------------------------------------------------------
@@ -208,15 +215,22 @@ class ToolCallingAgent:
         turns = 0
         completed = False
         incomplete_response = False
+        provider_error = None
 
         for _ in range(MAX_TURNS):
             turns += 1
-            response = self.openai_client.chat.completions.create(
-                model="gpt-4o-mini",
-                max_tokens=700,
-                tools=tools,
-                messages=messages,
-            )
+            try:
+                response = self.openai_client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    max_tokens=700,
+                    tools=tools,
+                    messages=messages,
+                )
+            except Exception as exc:
+                # Preserve earlier simulated actions when a subsequent model
+                # round-trip fails instead of replacing the entire trajectory.
+                provider_error = f"agent error: {str(exc)[:120]}"
+                break
             if response.usage:
                 tokens_in += response.usage.prompt_tokens
                 tokens_out += response.usage.completion_tokens
@@ -282,9 +296,9 @@ class ToolCallingAgent:
             # A tool call on the final budgeted turn has no follow-up answer.
             # Never grade an earlier intermediate message as a completed answer.
             "final_answer": final_answer if completed else "",
-            "turn_limit_exceeded": not completed and not incomplete_response,
+            "turn_limit_exceeded": not completed and not incomplete_response and provider_error is None,
             "incomplete_response": incomplete_response,
             "turns": turns,
             "tokens": {"input": tokens_in, "output": tokens_out},
-            "error": None,
+            "error": provider_error,
         }
