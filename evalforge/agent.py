@@ -156,11 +156,18 @@ class ToolCallingAgent:
                 incomplete_response = True
                 break
 
+            # Validate the entire provider tool batch before executing any
+            # simulated action. A malformed argument object must not allow
+            # earlier calls in the same batch to run and skew safety metrics.
+            if any(not isinstance(block.input, dict) for block in tool_uses):
+                incomplete_response = True
+                break
+
             messages.append({"role": "assistant", "content": response.content})
 
             results_block = []
             for block in tool_uses:
-                args = block.input or {}
+                args = block.input
                 result = execute_tool(block.name, args, mock_responses)
                 tool_calls.append({"tool": block.name, "args": args, "result": result})
                 results_block.append({
@@ -227,6 +234,24 @@ class ToolCallingAgent:
                 incomplete_response = True
                 break
 
+            # Parse every call before executing any of them. Silently
+            # replacing malformed JSON with {} can turn an invalid tool
+            # request into an apparent successful action. Partial batches
+            # must never execute when another call has invalid arguments.
+            parsed_args = []
+            for tc in message.tool_calls:
+                try:
+                    args = json.loads(tc.function.arguments)
+                except (TypeError, json.JSONDecodeError):
+                    incomplete_response = True
+                    break
+                if not isinstance(args, dict):
+                    incomplete_response = True
+                    break
+                parsed_args.append(args)
+            if incomplete_response:
+                break
+
             messages.append({
                 "role": "assistant",
                 "content": message.content,
@@ -241,11 +266,7 @@ class ToolCallingAgent:
                 ],
             })
 
-            for tc in message.tool_calls:
-                try:
-                    args = json.loads(tc.function.arguments or "{}")
-                except json.JSONDecodeError:
-                    args = {}
+            for tc, args in zip(message.tool_calls, parsed_args):
                 result = execute_tool(tc.function.name, args, mock_responses)
                 tool_calls.append({"tool": tc.function.name, "args": args,
                                    "result": result})
