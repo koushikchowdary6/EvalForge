@@ -8,6 +8,7 @@ separately so a failure can be attributed to the right stage.
 
 import json
 import os
+import tempfile
 from datetime import datetime
 
 from evalforge.rag import VectorStore, RAGPipeline, EmbeddingClient
@@ -71,6 +72,29 @@ def validate_rag_questions(questions, document_ids):
             raise ValueError(
                 f"RAG question {case_id}: unanswerable question must expect {ABSTAIN_TOKEN}"
             )
+
+
+
+def _atomic_json_dump(path, value):
+    """Publish complete JSON only; a failed write must preserve the previous file.
+
+    Use a temporary file in the destination directory so os.replace remains
+    atomic on the same filesystem. Remove leftovers after serialization errors.
+    """
+    directory = os.path.dirname(os.fspath(path)) or "."
+    fd, temporary = tempfile.mkstemp(
+        prefix=f".{os.path.basename(path)}.", suffix=".tmp", dir=directory
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(value, handle, indent=2)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
 
 
 class RAGEvalRunner:
@@ -347,14 +371,12 @@ class RAGEvalRunner:
 
     def save(self):
         detail_path = os.path.join(self.output_dir, "rag_results.json")
-        with open(detail_path, "w", encoding="utf-8") as f:
-            json.dump(self.results, f, indent=2)
+        _atomic_json_dump(detail_path, self.results)
         print(f"Saved detailed results to {detail_path}")
 
         report_path = os.path.join(self.output_dir, "rag_report.json")
         if self.report is not None:
-            with open(report_path, "w", encoding="utf-8") as f:
-                json.dump(self.report, f, indent=2)
+            _atomic_json_dump(report_path, self.report)
             print(f"Saved report to {report_path}")
         elif os.path.exists(report_path):
             # A new sweep without aggregation must not expose a previous
