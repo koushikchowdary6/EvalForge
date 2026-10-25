@@ -17,7 +17,8 @@ def _response(provider, *, with_tool):
             if with_tool else [SimpleNamespace(type="text", text="Done")]
         )
         return SimpleNamespace(
-            content=content, usage=SimpleNamespace(input_tokens=3, output_tokens=2)
+            content=content, stop_reason="tool_use" if with_tool else "end_turn",
+            usage=SimpleNamespace(input_tokens=3, output_tokens=2)
         )
     calls = (
         [SimpleNamespace(id="call-1", function=SimpleNamespace(
@@ -25,7 +26,8 @@ def _response(provider, *, with_tool):
         if with_tool else []
     )
     return SimpleNamespace(
-        choices=[SimpleNamespace(message=SimpleNamespace(
+        choices=[SimpleNamespace(finish_reason="tool_calls" if with_tool else "stop",
+                                 message=SimpleNamespace(
             content=None if with_tool else "Done", tool_calls=calls
         ))],
         usage=SimpleNamespace(prompt_tokens=3, completion_tokens=2),
