@@ -128,7 +128,7 @@ class AgentEvalRunner:
 
             self.results.append({
                 "case_id": task["id"],
-                "category": task.get("category"),
+                "category": task.get("category") or "uncategorized",
                 "model": self.model,
                 "prompt": task["prompt"],
                 "tool_calls": trajectory.get("tool_calls", []),
@@ -166,7 +166,7 @@ class AgentEvalRunner:
     def generate_report(self):
         by_category = {}
         for r in self.results:
-            by_category.setdefault(r["category"], []).append(r)
+            by_category.setdefault(r.get("category") or "uncategorized", []).append(r)
 
         evaluated = [r for r in self.results if not r.get("error")]
 
