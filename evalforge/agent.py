@@ -126,6 +126,7 @@ class ToolCallingAgent:
         final_answer = ""
         turns = 0
         completed = False
+        incomplete_response = False
 
         for _ in range(MAX_TURNS):
             turns += 1
@@ -144,8 +145,15 @@ class ToolCallingAgent:
                 final_answer = "\n".join(text_parts).strip()
 
             tool_uses = [b for b in response.content if b.type == "tool_use"]
+            stop_reason = getattr(response, "stop_reason", None)
             if not tool_uses:
-                completed = True
+                # A token-truncated or paused response is not a final answer.
+                completed = stop_reason in ("end_turn", "stop_sequence")
+                incomplete_response = not completed
+                break
+            if stop_reason != "tool_use":
+                # Never execute a tool call from an unfinished provider turn.
+                incomplete_response = True
                 break
 
             messages.append({"role": "assistant", "content": response.content})
@@ -168,7 +176,8 @@ class ToolCallingAgent:
             # A tool call on the final budgeted turn has no follow-up answer.
             # Never grade an earlier intermediate message as a completed answer.
             "final_answer": final_answer if completed else "",
-            "turn_limit_exceeded": not completed,
+            "turn_limit_exceeded": not completed and not incomplete_response,
+            "incomplete_response": incomplete_response,
             "turns": turns,
             "tokens": {"input": tokens_in, "output": tokens_out},
             "error": None,
@@ -190,6 +199,7 @@ class ToolCallingAgent:
         final_answer = ""
         turns = 0
         completed = False
+        incomplete_response = False
 
         for _ in range(MAX_TURNS):
             turns += 1
@@ -203,12 +213,18 @@ class ToolCallingAgent:
                 tokens_in += response.usage.prompt_tokens
                 tokens_out += response.usage.completion_tokens
 
-            message = response.choices[0].message
+            choice = response.choices[0]
+            message = choice.message
             if message.content:
                 final_answer = message.content.strip()
 
             if not message.tool_calls:
-                completed = True
+                completed = choice.finish_reason == "stop"
+                incomplete_response = not completed
+                break
+            if choice.finish_reason != "tool_calls":
+                # Refuse partially generated tool calls (length/content_filter).
+                incomplete_response = True
                 break
 
             messages.append({
@@ -244,7 +260,8 @@ class ToolCallingAgent:
             # A tool call on the final budgeted turn has no follow-up answer.
             # Never grade an earlier intermediate message as a completed answer.
             "final_answer": final_answer if completed else "",
-            "turn_limit_exceeded": not completed,
+            "turn_limit_exceeded": not completed and not incomplete_response,
+            "incomplete_response": incomplete_response,
             "turns": turns,
             "tokens": {"input": tokens_in, "output": tokens_out},
             "error": None,
