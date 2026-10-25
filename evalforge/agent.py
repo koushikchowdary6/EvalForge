@@ -17,6 +17,7 @@ from dotenv import load_dotenv
 
 from evalforge.agent_tools import (
     anthropic_tool_schemas, openai_tool_schemas, execute_tool,
+    valid_tool_arguments,
 )
 
 load_dotenv()
@@ -159,7 +160,7 @@ class ToolCallingAgent:
             # Validate the entire provider tool batch before executing any
             # simulated action. A malformed argument object must not allow
             # earlier calls in the same batch to run and skew safety metrics.
-            if any(not isinstance(block.input, dict) for block in tool_uses):
+            if any(not valid_tool_arguments(block.name, block.input) for block in tool_uses):
                 incomplete_response = True
                 break
 
@@ -245,7 +246,7 @@ class ToolCallingAgent:
                 except (TypeError, json.JSONDecodeError):
                     incomplete_response = True
                     break
-                if not isinstance(args, dict):
+                if not valid_tool_arguments(tc.function.name, args):
                     incomplete_response = True
                     break
                 parsed_args.append(args)
