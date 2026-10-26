@@ -1,8 +1,9 @@
 """Crash-safe JSON artifact publishing for evaluation runners.
 
 Write to a unique sibling temporary file, fsync the complete payload, then
-atomically replace the destination. Failed serialization or publication must
-leave the previous benchmark artifact intact.
+atomically replace the destination. On POSIX, sync the containing directory
+so the new filename survives a sudden crash on filesystems supporting fsync.
+Failed serialization or replacement must leave the previous artifact intact.
 """
 
 import json
@@ -23,6 +24,17 @@ def atomic_json_dump(path, value):
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temporary, destination)
+        # fsync on the temporary file makes its contents durable, but the
+        # rename itself is a directory metadata change. Sync the containing
+        # directory on POSIX so a power loss does not lose the new entry.
+        # This is best-effort filesystem durability, not a cross-platform
+        # transaction across multiple report files.
+        if os.name == "posix":
+            dir_fd = os.open(directory, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
     finally:
         if os.path.exists(temporary):
             os.unlink(temporary)
