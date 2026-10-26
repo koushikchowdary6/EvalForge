@@ -235,6 +235,11 @@ class ToolCallingAgent:
                 tokens_in += response.usage.prompt_tokens
                 tokens_out += response.usage.completion_tokens
 
+            # Multiple or missing choices make the observed agent trajectory
+            # ambiguous. Never select one arbitrarily and grant tool credit.
+            if len(response.choices) != 1:
+                incomplete_response = True
+                break
             choice = response.choices[0]
             message = choice.message
             if message.content:
