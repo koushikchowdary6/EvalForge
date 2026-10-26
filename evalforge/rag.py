@@ -385,7 +385,18 @@ class RAGPipeline:
                 if stop_reason != "end_turn":
                     return {"answer": "", "latency_ms": (time.time() - start) * 1000,
                             "error": "generation did not complete normally"}
-                answer = message.content[0].text
+                # A completed provider turn may still contain ambiguous or
+                # unusable output. Never grade an arbitrarily chosen block.
+                blocks = getattr(message, "content", None)
+                if not isinstance(blocks, (list, tuple)) or len(blocks) != 1:
+                    return {"answer": "", "latency_ms": (time.time() - start) * 1000,
+                            "error": "generation returned ambiguous or empty content"}
+                block = blocks[0]
+                answer = getattr(block, "text", None)
+                if (getattr(block, "type", "text") != "text"
+                        or not isinstance(answer, str) or not answer.strip()):
+                    return {"answer": "", "latency_ms": (time.time() - start) * 1000,
+                            "error": "generation returned ambiguous or empty content"}
 
             elif self.model == "gpt":
                 if not self.openai_client:
@@ -399,8 +410,14 @@ class RAGPipeline:
                         {"role": "user", "content": prompt},
                     ],
                 )
+                # Multiple choices are ambiguous; an empty list is not an
+                # answer. Both must be excluded from benchmark scoring.
+                choices = getattr(completion, "choices", None)
+                if not isinstance(choices, (list, tuple)) or len(choices) != 1:
+                    return {"answer": "", "latency_ms": (time.time() - start) * 1000,
+                            "error": "generation returned ambiguous or empty content"}
                 # OpenAI reports the equivalent truncation as finish_reason=length.
-                finish_reason = getattr(completion.choices[0], "finish_reason", None)
+                finish_reason = getattr(choices[0], "finish_reason", None)
                 if finish_reason == "length":
                     return {"answer": "", "latency_ms": (time.time() - start) * 1000,
                             "error": "generation truncated by token limit"}
@@ -409,7 +426,11 @@ class RAGPipeline:
                 if finish_reason != "stop":
                     return {"answer": "", "latency_ms": (time.time() - start) * 1000,
                             "error": "generation did not complete normally"}
-                answer = completion.choices[0].message.content
+                message = getattr(choices[0], "message", None)
+                answer = getattr(message, "content", None)
+                if not isinstance(answer, str) or not answer.strip():
+                    return {"answer": "", "latency_ms": (time.time() - start) * 1000,
+                            "error": "generation returned ambiguous or empty content"}
 
             else:
                 return {"answer": f"[Unknown model: {self.model}]",
