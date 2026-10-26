@@ -204,9 +204,19 @@ class EmbeddingClient:
             )
 
         response = self.client.embeddings.create(model=EMBED_MODEL, input=text)
-        vector = _validated_embedding(
-            response.data[0].embedding, label="API embedding"
-        )
+        # A single input must yield exactly one indexed embedding. Silently
+        # taking data[0] from an empty, duplicated, or out-of-order response
+        # can poison the cache and change retrieval rankings in later runs.
+        data = getattr(response, "data", None)
+        if not isinstance(data, (list, tuple)) or len(data) != 1:
+            raise ValueError("API embedding: expected exactly one result")
+        entry = data[0]
+        if entry is None or not hasattr(entry, "embedding"):
+            raise ValueError("API embedding: missing vector")
+        index = getattr(entry, "index", 0)
+        if isinstance(index, bool) or index != 0:
+            raise ValueError("API embedding: unexpected result index")
+        vector = _validated_embedding(entry.embedding, label="API embedding")
         self.api_calls += 1
         self.cache[cache_key] = vector
         return vector
