@@ -145,8 +145,8 @@ class RAGEvalRunner:
                         "precision_at_k", "recall_at_k", "reciprocal_rank", "hit_rate"
                     )}
                     if retrieval_error else {
-                        "precision_at_k": precision_at_k(retrieved_ids, relevant_ids),
-                        "recall_at_k": recall_at_k(retrieved_ids, relevant_ids),
+                        "precision_at_k": precision_at_k(retrieved_ids, relevant_ids, k=k),
+                        "recall_at_k": recall_at_k(retrieved_ids, relevant_ids, k=k),
                         "reciprocal_rank": reciprocal_rank(retrieved_ids, relevant_ids),
                         "hit_rate": hit_rate(retrieved_ids, relevant_ids),
                     }
