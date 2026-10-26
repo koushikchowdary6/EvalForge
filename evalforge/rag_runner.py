@@ -11,7 +11,7 @@ import os
 from datetime import datetime
 
 from evalforge.artifacts import atomic_json_dump as _atomic_json_dump
-from evalforge.rag import VectorStore, RAGPipeline, EmbeddingClient
+from evalforge.rag import VectorStore, RAGPipeline, EmbeddingClient, _unique_json_keys
 from evalforge.rag_graders import (
     precision_at_k, recall_at_k, ndcg_at_k, average_precision_at_k, reciprocal_rank, hit_rate,
     grade_abstention, RAGJudge, ABSTAIN_TOKEN,
@@ -104,7 +104,10 @@ class RAGEvalRunner:
         self.store.load_corpus(self.corpus_path)
         self.questions = []
         with open(self.questions_path, "r", encoding="utf-8") as f:
-            questions = json.load(f)
+            # Reject ambiguous duplicate fields at any nesting level. The
+            # default JSON decoder silently keeps the last value, which can
+            # relabel benchmark answerability, references, or case identity.
+            questions = json.load(f, object_pairs_hook=_unique_json_keys)
         validate_rag_questions(
             questions, {doc["doc_id"] for doc in self.store.documents}
         )
