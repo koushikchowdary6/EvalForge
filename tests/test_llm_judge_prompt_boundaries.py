@@ -21,7 +21,7 @@ def test_judge_keeps_adversarial_evidence_in_json_not_prompt_policy(provider):
     response = '{"score": 2, "reason": "Insufficient support"}'
     if provider == "claude":
         create = Mock(return_value=SimpleNamespace(
-            content=[SimpleNamespace(text=response)
+            content=[SimpleNamespace(text=response)]
         ))
         grader.anthropic_client = SimpleNamespace(messages=SimpleNamespace(create=create))
         result = grader._judge_with_claude(reference, forged, "factual")
