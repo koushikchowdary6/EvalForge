@@ -81,6 +81,22 @@ not claim any measured production failure rate.
 
 ---
 
+## RAG benchmark provenance
+
+Newly generated RAG summary reports include a `benchmark_provenance` object
+with SHA-256 fingerprints of the **validated, parsed** corpus and question
+datasets, plus the embedding and judge model identifiers. The fingerprints
+use canonical JSON (sorted object keys, preserved array order), so changing
+JSON indentation does not make the benchmark appear new, but editing evidence,
+case labels, or case order does. Failed validation or index construction
+cannot retain a previous dataset's fingerprints.
+
+Compare these identifiers alongside the generation model and top-k settings
+before attributing score changes to an AI system. Hashes are identifiers,
+**not proof of ground-truth quality, model determinism, or data secrecy**.
+Historical tracked reports predate this feature and must not be retroactively
+described as provenance-verified.
+
 ## RAG corpus integrity
 
 Corpus JSON is decoded with duplicate-key rejection at every object depth.
