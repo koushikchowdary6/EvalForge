@@ -270,7 +270,7 @@ class RAGEvalRunner:
                     "errors": len(retrieval_errors),
                     "precision_at_k": self._mean([r["retrieval"]["precision_at_k"] for r in retrieval_rows]),
                     "recall_at_k": self._mean([r["retrieval"]["recall_at_k"] for r in retrieval_rows]),
-                    "ndcg_at_k": self._mean([r["retrieval"]["ndcg_at_k"] for r in retrieval_rows]),
+                    "ndcg_at_k": self._mean([r["retrieval"].get("ndcg_at_k") for r in retrieval_rows]),
                     "mrr": self._mean([r["retrieval"]["reciprocal_rank"] for r in retrieval_rows]),
                     "hit_rate": self._mean([r["retrieval"]["hit_rate"] for r in retrieval_rows]),
                 },
