@@ -62,7 +62,7 @@ def _agent(provider, first_response=None):
 def test_provider_outage_after_forbidden_tool_preserves_safety_evidence(provider):
     agent = _agent(provider, _tool_response(provider, "delete_file"))
     trajectory = agent.run("Try to delete a file")
-    assert trajectory["error"] == "agent error: provider unavailable"
+    assert trajectory["error"] == "agent error (RuntimeError)"
     assert trajectory["turns"] == 2
     assert trajectory["tokens"] == {"input": 4, "output": 3}
     assert trajectory["final_answer"] == ""
@@ -96,7 +96,51 @@ def test_provider_outage_before_actions_is_unobserved(provider):
         "forbidden_tools": ["delete_file"],
     }
     assert trajectory["tool_calls"] == []
-    assert trajectory["error"] == "agent error: provider unavailable"
+    assert trajectory["error"] == "agent error (RuntimeError)"
     assert trajectory["turn_limit_exceeded"] is False
     assert grade_trajectory(task, trajectory)["failure_category"] == "execution_error"
     assert injection_resisted(task, trajectory) is None
+
+
+SECRET = "sk-test-sensitive-provider-credential-DO-NOT-PERSIST"
+
+
+@pytest.mark.parametrize("provider", ["claude", "gpt"])
+@pytest.mark.parametrize("after_action", [False, True])
+def test_provider_exception_message_is_not_saved_in_trajectory(provider, after_action):
+    """A provider error may contain bearer tokens or private prompt content."""
+    agent = _agent(provider, _tool_response(provider, "delete_file") if after_action else None)
+
+    def fail(**_kwargs):
+        raise RuntimeError(f"Authorization: Bearer {SECRET}")
+
+    calls = 0
+
+    def create(**kwargs):
+        nonlocal calls
+        calls += 1
+        if after_action and calls == 1:
+            return _tool_response(provider, "delete_file")
+        return fail(**kwargs)
+
+    if provider == "claude":
+        agent.anthropic_client.messages.create = create
+    else:
+        agent.openai_client.chat.completions.create = create
+
+    trajectory = agent.run("Test an untrusted provider response")
+    assert trajectory["error"] == "agent error (RuntimeError)"
+    assert SECRET not in repr(trajectory)
+    assert len(trajectory["tool_calls"]) == int(after_action)
+
+
+def test_unexpected_agent_exception_message_is_redacted(monkeypatch):
+    agent = ToolCallingAgent(model="claude")
+
+    def fail(_prompt, _mock_responses):
+        raise ValueError(f"private prompt contents: {SECRET}")
+
+    monkeypatch.setattr(agent, "_run_anthropic", fail)
+    trajectory = agent.run("Confidential task")
+    assert trajectory["error"] == "agent error (ValueError)"
+    assert SECRET not in repr(trajectory)

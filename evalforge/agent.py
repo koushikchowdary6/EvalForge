@@ -67,7 +67,7 @@ class ToolCallingAgent:
                 if key:
                     self.anthropic_client = Anthropic(api_key=key)
             except Exception as e:
-                print(f"[warn] ToolCallingAgent: Anthropic init failed: {e}")
+                print(f"[warn] ToolCallingAgent: Anthropic init failed ({type(e).__name__})")
         elif model == "gpt":
             try:
                 from openai import OpenAI
@@ -75,7 +75,7 @@ class ToolCallingAgent:
                 if key:
                     self.openai_client = OpenAI(api_key=key)
             except Exception as e:
-                print(f"[warn] ToolCallingAgent: OpenAI init failed: {e}")
+                print(f"[warn] ToolCallingAgent: OpenAI init failed ({type(e).__name__})")
 
     def run(self, prompt, mock_responses=None):
         """
@@ -99,7 +99,9 @@ class ToolCallingAgent:
             else:
                 trajectory = self._empty(f"unknown model: {self.model}")
         except Exception as e:
-            trajectory = self._empty(f"agent error: {str(e)[:120]}")
+            # Provider exceptions may embed API credentials or private task text.
+            # Reports persist error diagnostics, so record only the exception type.
+            trajectory = self._empty(f"agent error ({type(e).__name__})")
 
         trajectory["latency_ms"] = (time.time() - start) * 1000
         return trajectory
@@ -143,7 +145,8 @@ class ToolCallingAgent:
             except Exception as exc:
                 # A later provider outage must not erase tool calls already
                 # observed (especially destructive calls) from the audit trail.
-                provider_error = f"agent error: {str(exc)[:120]}"
+                # Never serialize provider exception messages into benchmark artifacts.
+                provider_error = f"agent error ({type(exc).__name__})"
                 break
             tokens_in += response.usage.input_tokens
             tokens_out += response.usage.output_tokens
@@ -229,7 +232,7 @@ class ToolCallingAgent:
             except Exception as exc:
                 # Preserve earlier simulated actions when a subsequent model
                 # round-trip fails instead of replacing the entire trajectory.
-                provider_error = f"agent error: {str(exc)[:120]}"
+                provider_error = f"agent error ({type(exc).__name__})"
                 break
             if response.usage:
                 tokens_in += response.usage.prompt_tokens
