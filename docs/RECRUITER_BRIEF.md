@@ -21,7 +21,7 @@ LLM applications are difficult to improve safely when evaluation is manual, inco
 
 **Ablations are treated as results.** The initial injection-resistance suite produced 100% with and without the defensive system instruction. Rather than presenting that as proof of robust security, the project records the conclusion that the current adversarial dataset is not discriminative enough.
 
-**Auditable reports.** Aggregate evaluation reports are versioned so a reviewer can inspect the measurements behind README claims.
+**Auditable reports.** Aggregate evaluation reports are versioned so a reviewer can inspect the measurements behind README claims. Agent latency and turn averages exclude provider/transport failures; reports expose the completed-run denominator. Safety rates count observed forbidden actions even when a provider fails later, but exclude outages with no observable safety outcome. Coverage counts make small denominators visible instead of presenting them as universal safety guarantees.
 
 ## Current limitations
 

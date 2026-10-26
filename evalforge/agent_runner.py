@@ -208,6 +208,15 @@ class AgentEvalRunner:
             "total_tasks": len(self.results),
             "evaluated_tasks": len(evaluated),
             "execution_errors": len(self.results) - len(evaluated),
+            # Safety attempts with observed forbidden actions count as failures
+            # even if the provider later errors. Unobserved outages stay out
+            # of the rate denominator; expose coverage to prevent overclaiming.
+            "injection_resistance_evaluated": sum(
+                r["injection_resisted"] is not None for r in self.results
+            ),
+            "destructive_refusal_evaluated": sum(
+                r["refused_destructive"] is not None for r in self.results
+            ),
             "overall": {
                 "task_success_rate": self._rate([r["grade"]["success"] for r in evaluated]),
                 "tool_selection_accuracy": self._mean(
@@ -222,8 +231,12 @@ class AgentEvalRunner:
                     [r["refused_destructive"] for r in self.results]),
                 "unnecessary_call_rate": self._rate(
                     [bool(r["grade"]["unnecessary_calls"]) for r in evaluated]),
-                "avg_latency_ms": self._mean([r["latency_ms"] for r in self.results]),
-                "avg_turns": self._mean([r["turns"] for r in self.results]),
+                "latency_samples": len(evaluated),
+                "turn_samples": len(evaluated),
+                # Failed requests often exit quickly and at turn zero. Mixing
+                # them into completed-run means rewards provider outages.
+                "avg_latency_ms": self._mean([r["latency_ms"] for r in evaluated]),
+                "avg_turns": self._mean([r["turns"] for r in evaluated]),
                 "total_cost_usd": sum(r["cost_usd"] or 0 for r in self.results),
             },
             "failure_categories": dict(failure_counts),
@@ -245,7 +258,8 @@ class AgentEvalRunner:
                     [r["grade"]["tool_selection_score"] for r in valid_rows]),
                 "tool_sequence_accuracy": self._mean(
                     [r["grade"].get("tool_sequence_score") for r in valid_rows]),
-                "avg_latency_ms": self._mean([r["latency_ms"] for r in rows]),
+                "latency_samples": len(valid_rows),
+                "avg_latency_ms": self._mean([r["latency_ms"] for r in valid_rows]),
             }
 
         self.report = report
@@ -268,6 +282,9 @@ class AgentEvalRunner:
         print("-" * 72)
         print(f"  Evaluated tasks ............ {self.report['evaluated_tasks']}/{self.report['total_tasks']}")
         print(f"  Execution errors ........... {self.report['execution_errors']}")
+        print(f"  Latency samples ............ {o['latency_samples']}/{self.report['total_tasks']}")
+        print(f"  Injection safety observed .. {self.report['injection_resistance_evaluated']}")
+        print(f"  Destructive safety observed  {self.report['destructive_refusal_evaluated']}")
         print(f"  Task success rate .......... {pct(o['task_success_rate'])}")
         print(f"  Tool selection accuracy .... {pct(o['tool_selection_accuracy'])}")
         print(f"  Tool sequence accuracy ..... {pct(o['tool_sequence_accuracy'])}")
