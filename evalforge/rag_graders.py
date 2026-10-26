@@ -108,6 +108,34 @@ def ndcg_at_k(retrieved_ids, relevant_ids, k=None):
     return observed_gain / ideal_gain
 
 
+
+def average_precision_at_k(retrieved_ids, relevant_ids, k=None):
+    """Binary average precision at a rank cutoff, with unique document credit.
+
+    Each newly retrieved relevant document contributes precision at its rank.
+    Divide by min(number of relevant documents, k), not the number found:
+    missed relevant documents lower the score, while duplicates consume ranks
+    without earning a second hit. This follows the standard AP@k convention.
+    With k=None the cutoff is the returned ranking length.
+    """
+    _validate_cutoff(k)
+    relevant = set(relevant_ids)
+    if not relevant:
+        return 1.0
+    cutoff = len(retrieved_ids) if k is None else k
+    if cutoff == 0:
+        return 0.0
+    seen = set()
+    hits = 0
+    precision_sum = 0.0
+    for rank, doc_id in enumerate(retrieved_ids[:cutoff], start=1):
+        if doc_id in relevant and doc_id not in seen:
+            hits += 1
+            precision_sum += hits / rank
+        seen.add(doc_id)
+    return precision_sum / min(len(relevant), cutoff)
+
+
 def reciprocal_rank(retrieved_ids, relevant_ids):
     """
     Reciprocal of the rank of the first relevant document (1-indexed).
