@@ -165,3 +165,41 @@ def test_embedding_cache_keys_are_model_scoped(monkeypatch):
     first = rag._embedding_cache_key("same input")
     monkeypatch.setattr(rag, "EMBED_MODEL", "another-embedding-model")
     assert rag._embedding_cache_key("same input") != first
+
+
+@pytest.mark.parametrize("provider_data", [
+    None,
+    [],
+    "not a list",
+    [None],
+    [SimpleNamespace(index=0)],
+    [SimpleNamespace(index=1, embedding=[1.0, 0.0])],
+    [SimpleNamespace(index=True, embedding=[1.0, 0.0])],
+    [
+        SimpleNamespace(index=0, embedding=[1.0, 0.0]),
+        SimpleNamespace(index=1, embedding=[0.0, 1.0]),
+    ],
+])
+def test_ambiguous_provider_embedding_is_not_cached(tmp_path, provider_data):
+    client, _ = _client(tmp_path)
+    client.client = SimpleNamespace(embeddings=SimpleNamespace(
+        create=lambda **kwargs: SimpleNamespace(data=provider_data)
+    ))
+    with pytest.raises(ValueError, match="API embedding"):
+        client.embed("private question")
+    assert client.cache == {}
+    assert client.api_calls == 0
+    assert client.cache_hits == 0
+
+
+def test_single_indexed_embedding_is_cached_normally(tmp_path):
+    client, _ = _client(tmp_path)
+    client.client = SimpleNamespace(embeddings=SimpleNamespace(
+        create=lambda **kwargs: SimpleNamespace(data=[
+            SimpleNamespace(index=0, embedding=[1.0, 0.0])
+        ])
+    ))
+    assert client.embed("question") == [1.0, 0.0]
+    assert client.embed("question") == [1.0, 0.0]
+    assert client.api_calls == 1
+    assert client.cache_hits == 1
