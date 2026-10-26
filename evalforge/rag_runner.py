@@ -13,7 +13,7 @@ from datetime import datetime
 from evalforge.artifacts import atomic_json_dump as _atomic_json_dump
 from evalforge.rag import VectorStore, RAGPipeline, EmbeddingClient
 from evalforge.rag_graders import (
-    precision_at_k, recall_at_k, reciprocal_rank, hit_rate,
+    precision_at_k, recall_at_k, ndcg_at_k, reciprocal_rank, hit_rate,
     grade_abstention, RAGJudge, ABSTAIN_TOKEN,
 )
 
@@ -142,11 +142,12 @@ class RAGEvalRunner:
                 # would silently misrepresent an outage as model quality.
                 retrieval_scores = (
                     {name: None for name in (
-                        "precision_at_k", "recall_at_k", "reciprocal_rank", "hit_rate"
+                        "precision_at_k", "recall_at_k", "ndcg_at_k", "reciprocal_rank", "hit_rate"
                     )}
                     if retrieval_error else {
                         "precision_at_k": precision_at_k(retrieved_ids, relevant_ids, k=k),
                         "recall_at_k": recall_at_k(retrieved_ids, relevant_ids, k=k),
+                        "ndcg_at_k": ndcg_at_k(retrieved_ids, relevant_ids, k=k),
                         "reciprocal_rank": reciprocal_rank(retrieved_ids, relevant_ids),
                         "hit_rate": hit_rate(retrieved_ids, relevant_ids),
                     }
@@ -269,6 +270,7 @@ class RAGEvalRunner:
                     "errors": len(retrieval_errors),
                     "precision_at_k": self._mean([r["retrieval"]["precision_at_k"] for r in retrieval_rows]),
                     "recall_at_k": self._mean([r["retrieval"]["recall_at_k"] for r in retrieval_rows]),
+                    "ndcg_at_k": self._mean([r["retrieval"]["ndcg_at_k"] for r in retrieval_rows]),
                     "mrr": self._mean([r["retrieval"]["reciprocal_rank"] for r in retrieval_rows]),
                     "hit_rate": self._mean([r["retrieval"]["hit_rate"] for r in retrieval_rows]),
                 },
@@ -320,19 +322,19 @@ class RAGEvalRunner:
                 return "n/a"
             return f"{value * 100:.1f}%" if pct else f"{value:.3f}"
 
-        print("\n" + "=" * 72)
+        print("\n" + "=" * 80)
         print("EVALFORGE v0.3 - RAG EVALUATION REPORT")
-        print("=" * 72)
+        print("=" * 80)
         print(f"Model: {self.report['model']}   "
               f"Questions: {self.report['total_questions']}   "
               f"Evaluations: {self.report['total_evaluations']}")
         print(f"Embedding calls: {self.report['embedding_api_calls']} "
               f"(cache hits: {self.report['embedding_cache_hits']})")
 
-        header = (f"\n{'top_k':<6}{'P@k':>8}{'R@k':>8}{'MRR':>8}{'Hit':>8}"
+        header = (f"\n{'top_k':<6}{'P@k':>8}{'R@k':>8}{'nDCG':>8}{'MRR':>8}{'Hit':>8}"
                   f"{'Correct':>10}{'Ground':>9}{'Halluc':>9}{'ms':>8}")
         print(header)
-        print("-" * 72)
+        print("-" * 80)
 
         for k, stats in self.report["by_top_k"].items():
             r, g = stats["retrieval"], stats["generation"]
@@ -340,6 +342,7 @@ class RAGEvalRunner:
             print(f"{k:<6}"
                   f"{fmt(r['precision_at_k']):>8}"
                   f"{fmt(r['recall_at_k']):>8}"
+                  f"{fmt(r['ndcg_at_k']):>8}"
                   f"{fmt(r['mrr']):>8}"
                   f"{fmt(r['hit_rate']):>8}"
                   f"{fmt(g['correctness']):>10}"
@@ -347,7 +350,7 @@ class RAGEvalRunner:
                   f"{fmt(h['hallucination_rate'], pct=True):>9}"
                   f"{lat['avg_total_ms']:>8.0f}")
 
-        print("=" * 72 + "\n")
+        print("=" * 80 + "\n")
 
     def save(self):
         detail_path = os.path.join(self.output_dir, "rag_results.json")
