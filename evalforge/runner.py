@@ -71,7 +71,18 @@ class RealModelClient:
                         {"role": "user", "content": question}
                     ]
                 )
-                response = message.content[0].text
+                # A truncated or ambiguous completion is not an observed
+                # model answer. Do not grade the first text block while
+                # ignoring later blocks or a max-token stop.
+                blocks = getattr(message, "content", None)
+                if getattr(message, "stop_reason", None) != "end_turn":
+                    raise ValueError("Anthropic completion did not finish normally")
+                if (not isinstance(blocks, (list, tuple)) or len(blocks) != 1
+                        or getattr(blocks[0], "type", None) != "text"
+                        or not isinstance(getattr(blocks[0], "text", None), str)
+                        or not blocks[0].text.strip()):
+                    raise ValueError("Anthropic completion requires one non-empty text block")
+                response = blocks[0].text
                 latency_ms = (time.time() - start_time) * 1000
 
                 return {
@@ -97,7 +108,17 @@ class RealModelClient:
                     ],
                     max_tokens=256
                 )
-                response = completion.choices[0].message.content
+                # Multi-choice, filtered, truncated, or empty outputs cannot
+                # be treated as a completed answer for benchmark grading.
+                choices = getattr(completion, "choices", None)
+                if not isinstance(choices, (list, tuple)) or len(choices) != 1:
+                    raise ValueError("OpenAI completion requires exactly one choice")
+                choice = choices[0]
+                if getattr(choice, "finish_reason", None) != "stop":
+                    raise ValueError("OpenAI completion did not finish normally")
+                response = getattr(getattr(choice, "message", None), "content", None)
+                if not isinstance(response, str) or not response.strip():
+                    raise ValueError("OpenAI completion requires non-empty text")
                 latency_ms = (time.time() - start_time) * 1000
 
                 return {
@@ -180,8 +201,11 @@ class EvalForgeRunner:
                 # Query the real model
                 print(f"  Querying {model}...", end="", flush=True)
                 result = self.model_client.query(model, question)
-                if result.get("error") is not None:
-                    # Never grade provider failures as if they were model answers.
+                if (result.get("error") is not None
+                        or not isinstance(result.get("response"), str)
+                        or not result["response"].strip()):
+                    # Never grade provider failures, missing output, or empty
+                    # responses as if they were completed model answers.
                     # Stop the sweep rather than publish misleading benchmark rates.
                     self.results = []
                     self.report = None
