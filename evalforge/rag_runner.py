@@ -309,9 +309,23 @@ class RAGEvalRunner:
                                              if evaluated_answerable else None),
                 },
                 "latency": {
-                    "avg_retrieval_ms": self._mean([r["latency"]["retrieval_ms"] for r in rows]),
-                    "avg_generation_ms": self._mean([r["latency"]["generation_ms"] for r in rows]),
-                    "avg_total_ms": self._mean([r["latency"]["total_ms"] for r in rows]),
+                    # A retrieval outage has no generation latency (recorded
+                    # as 0 ms), and a failed generation is not a completed
+                    # end-to-end response. Mixing those into successful
+                    # latency averages makes a failing system look faster.
+                    # Keep coverage alongside every average.
+                    "retrieval_samples": len(attempted_generation),
+                    "generation_samples": len(successful),
+                    "end_to_end_samples": len(successful),
+                    "avg_retrieval_ms": self._mean([
+                        r["latency"]["retrieval_ms"] for r in attempted_generation
+                    ]),
+                    "avg_generation_ms": self._mean([
+                        r["latency"]["generation_ms"] for r in successful
+                    ]),
+                    "avg_total_ms": self._mean([
+                        r["latency"]["total_ms"] for r in successful
+                    ]),
                 },
             }
 
@@ -326,6 +340,9 @@ class RAGEvalRunner:
             if value is None:
                 return "n/a"
             return f"{value * 100:.1f}%" if pct else f"{value:.3f}"
+
+        def fmt_ms(value):
+            return "n/a" if value is None else f"{value:.0f}"
 
         print("\n" + "=" * 90)
         print("EVALFORGE v0.3 - RAG EVALUATION REPORT")
@@ -354,7 +371,7 @@ class RAGEvalRunner:
                   f"{fmt(g['correctness']):>10}"
                   f"{fmt(g['groundedness']):>9}"
                   f"{fmt(h['hallucination_rate'], pct=True):>9}"
-                  f"{lat['avg_total_ms']:>8.0f}")
+                  f"{fmt_ms(lat['avg_total_ms']):>8}")
 
         print("=" * 90 + "\n")
 
