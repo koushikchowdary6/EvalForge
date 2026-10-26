@@ -6,12 +6,13 @@ pipeline over the question set, and scores retrieval and generation
 separately so a failure can be attributed to the right stage.
 """
 
+import hashlib
 import json
 import os
 from datetime import datetime
 
 from evalforge.artifacts import atomic_json_dump as _atomic_json_dump
-from evalforge.rag import VectorStore, RAGPipeline, EmbeddingClient, _unique_json_keys
+from evalforge.rag import VectorStore, RAGPipeline, EmbeddingClient, EMBED_MODEL, _unique_json_keys
 from evalforge.rag_graders import (
     precision_at_k, recall_at_k, ndcg_at_k, average_precision_at_k, reciprocal_rank, hit_rate,
     grade_abstention, RAGJudge, ABSTAIN_TOKEN,
@@ -75,6 +76,16 @@ def validate_rag_questions(questions, document_ids):
 
 
 
+def _dataset_sha256(data):
+    """Fingerprint parsed benchmark data independently of JSON formatting.
+
+    Key order and whitespace must not change a benchmark's identity, but
+    changes to evidence, labels, or case ordering must. A digest identifies
+    the inputs; it does not prove the benchmark is correct or hide secrets.
+    """
+    canonical = json.dumps(data, sort_keys=True, ensure_ascii=False,
+                           separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 class RAGEvalRunner:
@@ -86,6 +97,9 @@ class RAGEvalRunner:
         self.questions_path = questions_path
         self.output_dir = output_dir
         self.model = model
+        self.judge_model = judge_model
+        self.corpus_sha256 = None
+        self.questions_sha256 = None
 
         self.questions = []
         self.results = []
@@ -101,6 +115,9 @@ class RAGEvalRunner:
         self.judge = RAGJudge(judge_model=judge_model)
 
     def load(self):
+        # Never attach a prior benchmark's provenance to a failed reload.
+        self.corpus_sha256 = None
+        self.questions_sha256 = None
         self.store.load_corpus(self.corpus_path)
         self.questions = []
         with open(self.questions_path, "r", encoding="utf-8") as f:
@@ -114,6 +131,10 @@ class RAGEvalRunner:
         self.questions = questions
         print(f"Loaded {len(self.questions)} RAG questions")
         self.store.build_index()
+        # Record fingerprints only after both datasets pass validation and
+        # the index is ready. These are canonical data hashes, not file hashes.
+        self.corpus_sha256 = _dataset_sha256(self.store.documents)
+        self.questions_sha256 = _dataset_sha256(self.questions)
 
     def run(self, k_values=(1, 3, 5)):
         """Evaluate every question at each top-k setting."""
@@ -233,6 +254,12 @@ class RAGEvalRunner:
         report = {
             "timestamp": datetime.now().isoformat(),
             "model": self.model,
+            "benchmark_provenance": {
+                "corpus_sha256": getattr(self, "corpus_sha256", None),
+                "questions_sha256": getattr(self, "questions_sha256", None),
+                "embedding_model": EMBED_MODEL,
+                "judge_model": getattr(self, "judge_model", None),
+            },
             "total_questions": len(self.questions),
             "total_evaluations": len(self.results),
             "embedding_api_calls": self.embedder.api_calls,
