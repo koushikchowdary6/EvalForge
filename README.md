@@ -73,7 +73,11 @@ Re-embedding discarded entries requires a configured OpenAI API key.
 the embedding vectors themselves may be sensitive. Protect cache files with
 appropriate filesystem permissions and do not commit them. Offline tests
 cover cache hits, model isolation, legacy-key rejection, and non-disclosure of
-raw text in newly written keys.
+raw text in newly written keys. Embedding API responses must contain exactly
+one result for the single requested input (with index 0, when supplied);
+missing, duplicate, or misindexed results fail before entering the cache or
+retrieval ranking. These response-contract tests use mocked providers and do
+not claim any measured production failure rate.
 
 ---
 
