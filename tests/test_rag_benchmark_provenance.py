@@ -102,3 +102,30 @@ def test_report_records_dataset_and_model_configuration(tmp_path):
     assert provenance["questions_sha256"] == runner.questions_sha256
     assert provenance["embedding_model"] == "text-embedding-3-small"
     assert provenance["judge_model"] == "openai"
+
+
+def test_reload_invalidates_old_rows_and_report_even_on_failure(tmp_path):
+    runner = _runner(tmp_path)
+    runner.results = [{"case_id": "previous-run", "top_k": 1}]
+    runner.report = {"by_top_k": {"1": {"stale": True}}}
+    runner.load()
+    assert runner.results == []
+    assert runner.report is None
+
+    runner.results = [{"case_id": "previous-run", "top_k": 1}]
+    runner.report = {"by_top_k": {"1": {"stale": True}}}
+    runner.questions_path.write_text(json.dumps([_question("")]), encoding="utf-8")
+    with pytest.raises(ValueError, match="expected_answer"):
+        runner.load()
+    assert runner.results == []
+    assert runner.report is None
+    assert runner.corpus_sha256 is None
+    assert runner.questions_sha256 is None
+
+
+def test_canonical_hash_handles_escaped_unicode_metadata():
+    # JSON permits escaped lone surrogates even though they are not UTF-8
+    # characters. Unused metadata must not crash report fingerprinting.
+    data = {"note": "\\ud800", "title": "Résumé"}
+    assert len(_dataset_sha256(data)) == 64
+    assert _dataset_sha256(data) == _dataset_sha256(dict(reversed(list(data.items()))))

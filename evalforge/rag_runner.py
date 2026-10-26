@@ -83,7 +83,8 @@ def _dataset_sha256(data):
     changes to evidence, labels, or case ordering must. A digest identifies
     the inputs; it does not prove the benchmark is correct or hide secrets.
     """
-    canonical = json.dumps(data, sort_keys=True, ensure_ascii=False,
+    # ASCII escaping preserves escaped lone surrogates in unused JSON metadata.
+    canonical = json.dumps(data, sort_keys=True, ensure_ascii=True,
                            separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
@@ -115,7 +116,10 @@ class RAGEvalRunner:
         self.judge = RAGJudge(judge_model=judge_model)
 
     def load(self):
-        # Never attach a prior benchmark's provenance to a failed reload.
+        # A reload (even one that fails) invalidates old measurements; otherwise
+        # a fresh dataset fingerprint could be attached to stale evaluation rows.
+        self.results = []
+        self.report = None
         self.corpus_sha256 = None
         self.questions_sha256 = None
         self.store.load_corpus(self.corpus_path)
