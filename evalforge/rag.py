@@ -130,8 +130,19 @@ class EmbeddingClient:
     def _load_cache(self):
         if os.path.exists(self.cache_path):
             try:
+                # Duplicate JSON keys are ambiguous: the default decoder silently
+                # keeps the last vector, which can change retrieval rankings.
+                # Discard the cache rather than trusting a last-key-wins value.
+                def unique_keys(pairs):
+                    values = {}
+                    for key, value in pairs:
+                        if key in values:
+                            raise ValueError("duplicate embedding cache key")
+                        values[key] = value
+                    return values
+
                 with open(self.cache_path, "r", encoding="utf-8") as f:
-                    loaded = json.load(f)
+                    loaded = json.load(f, object_pairs_hook=unique_keys)
                 # Legacy keys contained raw document/query text. Do not
                 # load or re-persist those entries; regenerate embeddings
                 # using the v2 digest-based key format.
@@ -152,7 +163,7 @@ class EmbeddingClient:
                         # healthy cache or block saving fresh embeddings.
                         continue
                 return validated
-            except (json.JSONDecodeError, OSError):
+            except (json.JSONDecodeError, OSError, ValueError):
                 return {}
         return {}
 
