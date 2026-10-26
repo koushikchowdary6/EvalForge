@@ -323,7 +323,10 @@ class VectorStore:
                 "score": score,
             })
 
-        scored.sort(key=lambda d: d["score"], reverse=True)
+        # Equal cosine scores are common for duplicate/orthogonal embeddings.
+        # Breaking ties by document ID makes ranking and AP@k/nDCG@k
+        # reproducible even when the input corpus is reordered.
+        scored.sort(key=lambda d: (-d["score"], d["doc_id"]))
         return scored[:top_k]
 
 
