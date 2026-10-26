@@ -81,6 +81,15 @@ not claim any measured production failure rate.
 
 ---
 
+## RAG corpus integrity
+
+Corpus JSON is decoded with duplicate-key rejection at every object depth.
+Without this check, standard JSON decoding silently takes the last value for
+repeated `doc_id`, `title`, or `text` keys, making retrieved evidence and
+evaluation results ambiguous. An invalid reload fails before replacing the
+previous in-memory corpus/index. This is an offline input-integrity control,
+not validation of whether the corpus evidence is factually correct.
+
 ## RAG prompt-injection trust boundaries
 
 Retrieved documents and generated answers can contain adversarial text. The

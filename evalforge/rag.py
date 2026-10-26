@@ -45,6 +45,16 @@ RAG_SYSTEM_INSTRUCTIONS = (
 )
 
 
+def _unique_json_keys(pairs):
+    """Reject ambiguous duplicate keys at every level of a JSON document."""
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"Duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+
 def _finite_number(value):
     """Accept only finite, representable numeric embedding components.
 
@@ -133,16 +143,8 @@ class EmbeddingClient:
                 # Duplicate JSON keys are ambiguous: the default decoder silently
                 # keeps the last vector, which can change retrieval rankings.
                 # Discard the cache rather than trusting a last-key-wins value.
-                def unique_keys(pairs):
-                    values = {}
-                    for key, value in pairs:
-                        if key in values:
-                            raise ValueError("duplicate embedding cache key")
-                        values[key] = value
-                    return values
-
                 with open(self.cache_path, "r", encoding="utf-8") as f:
-                    loaded = json.load(f, object_pairs_hook=unique_keys)
+                    loaded = json.load(f, object_pairs_hook=_unique_json_keys)
                 # Legacy keys contained raw document/query text. Do not
                 # load or re-persist those entries; regenerate embeddings
                 # using the v2 digest-based key format.
@@ -242,8 +244,11 @@ class VectorStore:
         self.vectors = {}
 
     def load_corpus(self, corpus_path):
+        # The default JSON decoder silently keeps the last value for
+        # duplicate keys (including doc_id/title/text). That makes the
+        # evaluated corpus ambiguous and can silently change ground truth.
         with open(corpus_path, "r", encoding="utf-8") as f:
-            documents = json.load(f)
+            documents = json.load(f, object_pairs_hook=_unique_json_keys)
         if not isinstance(documents, list):
             raise ValueError("RAG corpus must be a list of documents")
         seen_ids = set()
