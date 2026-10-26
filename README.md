@@ -26,9 +26,10 @@ Think of it like a grading system for AI homework. You write the test questions,
 **v0.3**: RAG evaluation (retrieval + generation; full benchmark suite implemented, tracked artifact below is a smoke run)
 - Security-themed 15-document corpus, 14 questions (incl. 2 unanswerable)
 - Embedding cache + cosine similarity (zero new dependencies)
-- Retrieval metrics: precision@k, recall@k, MRR, hit rate
+- Retrieval metrics: precision@k, recall@k, **nDCG@k**, MRR, hit rate
 - LLM-judged correctness and groundedness; hallucination detection via abstention
 - Top-k sweep support across k=1,3,5 to quantify precision/recall tradeoffs; precision@k uses the requested k as its denominator, including when fewer documents are returned
+- Binary-relevance nDCG@k discounts lower-ranked evidence, counts repeated document IDs only once, and is included in per-case JSON, aggregate reports, and the terminal summary; unanswerable cases are excluded from retrieval averages
 - 38 comprehensive unit tests
 
 **v0.4**: Agent evaluation (tool-calling + safety; full task suite implemented, tracked artifact below is an ablation run)
@@ -159,7 +160,7 @@ The tracked artifact in `results/rag_report.json` is a **3-question k=3 smoke ru
 | Groundedness | 93.3% |
 | Avg total latency | 1904ms |
 
-The tracked smoke-run artifact predates the fixed-k precision denominator change. Its historical values have not been recalculated; rerun the benchmark before comparing them to new precision@k reports.
+The tracked smoke-run artifact predates the fixed-k precision denominator change. Its historical values have not been recalculated; it also predates nDCG@k. Rerun the benchmark before comparing historical values to new retrieval reports.
 
 This sample is useful as an end-to-end pipeline check, but **three questions are too few for comparative retrieval claims**. The larger 14-question corpus and k=1/3/5 sweep remain implemented in the project; a full reproducible run should be committed before treating those results as benchmark evidence.
 
