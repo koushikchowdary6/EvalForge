@@ -80,6 +80,34 @@ def recall_at_k(retrieved_ids, relevant_ids, k=None):
     return hits / len(relevant_set)
 
 
+
+def ndcg_at_k(retrieved_ids, relevant_ids, k=None):
+    """Normalized discounted cumulative gain for binary relevance at rank k.
+
+    Higher-ranked relevant documents contribute more. A duplicate document
+    never earns relevance credit twice, but still occupies a rank slot.
+    Unanswerable cases use the same empty-ground-truth convention as recall;
+    the RAG report excludes them from answerable retrieval averages.
+    """
+    _validate_cutoff(k)
+    relevant = set(relevant_ids)
+    if not relevant:
+        return 1.0
+    cutoff = len(retrieved_ids) if k is None else k
+    if cutoff == 0:
+        return 0.0
+
+    ideal_hits = min(len(relevant), cutoff)
+    ideal_gain = sum(1.0 / math.log2(rank + 1) for rank in range(1, ideal_hits + 1))
+    observed_gain = 0.0
+    seen = set()
+    for rank, doc_id in enumerate(retrieved_ids[:cutoff], start=1):
+        if doc_id in relevant and doc_id not in seen:
+            observed_gain += 1.0 / math.log2(rank + 1)
+        seen.add(doc_id)
+    return observed_gain / ideal_gain
+
+
 def reciprocal_rank(retrieved_ids, relevant_ids):
     """
     Reciprocal of the rank of the first relevant document (1-indexed).
