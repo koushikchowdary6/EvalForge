@@ -111,6 +111,7 @@ def valid_tool_arguments(tool_name, arguments):
             key in properties
             and properties[key].get("type") == "string"
             and isinstance(value, str)
+            and bool(value.strip())
             for key, value in arguments.items()
         )
     )
