@@ -40,11 +40,12 @@ def _validate_cutoff(k):
 
 def precision_at_k(retrieved_ids, relevant_ids, k=None):
     """
-    Fraction of retrieved documents that are relevant.
+    Precision over the requested top-k slots when k is provided.
 
-    Returns 0.0 when nothing is retrieved. Note the convention: precision
-    over an empty retrieval is defined as 0.0 here rather than undefined,
-    so aggregate averages stay well-defined.
+    Missing retrievals consume slots: returning one relevant document for a
+    requested k=5 earns 1/5, not a misleading 100%. Without k, the denominator
+    is the number of returned documents for backward-compatible usage.
+    Empty retrievals score 0.0.
     """
     _validate_cutoff(k)
     if k is not None:
@@ -56,7 +57,7 @@ def precision_at_k(retrieved_ids, relevant_ids, k=None):
     # consume rank slots (and therefore remain in the denominator), but they
     # must not inflate the number of relevant hits.
     hits = len(set(retrieved_ids) & relevant_set)
-    return hits / len(retrieved_ids)
+    return hits / (k if k is not None else len(retrieved_ids))
 
 
 def recall_at_k(retrieved_ids, relevant_ids, k=None):

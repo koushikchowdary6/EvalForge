@@ -28,7 +28,7 @@ Think of it like a grading system for AI homework. You write the test questions,
 - Embedding cache + cosine similarity (zero new dependencies)
 - Retrieval metrics: precision@k, recall@k, MRR, hit rate
 - LLM-judged correctness and groundedness; hallucination detection via abstention
-- Top-k sweep support across k=1,3,5 to quantify precision/recall tradeoffs
+- Top-k sweep support across k=1,3,5 to quantify precision/recall tradeoffs; precision@k uses the requested k as its denominator, including when fewer documents are returned
 - 38 comprehensive unit tests
 
 **v0.4**: Agent evaluation (tool-calling + safety; full task suite implemented, tracked artifact below is an ablation run)
@@ -158,6 +158,8 @@ The tracked artifact in `results/rag_report.json` is a **3-question k=3 smoke ru
 | Correctness | 90.0% |
 | Groundedness | 93.3% |
 | Avg total latency | 1904ms |
+
+The tracked smoke-run artifact predates the fixed-k precision denominator change. Its historical values have not been recalculated; rerun the benchmark before comparing them to new precision@k reports.
 
 This sample is useful as an end-to-end pipeline check, but **three questions are too few for comparative retrieval claims**. The larger 14-question corpus and k=1/3/5 sweep remain implemented in the project; a full reproducible run should be committed before treating those results as benchmark evidence.
 
