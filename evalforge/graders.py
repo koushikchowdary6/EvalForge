@@ -257,8 +257,19 @@ class LLMJudgeGrader:
                 ]
             )
 
-            response_text = message.content[0].text.strip()
-            return self._parse_judgment(response_text, "claude")
+            # A plausible JSON score in a truncated or multi-block response
+            # is not a completed judgment and must never receive credit.
+            blocks = getattr(message, "content", None)
+            if (
+                getattr(message, "stop_reason", None) != "end_turn"
+                or not isinstance(blocks, list)
+                or len(blocks) != 1
+                or getattr(blocks[0], "type", None) != "text"
+                or not isinstance(getattr(blocks[0], "text", None), str)
+                or not blocks[0].text.strip()
+            ):
+                raise ValueError("Incomplete or ambiguous Claude judge response")
+            return self._parse_judgment(blocks[0].text.strip(), "claude")
 
         except Exception as e:
             return {
@@ -284,8 +295,18 @@ class LLMJudgeGrader:
                 max_tokens=150
             )
 
-            response_text = completion.choices[0].message.content.strip()
-            return self._parse_judgment(response_text, "gpt")
+            # A length-limited, filtered, or multi-choice completion cannot
+            # be trusted as a final rubric judgment, even if its JSON parses.
+            choices = getattr(completion, "choices", None)
+            if (
+                not isinstance(choices, list)
+                or len(choices) != 1
+                or getattr(choices[0], "finish_reason", None) != "stop"
+                or not isinstance(getattr(getattr(choices[0], "message", None), "content", None), str)
+                or not choices[0].message.content.strip()
+            ):
+                raise ValueError("Incomplete or ambiguous GPT judge response")
+            return self._parse_judgment(choices[0].message.content.strip(), "gpt")
 
         except Exception as e:
             return {
