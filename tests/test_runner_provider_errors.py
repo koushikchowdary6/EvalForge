@@ -97,3 +97,18 @@ def test_save_results_removes_stale_report_after_provider_failure(tmp_path, monk
     runner.save_results()
     assert not report_path.exists()
     assert json.loads((tmp_path / "out" / "results.json").read_text()) == []
+
+
+@pytest.mark.parametrize("invalid_response", [
+    {"model": "gpt", "response": None, "latency_ms": 10},
+    {"model": "gpt", "response": "  ", "latency_ms": 10},
+    {"model": "gpt", "latency_ms": 10},
+])
+def test_empty_or_missing_stub_response_cannot_receive_grade(
+    tmp_path, monkeypatch, invalid_response
+):
+    runner, grader = _runner(tmp_path, monkeypatch, [invalid_response])
+    with pytest.raises(RuntimeError, match="aborted before grading"):
+        runner.run_evaluation(models=["gpt"])
+    assert runner.results == []
+    assert grader.calls == 0
