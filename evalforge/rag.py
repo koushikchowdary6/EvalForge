@@ -15,9 +15,10 @@ import hashlib
 import json
 import math
 import os
-import tempfile
 import time
 from dotenv import load_dotenv
+
+from evalforge.artifacts import atomic_json_dump
 
 load_dotenv()
 
@@ -170,23 +171,16 @@ class EmbeddingClient:
         return {}
 
     def save_cache(self):
+        """Atomically publish validated cache data and sync rename metadata.
+
+        Reuse the report artifact writer so a completed cache rename also
+        receives a parent-directory fsync on POSIX. This is best-effort
+        filesystem durability, not an atomic transaction with eval reports.
+        """
         directory = os.path.dirname(self.cache_path)
         if directory:
             os.makedirs(directory, exist_ok=True)
-        # A process crash during a direct write can truncate the only cache.
-        # Stage in the same directory and atomically replace on success.
-        fd, temporary_path = tempfile.mkstemp(
-            prefix=".embedding-cache-", suffix=".tmp", dir=directory or "."
-        )
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                json.dump(self.cache, f, allow_nan=False)
-                f.flush()
-                os.fsync(f.fileno())
-            os.replace(temporary_path, self.cache_path)
-        finally:
-            if os.path.exists(temporary_path):
-                os.unlink(temporary_path)
+        atomic_json_dump(self.cache_path, self.cache)
 
     def embed(self, text):
         """

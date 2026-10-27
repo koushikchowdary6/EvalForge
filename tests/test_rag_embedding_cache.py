@@ -203,3 +203,50 @@ def test_single_indexed_embedding_is_cached_normally(tmp_path):
     assert client.embed("question") == [1.0, 0.0]
     assert client.api_calls == 1
     assert client.cache_hits == 1
+
+
+@pytest.mark.skipif(rag.os.name != "posix", reason="directory fsync is POSIX-specific")
+def test_cache_publish_syncs_file_then_rename_then_directory(tmp_path, monkeypatch):
+    """An acknowledged cache save must durably publish the directory entry."""
+    import os
+    import stat
+
+    client, _ = _client(tmp_path, cache={"fresh": [1.0, 2.0]})
+    events = []
+    real_fsync = rag.os.fsync
+    real_replace = rag.os.replace
+
+    def recording_fsync(fd):
+        events.append("directory" if stat.S_ISDIR(os.fstat(fd).st_mode) else "file")
+        return real_fsync(fd)
+
+    def recording_replace(source, destination):
+        events.append("replace")
+        return real_replace(source, destination)
+
+    monkeypatch.setattr(rag.os, "fsync", recording_fsync)
+    monkeypatch.setattr(rag.os, "replace", recording_replace)
+    client.save_cache()
+    assert events == ["file", "replace", "directory"]
+    assert json.loads((tmp_path / "embedding_cache.json").read_text()) == client.cache
+
+
+@pytest.mark.skipif(rag.os.name != "posix", reason="directory fsync is POSIX-specific")
+def test_cache_directory_sync_failure_does_not_leave_temporary_files(tmp_path, monkeypatch):
+    """A post-rename fsync failure must propagate without claiming rollback."""
+    import os
+    import stat
+
+    client, _ = _client(tmp_path, cache={"new": [3.0, 4.0]})
+    real_fsync = rag.os.fsync
+
+    def failing_directory_fsync(fd):
+        if stat.S_ISDIR(os.fstat(fd).st_mode):
+            raise OSError("simulated cache directory sync failure")
+        return real_fsync(fd)
+
+    monkeypatch.setattr(rag.os, "fsync", failing_directory_fsync)
+    with pytest.raises(OSError, match="simulated cache directory sync failure"):
+        client.save_cache()
+    assert json.loads((tmp_path / "embedding_cache.json").read_text()) == client.cache
+    assert not list(tmp_path.glob(".*.tmp"))
