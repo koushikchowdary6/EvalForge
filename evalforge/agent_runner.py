@@ -7,6 +7,7 @@ and estimated cost - broken down by task category so failures are
 attributable rather than averaged away.
 """
 
+import hashlib
 import json
 import os
 from collections import Counter
@@ -140,6 +141,18 @@ def validate_agent_tasks(tasks):
             raise ValueError(f"{task_id}: mock_responses contains unknown tools: {unknown_mocks}")
 
 
+def _agent_dataset_sha256(tasks):
+    """Hash parsed benchmark cases, ignoring JSON key order and formatting.
+
+    Case order, prompts, labels, and mocked tool responses remain part of
+    the fingerprint. The digest is an identity marker, not proof of quality.
+    ASCII escaping also supports JSON-escaped Unicode surrogate metadata.
+    """
+    canonical = json.dumps(tasks, sort_keys=True, ensure_ascii=True,
+                           allow_nan=False, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 class AgentEvalRunner:
     """Runs agent evaluation over a task dataset."""
 
@@ -152,6 +165,7 @@ class AgentEvalRunner:
         self.tasks = []
         self.results = []
         self.report = None
+        self.tasks_sha256 = None
         os.makedirs(output_dir, exist_ok=True)
 
     def load(self):
@@ -159,15 +173,21 @@ class AgentEvalRunner:
         self.tasks = []
         self.results = []
         self.report = None
+        self.tasks_sha256 = None
         with open(self.tasks_path, "r", encoding="utf-8") as f:
             candidate = json.load(f, object_pairs_hook=_reject_duplicate_json_keys)
         validate_agent_tasks(candidate)
+        fingerprint = _agent_dataset_sha256(candidate)
         self.tasks = candidate
+        self.tasks_sha256 = fingerprint
         print(f"Loaded {len(self.tasks)} agent tasks from {self.tasks_path}")
         return self.tasks
 
     def run(self):
+        # A mutated or invalid task list must never inherit an older digest.
+        self.tasks_sha256 = None
         validate_agent_tasks(self.tasks)
+        self.tasks_sha256 = _agent_dataset_sha256(self.tasks)
         # Each run is an independent evaluation sweep. Reusing a runner should
         # reuse loaded tasks/configuration, not accumulate trajectories from a
         # previous experiment or expose a stale aggregate report.
@@ -237,6 +257,7 @@ class AgentEvalRunner:
             "timestamp": datetime.now().isoformat(),
             "model": self.model,
             "injection_defense_enabled": self.defense_enabled,
+            "benchmark_provenance": {"agent_tasks_sha256": self.tasks_sha256},
             "total_tasks": len(self.results),
             "evaluated_tasks": len(evaluated),
             "execution_errors": len(self.results) - len(evaluated),
@@ -312,6 +333,8 @@ class AgentEvalRunner:
               f"    Injection defense: "
               f"{'on' if self.report['injection_defense_enabled'] else 'OFF (ablation)'}")
         print("-" * 72)
+        print("  Dataset SHA256 ............. "
+              + (self.report["benchmark_provenance"]["agent_tasks_sha256"] or "n/a"))
         print(f"  Evaluated tasks ............ {self.report['evaluated_tasks']}/{self.report['total_tasks']}")
         print(f"  Execution errors ........... {self.report['execution_errors']}")
         print(f"  Latency samples ............ {o['latency_samples']}/{self.report['total_tasks']}")
