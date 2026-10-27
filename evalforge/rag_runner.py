@@ -157,6 +157,20 @@ class RAGEvalRunner:
                        for k in k_values)
                 or len(k_values) != len(set(k_values))):
             raise ValueError("k_values must be unique positive integers")
+
+        # The index was built from a particular corpus and the question labels
+        # were validated at load time. Mutating either in memory after load
+        # must not silently attach the old provenance hashes to new results.
+        # Bare test doubles without provenance attributes remain supported.
+        if hasattr(self, "corpus_sha256"):
+            if (not self.corpus_sha256
+                    or _dataset_sha256(self.store.documents) != self.corpus_sha256):
+                raise ValueError("RAG corpus changed or was not loaded; reload before running")
+        if hasattr(self, "questions_sha256"):
+            if (not self.questions_sha256
+                    or _dataset_sha256(self.questions) != self.questions_sha256):
+                raise ValueError("RAG questions changed or were not loaded; reload before running")
+
         pipeline = RAGPipeline(self.store, model=self.model)
 
         total = len(self.questions) * len(k_values)
