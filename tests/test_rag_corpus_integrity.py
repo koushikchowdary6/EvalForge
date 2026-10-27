@@ -41,8 +41,12 @@ def test_duplicate_doc_ids_rejected_before_embedding(tmp_path):
     "documents",
     [
         {"doc_id": "one"},
+        [],
         [None],
         [doc("")],
+        [doc(" padded ")],
+        [doc("one", title=" \t")],
+        [doc("one", text="\n ")],
         [{"doc_id": "one", "title": 7, "text": "body"}],
         [{"doc_id": "one", "title": "Title", "text": None}],
     ],
@@ -76,3 +80,18 @@ def test_corpus_reload_invalidates_old_index(tmp_path):
     store.build_index()
     assert [r["doc_id"] for r in store.search("beta")] == ["new"]
     assert set(store.vectors) == {"new"}
+
+
+def test_invalid_blank_evidence_reload_preserves_existing_index(tmp_path):
+    store = VectorStore(StubEmbedder())
+    store.load_corpus(write_corpus(tmp_path, "first.json", [doc("old", "alpha")]))
+    store.build_index()
+    before = store.search("alpha")
+
+    invalid = write_corpus(tmp_path, "blank.json", [doc("new", " ", " ")])
+    with pytest.raises(ValueError, match="non-empty string"):
+        store.load_corpus(invalid)
+
+    assert store.search("alpha") == before
+    assert [item["doc_id"] for item in store.documents] == ["old"]
+    assert set(store.vectors) == {"old"}
