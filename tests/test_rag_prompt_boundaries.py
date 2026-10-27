@@ -65,12 +65,12 @@ def test_rag_judge_keeps_grading_policy_outside_untrusted_content(provider):
         if provider == "claude":
             return SimpleNamespace(
                 stop_reason="end_turn",
-                content=[SimpleNamespace(text='{"score": 4}')],
+                content=[SimpleNamespace(text='{"score": 4, "reason": "partially supported"}')],
             )
         return SimpleNamespace(
             choices=[SimpleNamespace(
                 finish_reason="stop",
-                message=SimpleNamespace(content='{"score": 4}'),
+                message=SimpleNamespace(content='{"score": 4, "reason": "partially supported"}'),
             )]
         )
 
