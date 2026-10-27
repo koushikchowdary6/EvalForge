@@ -56,3 +56,17 @@ def test_provider_error_still_classified_as_execution_error():
     })
     assert result["failure_category"] == "execution_error"
     assert result["success"] is False
+
+
+@pytest.mark.parametrize("answer", ["\u0301", "\u034f", "\u200b", " \u0301\u200b\t"])
+def test_invisible_only_final_answer_cannot_pass_no_tool_evaluation(answer):
+    task = {
+        "id": "invisible-answer", "category": "no_tool",
+        "expected_tools": [], "answer_must_contain": [],
+    }
+    result = grade_trajectory(task, {
+        "tool_calls": [], "final_answer": answer, "turns": 1,
+    })
+    assert result["answer_ok"] is False
+    assert result["success"] is False
+    assert result["failure_category"] == "wrong_answer"
