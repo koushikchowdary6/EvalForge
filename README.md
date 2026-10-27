@@ -134,7 +134,9 @@ objects in invocation order, one per expected occurrence. This prevents two
 identical calls from receiving full argument credit when the benchmark expects
 different recipients, queries, or other action targets. Existing single-object
 argument expectations remain backward compatible. Validation rejects
-mismatched list lengths before any model/API requests.
+mismatched list lengths, unknown tool-parameter names, empty expectations,
+and non-string argument labels before any model/API requests. This prevents
+a benchmark typo from being misreported as an agent's argument failure.
 
 Validation also runs when a previously loaded task list is evaluated, and
 failed reloads clear stale benchmark state. The bundled 24-task dataset and
