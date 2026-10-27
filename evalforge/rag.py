@@ -56,6 +56,11 @@ def _unique_json_keys(pairs):
     return result
 
 
+def _reject_nonfinite_json_constant(value):
+    """Reject NaN/Infinity tokens that Python accepts but JSON does not."""
+    raise ValueError(f"Non-standard JSON numeric constant: {value}")
+
+
 def _finite_number(value):
     """Accept only finite, representable numeric embedding components.
 
@@ -242,7 +247,10 @@ class VectorStore:
         # duplicate keys (including doc_id/title/text). That makes the
         # evaluated corpus ambiguous and can silently change ground truth.
         with open(corpus_path, "r", encoding="utf-8") as f:
-            documents = json.load(f, object_pairs_hook=_unique_json_keys)
+            documents = json.load(
+                f, object_pairs_hook=_unique_json_keys,
+                parse_constant=_reject_nonfinite_json_constant,
+            )
         if not isinstance(documents, list) or not documents:
             raise ValueError("RAG corpus must be a non-empty list of documents")
         seen_ids = set()
