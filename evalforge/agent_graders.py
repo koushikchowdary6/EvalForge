@@ -190,10 +190,16 @@ def answer_contains_all(final_answer, required_substrings):
             literal = r"(?<![A-Za-z0-9_.,+\-])" + re.escape(needle) + r"(?![A-Za-z0-9_]|[.,]\d)"
             if not re.search(literal, text):
                 return False
-        elif needle not in text and needle not in text_grouped:
-            # Only valid thousands groups are normalized. Removing every
-            # comma would credit "12 apples" for "1,2 apples".
-            return False
+        else:
+            # Word-like reference labels must be complete tokens. A required
+            # "yes" must not be credited by "yesterday", and "suspended"
+            # must not match "unsuspended". Preserve phrase matches followed
+            # by punctuation or spaces and the valid-thousands normalization.
+            left = r"(?<!\w)" if needle[0].isalnum() else ""
+            right = r"(?!\w)" if needle[-1].isalnum() else ""
+            pattern = left + re.escape(needle) + right
+            if not (re.search(pattern, text) or re.search(pattern, text_grouped)):
+                return False
     return True
 
 def estimate_cost(tokens, model):
