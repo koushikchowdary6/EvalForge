@@ -35,6 +35,11 @@ def grader():
         '{"score": 8, "reason": "   "}',
         '{"score": 8, "reason": ["good"]}',
         '{"score": 8, "reason": "good"} extra',
+        '{"score": 0, "score": 10, "reason": "contradictory"}',
+        '{"score": 10, "reason": "good", "reason": "bad"}',
+        '{"score": 10, "reason": "good", "metadata": {"a": 1, "a": 2}}',
+        '{"score": 10, "reason": "good", "metadata": [NaN]}',
+        '{"score": 10, "reason": "good", "metadata": Infinity}',
     ],
 )
 def test_malformed_or_ambiguous_judge_response_fails_closed(grader, payload):

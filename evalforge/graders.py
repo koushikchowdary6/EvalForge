@@ -333,8 +333,28 @@ class LLMJudgeGrader:
         }
         if not isinstance(response_text, str):
             return invalid
+        # Judge output is untrusted evidence. Default JSON parsing silently
+        # keeps the last duplicate key, so an ambiguous response such as
+        # {"score": 0, "score": 10} can inflate benchmark results. Reject
+        # duplicates at every nesting level, and reject non-JSON constants
+        # (NaN/Infinity) even when they appear outside the score field.
+        def unique_keys(pairs):
+            result = {}
+            for key, value in pairs:
+                if key in result:
+                    raise ValueError("duplicate judge JSON key")
+                result[key] = value
+            return result
+
+        def reject_nonfinite(_value):
+            raise ValueError("non-finite JSON constant")
+
         try:
-            judgment = json.loads(response_text)
+            judgment = json.loads(
+                response_text,
+                object_pairs_hook=unique_keys,
+                parse_constant=reject_nonfinite,
+            )
         except (json.JSONDecodeError, ValueError):
             return invalid
         if not isinstance(judgment, dict):
