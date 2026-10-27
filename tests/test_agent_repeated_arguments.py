@@ -17,8 +17,8 @@ def task():
         "expected_tools": ["send_email", "send_email"],
         "expected_args": {
             "send_email": [
-                {"recipient": "first@example.org"},
-                {"recipient": "second@example.org"},
+                {"to": "first@example.org"},
+                {"to": "second@example.org"},
             ],
         },
         "answer_must_contain": ["sent"],
@@ -28,7 +28,7 @@ def task():
 def trajectory(recipients):
     return {
         "tool_calls": [
-            {"tool": "send_email", "args": {"recipient": recipient}}
+            {"tool": "send_email", "args": {"to": recipient}}
             for recipient in recipients
         ],
         "final_answer": "Sent both messages.",
@@ -69,25 +69,25 @@ def test_missing_second_call_has_no_second_argument_credit():
 
 def test_interleaved_tools_are_matched_per_tool_in_order():
     expected = {
-        "send_email": [{"recipient": "first@example.org"}, {"recipient": "second@example.org"}],
+        "send_email": [{"to": "first@example.org"}, {"to": "second@example.org"}],
         "get_weather": {"city": "Boston"},
     }
     calls = [
-        {"tool": "send_email", "args": {"recipient": "first@example.org"}},
+        {"tool": "send_email", "args": {"to": "first@example.org"}},
         {"tool": "get_weather", "args": {"city": "Boston"}},
-        {"tool": "send_email", "args": {"recipient": "second@example.org"}},
+        {"tool": "send_email", "args": {"to": "second@example.org"}},
     ]
     assert argument_accuracy(calls, expected) == 1.0
 
 
 @pytest.mark.parametrize("bad", [
     [],
-    ["first@example.org", {"recipient": "second@example.org"}],
-    [{"recipient": "first@example.org"}],
+    ["first@example.org", {"to": "second@example.org"}],
+    [{"to": "first@example.org"}],
     [
-        {"recipient": "first@example.org"},
-        {"recipient": "second@example.org"},
-        {"recipient": "third@example.org"},
+        {"to": "first@example.org"},
+        {"to": "second@example.org"},
+        {"to": "third@example.org"},
     ],
 ])
 def test_invalid_repeated_argument_labels_are_rejected(bad):
@@ -99,7 +99,7 @@ def test_invalid_repeated_argument_labels_are_rejected(bad):
 
 def test_legacy_single_argument_map_remains_compatible():
     case = task()
-    case["expected_args"] = {"send_email": {"recipient": "second@example.org"}}
+    case["expected_args"] = {"send_email": {"to": "second@example.org"}}
     validate_agent_tasks([case])
     assert argument_accuracy(
         trajectory(["first@example.org", "second@example.org"])["tool_calls"],
