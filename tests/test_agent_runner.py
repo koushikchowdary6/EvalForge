@@ -2,6 +2,8 @@
 
 import json
 
+import pytest
+
 import evalforge.agent_runner as agent_runner_module
 from evalforge.agent_runner import AgentEvalRunner
 
@@ -138,3 +140,32 @@ def test_category_success_rates_exclude_provider_errors(tmp_path):
     assert report["by_category"]["outage_only"]["evaluated_tasks"] == 0
     assert report["by_category"]["outage_only"]["execution_errors"] == 1
     assert report["by_category"]["outage_only"]["success_rate"] is None
+
+
+def test_invalid_revalidation_clears_previous_sweep_and_saved_report(monkeypatch, tmp_path):
+    """A failed rerun cannot re-publish results from an older valid dataset."""
+    path = tmp_path / "tasks.json"
+    path.write_text(json.dumps([_task()]), encoding="utf-8")
+    monkeypatch.setattr(agent_runner_module, "ToolCallingAgent", FakeAgent)
+
+    runner = AgentEvalRunner(path, output_dir=tmp_path)
+    runner.load()
+    runner.run()
+    runner.generate_report()
+    runner.save()
+    report_path = tmp_path / "agent_report.json"
+    assert report_path.exists()
+    assert len(runner.results) == 1
+
+    # A caller may mutate loaded tasks between sweeps. Reject the mutation
+    # without retaining an old report or a successful trajectory.
+    runner.tasks[0]["expected_tools"] = "not-a-list"
+    with pytest.raises(ValueError, match="expected_tools"):
+        runner.run()
+
+    assert runner.tasks_sha256 is None
+    assert runner.results == []
+    assert runner.report is None
+    runner.save()
+    assert json.loads((tmp_path / "agent_results.json").read_text()) == []
+    assert not report_path.exists()
