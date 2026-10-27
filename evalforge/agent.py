@@ -24,6 +24,21 @@ load_dotenv()
 
 MAX_TURNS = 6
 
+
+def _reject_duplicate_tool_argument_keys(pairs):
+    """Fail closed when a provider emits ambiguous JSON tool arguments.
+
+    Python json.loads otherwise silently keeps the last duplicate key,
+    potentially changing the action or its target before validation.
+    This hook runs for nested objects as well as the top-level arguments.
+    """
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate tool argument key: {key}")
+        result[key] = value
+    return result
+
 BASE_PROMPT = (
     "You are a helpful assistant with access to tools.\n"
     "Use a tool only when it is needed to answer the user's request; answer "
@@ -264,8 +279,11 @@ class ToolCallingAgent:
             parsed_args = []
             for tc in message.tool_calls:
                 try:
-                    args = json.loads(tc.function.arguments)
-                except (TypeError, json.JSONDecodeError):
+                    args = json.loads(
+                        tc.function.arguments,
+                        object_pairs_hook=_reject_duplicate_tool_argument_keys,
+                    )
+                except (TypeError, ValueError):
                     incomplete_response = True
                     break
                 if not valid_tool_arguments(tc.function.name, args):
