@@ -89,7 +89,7 @@ class ToolCallingAgent:
             tokens       - input/output token counts for cost analysis
         """
         mock_responses = mock_responses or {}
-        start = time.time()
+        start = time.perf_counter()
 
         try:
             if self.model == "claude":
@@ -103,7 +103,7 @@ class ToolCallingAgent:
             # Reports persist error diagnostics, so record only the exception type.
             trajectory = self._empty(f"agent error ({type(e).__name__})")
 
-        trajectory["latency_ms"] = (time.time() - start) * 1000
+        trajectory["latency_ms"] = (time.perf_counter() - start) * 1000
         return trajectory
 
     @staticmethod
