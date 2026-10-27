@@ -391,9 +391,9 @@ class RAGPipeline:
         )
 
     def generate(self, question, retrieved_docs):
-        """Generate an answer from retrieved context. Returns text + latency."""
+        """Generate an answer from retrieved context with monotonic elapsed latency."""
         prompt = self.build_prompt(question, retrieved_docs)
-        start = time.time()
+        start = time.perf_counter()
 
         try:
             if self.model == "claude":
@@ -410,24 +410,24 @@ class RAGPipeline:
                 # benchmark response. Never send it to the correctness judge.
                 stop_reason = getattr(message, "stop_reason", None)
                 if stop_reason == "max_tokens":
-                    return {"answer": "", "latency_ms": (time.time() - start) * 1000,
+                    return {"answer": "", "latency_ms": (time.perf_counter() - start) * 1000,
                             "error": "generation truncated by token limit"}
                 # A tool handoff or an unknown stop is not a completed answer,
                 # even if the response contains plausible-looking text.
                 if stop_reason != "end_turn":
-                    return {"answer": "", "latency_ms": (time.time() - start) * 1000,
+                    return {"answer": "", "latency_ms": (time.perf_counter() - start) * 1000,
                             "error": "generation did not complete normally"}
                 # A completed provider turn may still contain ambiguous or
                 # unusable output. Never grade an arbitrarily chosen block.
                 blocks = getattr(message, "content", None)
                 if not isinstance(blocks, (list, tuple)) or len(blocks) != 1:
-                    return {"answer": "", "latency_ms": (time.time() - start) * 1000,
+                    return {"answer": "", "latency_ms": (time.perf_counter() - start) * 1000,
                             "error": "generation returned ambiguous or empty content"}
                 block = blocks[0]
                 answer = getattr(block, "text", None)
                 if (getattr(block, "type", "text") != "text"
                         or not isinstance(answer, str) or not answer.strip()):
-                    return {"answer": "", "latency_ms": (time.time() - start) * 1000,
+                    return {"answer": "", "latency_ms": (time.perf_counter() - start) * 1000,
                             "error": "generation returned ambiguous or empty content"}
 
             elif self.model == "gpt":
@@ -446,22 +446,22 @@ class RAGPipeline:
                 # answer. Both must be excluded from benchmark scoring.
                 choices = getattr(completion, "choices", None)
                 if not isinstance(choices, (list, tuple)) or len(choices) != 1:
-                    return {"answer": "", "latency_ms": (time.time() - start) * 1000,
+                    return {"answer": "", "latency_ms": (time.perf_counter() - start) * 1000,
                             "error": "generation returned ambiguous or empty content"}
                 # OpenAI reports the equivalent truncation as finish_reason=length.
                 finish_reason = getattr(choices[0], "finish_reason", None)
                 if finish_reason == "length":
-                    return {"answer": "", "latency_ms": (time.time() - start) * 1000,
+                    return {"answer": "", "latency_ms": (time.perf_counter() - start) * 1000,
                             "error": "generation truncated by token limit"}
                 # Content filtering and tool handoffs must not enter RAG
                 # correctness, groundedness, or abstention denominators.
                 if finish_reason != "stop":
-                    return {"answer": "", "latency_ms": (time.time() - start) * 1000,
+                    return {"answer": "", "latency_ms": (time.perf_counter() - start) * 1000,
                             "error": "generation did not complete normally"}
                 message = getattr(choices[0], "message", None)
                 answer = getattr(message, "content", None)
                 if not isinstance(answer, str) or not answer.strip():
-                    return {"answer": "", "latency_ms": (time.time() - start) * 1000,
+                    return {"answer": "", "latency_ms": (time.perf_counter() - start) * 1000,
                             "error": "generation returned ambiguous or empty content"}
 
             else:
@@ -469,7 +469,7 @@ class RAGPipeline:
                         "latency_ms": 0, "error": "unknown model"}
 
             return {"answer": answer.strip(),
-                    "latency_ms": (time.time() - start) * 1000}
+                    "latency_ms": (time.perf_counter() - start) * 1000}
 
         except Exception as e:
             return {
@@ -477,20 +477,20 @@ class RAGPipeline:
                 # or private document snippets. Reports are durable artifacts:
                 # record a diagnostic exception type, never the raw message.
                 "answer": "",
-                "latency_ms": (time.time() - start) * 1000,
+                "latency_ms": (time.perf_counter() - start) * 1000,
                 "error": f"generation failed ({type(e).__name__})",
             }
 
     def query(self, question, top_k=3):
-        """Full RAG turn: retrieve, then generate. Latencies reported separately."""
-        retrieval_start = time.time()
+        """Full RAG turn with monotonic retrieval and generation durations."""
+        retrieval_start = time.perf_counter()
         try:
             retrieved = self.store.search(question, top_k=top_k)
         except Exception as exc:
             # Retrieval failures are not "zero relevant hits" and must not
             # be confused with generation failures in benchmark reports.
             # Avoid serializing provider exception messages into public results.
-            retrieval_ms = (time.time() - retrieval_start) * 1000
+            retrieval_ms = (time.perf_counter() - retrieval_start) * 1000
             return {
                 "question": question,
                 "retrieved": [],
@@ -501,7 +501,7 @@ class RAGPipeline:
                 "error": f"retrieval failed ({type(exc).__name__})",
                 "error_stage": "retrieval",
             }
-        retrieval_ms = (time.time() - retrieval_start) * 1000
+        retrieval_ms = (time.perf_counter() - retrieval_start) * 1000
 
         generation = self.generate(question, retrieved)
 
