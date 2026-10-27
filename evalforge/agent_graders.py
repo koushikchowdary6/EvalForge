@@ -153,7 +153,6 @@ def answer_contains_all(final_answer, required_substrings):
     if not required_substrings:
         return True
     text = (final_answer or "").lower()
-    text_no_separators = text.replace(",", "")
     # Normalize only correctly grouped thousands (1,081 or 1,234,567).
     # Never collapse arbitrary commas: "1,2" is not the number 12.
     text_grouped = re.sub(
@@ -163,7 +162,12 @@ def answer_contains_all(final_answer, required_substrings):
     for sub in required_substrings:
         needle = sub.lower()
         compact = needle.replace(",", "")
-        if re.fullmatch(r"[+-]?\d+(?:\.\d+)?", compact):
+        # A reference with commas is numeric only when its thousands grouping
+        # is valid. "1,2" is not the same benchmark answer as "12".
+        numeric_reference = re.fullmatch(
+            r"[+-]?(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?", needle
+        )
+        if numeric_reference:
             # Match signed integers and decimals as *complete numeric tokens*.
             # Substring matching incorrectly credits -12 for -120, 12.5 for
             # 12.50, or 12.5 for -12.5. A positive unsigned reference still
@@ -180,7 +184,15 @@ def answer_contains_all(final_answer, required_substrings):
             )
             if not re.search(pattern, text_grouped):
                 return False
-        elif needle not in text and compact not in text_no_separators:
+        elif "," in needle and re.fullmatch(r"[+-]?[\d,]+(?:\.\d+)?", needle):
+            # Preserve malformed numeric-looking references literally. Require
+            # complete token boundaries, so "1,2" cannot match "1,20".
+            literal = r"(?<![A-Za-z0-9_.,+\-])" + re.escape(needle) + r"(?![A-Za-z0-9_]|[.,]\d)"
+            if not re.search(literal, text):
+                return False
+        elif needle not in text and needle not in text_grouped:
+            # Only valid thousands groups are normalized. Removing every
+            # comma would credit "12 apples" for "1,2 apples".
             return False
     return True
 
