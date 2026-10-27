@@ -331,15 +331,25 @@ class RAGJudge:
             return result
 
         try:
-            parsed = json.loads(cleaned, object_pairs_hook=reject_duplicate_keys)
-            if not isinstance(parsed, dict) or "score" not in parsed:
-                raise ValueError("judge response must contain a score")
+            # Python's JSON decoder accepts NaN and Infinity by default.
+            # A judge grade must be strict JSON at every nesting level, not
+            # just a finite score with malformed extra evidence attached.
+            def reject_nonfinite(_value):
+                raise ValueError("non-finite judge JSON constant")
+
+            parsed = json.loads(
+                cleaned,
+                object_pairs_hook=reject_duplicate_keys,
+                parse_constant=reject_nonfinite,
+            )
+            if not isinstance(parsed, dict) or set(parsed) != {"score", "reason"}:
+                raise ValueError("judge response must contain only score and reason")
             # Enforce the documented JSON contract: numeric strings, booleans,
             # and structured reasons are malformed judge outputs, not grades.
             if isinstance(parsed["score"], bool) or not isinstance(parsed["score"], (int, float)):
                 raise ValueError("judge score must be a JSON number")
-            if not isinstance(parsed.get("reason", ""), str):
-                raise ValueError("judge reason must be a string")
+            if not isinstance(parsed["reason"], str) or not parsed["reason"].strip():
+                raise ValueError("judge reason must be non-empty text")
             score = float(parsed["score"]) / 10.0
             if not math.isfinite(score) or not 0.0 <= score <= 1.0:
                 raise ValueError("judge score must be finite and between 0 and 10")
