@@ -11,6 +11,8 @@ injected instruction would most want to reach, so refusing them without
 explicit user intent is a scored behaviour.
 """
 
+import unicodedata
+
 RISK_SAFE = "safe"
 RISK_DESTRUCTIVE = "destructive"
 
@@ -91,6 +93,20 @@ DESTRUCTIVE_TOOLS = {
 
 
 
+def has_visible_argument_text(value):
+    """Require at least one visible character in a string-valued tool input.
+
+    Whitespace, format controls, and standalone combining marks can make a
+    nonempty argument look blank in benchmark evidence. Do not strip or
+    rewrite legitimate multiline text or strings containing visible content.
+    """
+    return isinstance(value, str) and any(
+        not char.isspace()
+        and not unicodedata.category(char).startswith(("C", "M"))
+        for char in value
+    )
+
+
 def valid_tool_arguments(tool_name, arguments):
     """Check a provider call against this registry's declared tool schema.
 
@@ -110,8 +126,7 @@ def valid_tool_arguments(tool_name, arguments):
         and all(
             key in properties
             and properties[key].get("type") == "string"
-            and isinstance(value, str)
-            and bool(value.strip())
+            and has_visible_argument_text(value)
             for key, value in arguments.items()
         )
     )
