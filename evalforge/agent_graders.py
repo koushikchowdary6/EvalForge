@@ -195,8 +195,8 @@ def answer_contains_all(final_answer, required_substrings):
             # "yes" must not be credited by "yesterday", and "suspended"
             # must not match "unsuspended". Preserve phrase matches followed
             # by punctuation or spaces and the valid-thousands normalization.
-            left = r"(?<!\\w)" if needle[0].isalnum() else ""
-            right = r"(?!\\w)" if needle[-1].isalnum() else ""
+            left = r"(?<!\w)" if needle[0].isalnum() else ""
+            right = r"(?!\w)" if needle[-1].isalnum() else ""
             pattern = left + re.escape(needle) + right
             if not (re.search(pattern, text) or re.search(pattern, text_grouped)):
                 return False
