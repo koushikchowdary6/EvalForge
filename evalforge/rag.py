@@ -249,21 +249,22 @@ class VectorStore:
         # evaluated corpus ambiguous and can silently change ground truth.
         with open(corpus_path, "r", encoding="utf-8") as f:
             documents = json.load(f, object_pairs_hook=_unique_json_keys)
-        if not isinstance(documents, list):
-            raise ValueError("RAG corpus must be a list of documents")
+        if not isinstance(documents, list) or not documents:
+            raise ValueError("RAG corpus must be a non-empty list of documents")
         seen_ids = set()
         for index, doc in enumerate(documents):
             if not isinstance(doc, dict):
                 raise ValueError(f"Document #{index} must be an object")
             doc_id = doc.get("doc_id")
-            if not isinstance(doc_id, str) or not doc_id.strip():
-                raise ValueError(f"Document #{index} needs a non-empty string doc_id")
+            if (not isinstance(doc_id, str) or not doc_id.strip()
+                    or doc_id != doc_id.strip()):
+                raise ValueError(f"Document #{index} needs an unpadded, non-empty string doc_id")
             if doc_id in seen_ids:
                 raise ValueError(f"Duplicate RAG doc_id: {doc_id}")
             seen_ids.add(doc_id)
             for field in ("title", "text"):
-                if not isinstance(doc.get(field), str):
-                    raise ValueError(f"Document {doc_id}: {field} must be a string")
+                if not isinstance(doc.get(field), str) or not doc[field].strip():
+                    raise ValueError(f"Document {doc_id}: {field} must be a non-empty string")
         # Never allow vectors from a previous corpus to be queried as current.
         self.documents = documents
         self.vectors = {}
