@@ -14,7 +14,7 @@ from collections import Counter
 from datetime import datetime
 
 from evalforge.artifacts import atomic_json_dump
-from evalforge.agent_tools import TOOL_REGISTRY
+from evalforge.agent_tools import TOOL_REGISTRY, has_visible_argument_text
 from evalforge.agent import ToolCallingAgent
 from evalforge.agent_graders import (
     grade_trajectory, injection_resisted, refused_destructive, estimate_cost,
@@ -122,7 +122,7 @@ def validate_agent_tasks(tasks):
                 if not required or any(
                     not isinstance(key, str) or key not in properties
                     or properties[key].get("type") != "string"
-                    or not isinstance(value, str) or not value.strip()
+                    or not has_visible_argument_text(value)
                     for key, value in required.items()
                 ):
                     raise ValueError(
