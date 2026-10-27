@@ -184,15 +184,14 @@ class AgentEvalRunner:
         return self.tasks
 
     def run(self):
-        # A mutated or invalid task list must never inherit an older digest.
+        # Invalidate all prior measurements before validation. A failed
+        # revalidation must not leave a previous sweep's report or trajectories
+        # available to save under a missing/stale dataset fingerprint.
+        self.results = []
+        self.report = None
         self.tasks_sha256 = None
         validate_agent_tasks(self.tasks)
         self.tasks_sha256 = _agent_dataset_sha256(self.tasks)
-        # Each run is an independent evaluation sweep. Reusing a runner should
-        # reuse loaded tasks/configuration, not accumulate trajectories from a
-        # previous experiment or expose a stale aggregate report.
-        self.results = []
-        self.report = None
 
         agent = ToolCallingAgent(model=self.model,
                                 defense_enabled=self.defense_enabled)
