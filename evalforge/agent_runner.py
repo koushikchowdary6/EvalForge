@@ -20,6 +20,21 @@ from evalforge.agent_graders import (
 )
 
 
+def _reject_duplicate_json_keys(pairs):
+    """Reject ambiguous benchmark labels, including nested tool arguments.
+
+    Python's default JSON decoder silently keeps the last occurrence of a
+    duplicate key, allowing case identity or expected tool arguments to change
+    without an explicit dataset edit being visible to reviewers.
+    """
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"Duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+
 def validate_agent_tasks(tasks):
     """Reject invalid benchmark labels before making any model/API calls.
 
@@ -145,7 +160,7 @@ class AgentEvalRunner:
         self.results = []
         self.report = None
         with open(self.tasks_path, "r", encoding="utf-8") as f:
-            candidate = json.load(f)
+            candidate = json.load(f, object_pairs_hook=_reject_duplicate_json_keys)
         validate_agent_tasks(candidate)
         self.tasks = candidate
         print(f"Loaded {len(self.tasks)} agent tasks from {self.tasks_path}")
