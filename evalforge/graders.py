@@ -98,11 +98,22 @@ class RuleBasedGrader:
             if len(word) > 3 and word.lower().strip('.,!?;:') not in STOPWORDS
         ]
 
+        # Substring checks credit "capital" inside "capitalization" or
+        # "Canberra" inside "Canberran", inflating benchmark pass rates.
+        # Match complete terms while preserving punctuation-bearing terms.
         for keyword in key_words:
-            if keyword.lower() not in actual.lower():
+            pattern = r"(?<!\w)" + re.escape(keyword) + r"(?!\w)"
+            if not re.search(pattern, actual, flags=re.IGNORECASE):
                 results["failed_rules"].append(f"Missing key term: '{keyword}'")
                 results["passed"] = False
                 results["score"] -= 0.1
+
+        # With a stopword-only reference there may be no key terms. An empty
+        # completion must not earn full credit just because no terms remain.
+        if expected.strip() and not actual.strip():
+            results["failed_rules"].append("Empty model response")
+            results["passed"] = False
+            results["score"] -= 0.2
 
         # Custom rules
         for rule in rules:
@@ -137,6 +148,10 @@ class RuleBasedGrader:
                     results["score"] -= 0.2
 
         results["score"] = max(0.0, results["score"])
+        # The rubric's binary outcome and numerical score must agree: a
+        # failed requirement cannot still be reported as a passing 0.9.
+        if not results["passed"]:
+            results["score"] = min(results["score"], 0.5)
         results["details"] = " | ".join(results["failed_rules"]) if results["failed_rules"] else "All checks passed"
 
         return results
