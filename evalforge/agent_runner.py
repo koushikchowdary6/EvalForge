@@ -96,6 +96,23 @@ def validate_agent_tasks(tasks):
                     f"{task_id}: expected_args for {name} must have one "
                     "argument object per required invocation"
                 )
+            # An expected argument name that the tool does not accept can
+            # never be supplied by a valid provider call. Previously such
+            # benchmark labels were silently graded as model failures.
+            # Partial expectations are allowed, but every supplied field
+            # must be a meaningful string parameter from the tool schema.
+            properties = TOOL_REGISTRY[name]["parameters"]["properties"]
+            for required in (args if isinstance(args, list) else [args]):
+                if not required or any(
+                    not isinstance(key, str) or key not in properties
+                    or properties[key].get("type") != "string"
+                    or not isinstance(value, str) or not value.strip()
+                    for key, value in required.items()
+                ):
+                    raise ValueError(
+                        f"{task_id}: expected_args for {name} contains "
+                        "unknown, empty, or non-string tool parameters"
+                    )
 
         responses = task.get("mock_responses", {})
         if not isinstance(responses, dict) or any(
