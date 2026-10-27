@@ -13,6 +13,8 @@ import math
 import os
 from dotenv import load_dotenv
 
+from evalforge.agent_tools import has_visible_argument_text
+
 load_dotenv()
 
 ABSTAIN_TOKEN = "INSUFFICIENT_CONTEXT"
@@ -184,7 +186,10 @@ def grade_abstention(answer, answerable):
     them separately so they cannot receive passing abstention credit or
     dilute hallucination and over-abstention rates.
     """
-    if not isinstance(answer, str) or not answer.strip():
+    # Combining marks and zero-width format characters can be nonempty after
+    # strip(), but they are not an answer. Keep RAG scoring consistent with
+    # the agent evaluator: invisible-only output must never earn passing credit.
+    if not has_visible_argument_text(answer):
         return {"outcome": "empty_answer", "abstained": False, "passed": False}
 
     abstained = did_abstain(answer)
