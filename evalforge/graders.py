@@ -102,7 +102,7 @@ class RuleBasedGrader:
         # "Canberra" inside "Canberran", inflating benchmark pass rates.
         # Match complete terms while preserving punctuation-bearing terms.
         for keyword in key_words:
-            pattern = r"(?<!\\w)" + re.escape(keyword) + r"(?!\\w)"
+            pattern = r"(?<!\w)" + re.escape(keyword) + r"(?!\w)"
             if not re.search(pattern, actual, flags=re.IGNORECASE):
                 results["failed_rules"].append(f"Missing key term: '{keyword}'")
                 results["passed"] = False
