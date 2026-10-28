@@ -18,6 +18,7 @@ import os
 import time
 from dotenv import load_dotenv
 
+from evalforge.agent_tools import has_visible_argument_text
 from evalforge.artifacts import atomic_json_dump
 from evalforge.identifiers import valid_benchmark_id
 
@@ -268,8 +269,17 @@ class VectorStore:
                 raise ValueError(f"Duplicate RAG doc_id: {doc_id}")
             seen_ids.add(doc_id)
             for field in ("title", "text"):
-                if not isinstance(doc.get(field), str) or not doc[field].strip():
-                    raise ValueError(f"Document {doc_id}: {field} must be a non-empty string")
+                value = doc.get(field)
+                # JSON can escape lone UTF-16 surrogates that are not valid
+                # UTF-8. Reject them before embedding/cache-key generation,
+                # where encoding would otherwise fail after earlier API calls.
+                # Invisible-only evidence is also not a meaningful document;
+                # preserve visible adversarial text and ordinary Unicode.
+                if (not has_visible_argument_text(value)
+                        or any("\ud800" <= char <= "\udfff" for char in value)):
+                    raise ValueError(
+                        f"Document {doc_id}: {field} must contain visible, valid Unicode text"
+                    )
         # Never allow vectors from a previous corpus to be queried as current.
         self.documents = documents
         self.vectors = {}
