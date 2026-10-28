@@ -139,7 +139,7 @@ class RuleBasedGrader:
 
         # With a stopword-only reference there may be no key terms. An empty
         # completion must not earn full credit just because no terms remain.
-        if expected.strip() and not actual.strip():
+        if expected.strip() and not has_visible_argument_text(actual):
             results["failed_rules"].append("Empty model response")
             results["passed"] = False
             results["score"] -= 0.2
