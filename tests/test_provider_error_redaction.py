@@ -54,6 +54,7 @@ def test_judge_provider_error_is_redacted_from_result(provider):
     )
     assert result["passed"] is False
     assert result["score"] == 0.0
-    assert result["feedback"] == "Claude judging error (RuntimeError)" if provider == "claude" else result["feedback"] == "GPT judging error (RuntimeError)"
+    expected = "Claude" if provider == "claude" else "GPT"
+    assert result["feedback"] == f"{expected} judging error (RuntimeError)"
     assert result["details"] == "judge provider request failed"
     assert SECRET not in repr(result)
