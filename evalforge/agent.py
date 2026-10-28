@@ -229,6 +229,7 @@ class ToolCallingAgent:
         ]
         tool_calls = []
         tokens_in = tokens_out = 0
+        usage_complete = True
         final_answer = ""
         turns = 0
         completed = False
@@ -252,6 +253,10 @@ class ToolCallingAgent:
             if response.usage:
                 tokens_in += response.usage.prompt_tokens
                 tokens_out += response.usage.completion_tokens
+            else:
+                # A completed turn can omit usage. Do not report a fully
+                # measured $0 run when any round-trip was unmetered.
+                usage_complete = False
 
             # Multiple or missing choices make the observed agent trajectory
             # ambiguous. Never select one arbitrarily and grant tool credit.
@@ -325,6 +330,9 @@ class ToolCallingAgent:
             "turn_limit_exceeded": not completed and not incomplete_response and provider_error is None,
             "incomplete_response": incomplete_response,
             "turns": turns,
-            "tokens": {"input": tokens_in, "output": tokens_out},
+            "tokens": (
+                {"input": tokens_in, "output": tokens_out}
+                if usage_complete else {}
+            ),
             "error": provider_error,
         }
