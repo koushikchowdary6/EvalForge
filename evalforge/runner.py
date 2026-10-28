@@ -8,11 +8,60 @@ import json
 import os
 import time
 from datetime import datetime
+import unicodedata
+
 from dotenv import load_dotenv
+from evalforge.agent_tools import has_visible_argument_text
 from evalforge.graders import ExactMatchGrader, RuleBasedGrader, LLMJudgeGrader
+from evalforge.identifiers import valid_benchmark_id
 
 # Load environment variables from .env file
 load_dotenv()
+
+# The general benchmark uses a fixed rubric family. A typo must not silently
+# fall back to the generic rubric and change cross-run comparability.
+GENERAL_CATEGORIES = {"factual", "reasoning", "instruction_following", "general"}
+
+
+def _unique_json_keys(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate benchmark JSON key: {key}")
+        result[key] = value
+    return result
+
+
+def _reject_nonfinite_json(value):
+    raise ValueError(f"non-finite benchmark JSON constant: {value}")
+
+
+def validate_general_cases(cases):
+    """Reject ambiguous benchmark labels before making paid model calls.
+
+    Duplicate IDs and unknown rubric categories distort per-case reporting.
+    Keep question/answer text verbatim (including adversarial instructions),
+    but require visible, UTF-8-serializable evidence.
+    """
+    if not isinstance(cases, list) or not cases:
+        raise ValueError("general benchmark must be a non-empty JSON list")
+    seen = set()
+    for index, case in enumerate(cases):
+        if not isinstance(case, dict):
+            raise ValueError(f"general benchmark case #{index} must be an object")
+        case_id = case.get("id")
+        if not valid_benchmark_id(case_id):
+            raise ValueError(f"general benchmark case #{index} has invalid id")
+        if case_id in seen:
+            raise ValueError(f"duplicate general benchmark id: {case_id}")
+        seen.add(case_id)
+        for field in ("question", "expected_answer"):
+            value = case.get(field)
+            if (not has_visible_argument_text(value)
+                    or any(unicodedata.category(char) == "Cs" for char in value)):
+                raise ValueError(f"general benchmark case {case_id}: invalid {field}")
+        if case.get("category") not in GENERAL_CATEGORIES:
+            raise ValueError(f"general benchmark case {case_id}: unknown category")
 
 
 class RealModelClient:
@@ -163,8 +212,18 @@ class EvalForgeRunner:
 
     def load_dataset(self):
         """Load test dataset from JSON."""
-        with open(self.dataset_path, 'r') as f:
-            self.dataset = json.load(f)
+        # Never retain a previous valid sweep when reloading an invalid file.
+        self.dataset = []
+        self.results = []
+        self.report = None
+        with open(self.dataset_path, "r", encoding="utf-8") as f:
+            loaded = json.load(
+                f,
+                object_pairs_hook=_unique_json_keys,
+                parse_constant=_reject_nonfinite_json,
+            )
+        validate_general_cases(loaded)
+        self.dataset = loaded
         print(f"Loaded {len(self.dataset)} test cases")
         return self.dataset
 
@@ -186,6 +245,9 @@ class EvalForgeRunner:
 
         if not self.dataset:
             self.load_dataset()
+        # Also validate datasets injected by callers after load_dataset().
+        # Invalid cases must not reach a paid provider or grader.
+        validate_general_cases(self.dataset)
 
         print(f"\nStarting evaluation across {len(self.dataset)} cases for {len(models)} models...\n")
 
