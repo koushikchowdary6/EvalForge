@@ -98,7 +98,8 @@ class RuleBasedGrader:
             if not isinstance(rule, dict):
                 raise ValueError("each rule must be a mapping")
             rule_type = rule.get("type")
-            if not isinstance(rule_type, str) or rule_type not in {"min_length", "max_length", "contains", "not_contains"}:
+            if (not isinstance(rule_type, str) or rule_type not in
+                    {"min_length", "max_length", "contains", "not_contains"}):
                 raise ValueError("unsupported rule type")
             if rule_type in {"min_length", "max_length"}:
                 default = 10 if rule_type == "min_length" else 500
