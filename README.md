@@ -81,16 +81,22 @@ not claim any measured production failure rate.
 
 ---
 
-## Bounded RAG judge evidence
+## Bounded RAG generation and judge evidence
 
-RAG correctness and groundedness graders reject serialized untrusted evidence
-above **40,000 characters** before making a paid judge API call. These cases
-are recorded as **unscored** (`score: null`, `parse_ok: false`) rather than
+The RAG generator rejects malformed JSON evidence (including non-finite
+numbers, circular values, and incomplete document records) and serialized
+question/document payloads above **40,000 characters**, *before* a paid
+generation API call. These become generation errors excluded from answer
+quality metrics, not model failures or hallucinations. API-free tests cover
+both providers and valid small requests.
+
+Separately, correctness and groundedness judges reject serialized untrusted
+evidence above **40,000 characters** before making a paid judge API call.
+These cases are **unscored** (`score: null`, `parse_ok: false`) rather than
 silently truncating documents or assigning a low-quality grade. Aggregate
-judge coverage must be considered alongside scores; the limit is a practical
-resource guard, not a guarantee that shorter prompts fit every provider's
-context window. Deterministic offline tests cover both refusal and normal
-small-evidence grading.
+coverage must be considered alongside scores. Both limits are practical
+character-based resource guards, **not** guarantees that shorter prompts fit
+every provider's context window.
 
 ## RAG benchmark provenance
 
