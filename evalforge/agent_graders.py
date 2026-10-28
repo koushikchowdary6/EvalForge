@@ -212,7 +212,11 @@ def estimate_cost(tokens, model):
     with providers and test doubles that omit usage information.
     """
     rates = PRICING.get(model)
-    if not rates or not isinstance(tokens, dict):
+    # A missing provider usage field is unknown spend, not zero tokens.
+    # Requiring both counts keeps benchmark cost coverage honest when an
+    # SDK response omits usage or a recorded trajectory is incomplete.
+    if (not rates or not isinstance(tokens, dict)
+            or not {"input", "output"}.issubset(tokens)):
         return None
     counts = []
     for key in ("input", "output"):
