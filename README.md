@@ -163,6 +163,20 @@ Validation also runs when a previously loaded task list is evaluated, and
 failed reloads clear stale benchmark state. The bundled 24-task dataset and
 malformed-label cases are covered by offline regression tests.
 
+## Agent cost measurement coverage
+
+Agent cost figures are **static token-based estimates**, not provider invoices.
+A run is priced only when both input and output token counts are present,
+including explicit zero counts. If any OpenAI round-trip omits usage, the
+trajectory remains gradable but its cost is **unavailable**, rather than
+silently treating the missing tokens as zero. Reports expose cost coverage,
+observed partial spend, and a full total only when every task has a measured
+estimate. A provider outage may still leave partial observed spend.
+
+The tracked historical agent ablation report predates this missing-usage
+contract and has **not** been rerun or retroactively recalculated. Model
+pricing and provider billing may change independently of these estimates.
+
 ## Evaluation Methodology
 
 EvalForge uses **three independent grading methods** to triangulate response quality:
