@@ -27,15 +27,15 @@ class RealModelClient:
         try:
             from openai import OpenAI
             self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        except Exception as e:
-            print(f"⚠ OpenAI client failed: {e}")
+        except Exception as exc:
+            print(f"⚠ OpenAI client failed ({type(exc).__name__})")
             self.openai_client = None
 
         try:
             from anthropic import Anthropic
             self.anthropic_client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-        except Exception as e:
-            print(f"⚠ Anthropic client failed: {e}")
+        except Exception as exc:
+            print(f"⚠ Anthropic client failed ({type(exc).__name__})")
             self.anthropic_client = None
 
     def query(self, model_name, question):
@@ -128,13 +128,16 @@ class RealModelClient:
                     "tokens_used": completion.usage.completion_tokens
                 }
 
-        except Exception as e:
-            print(f"✗ Error querying {model_name}: {str(e)}")
+        except Exception as exc:
+            # Provider exception strings can echo request headers, API keys,
+            # prompts, or private context. Do not persist or print them.
+            error_type = type(exc).__name__
+            print(f"✗ Error querying {model_name} ({error_type})")
             return {
                 "model": model_name,
-                "response": f"[API Error: {str(e)[:100]}]",
+                "response": f"[API Error: {error_type}]",
                 "latency_ms": (time.time() - start_time) * 1000,
-                "error": str(e)
+                "error": f"provider request failed ({error_type})"
             }
 
 
