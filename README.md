@@ -169,6 +169,24 @@ EvalForge uses **three independent grading methods** to triangulate response qua
 
 3. **LLM Judge**: Makes real API calls (Claude or GPT) with a category-specific rubric (factual/reasoning/instruction-following). The judge grades quality on a 0-10 scale converted to 0-1. Most sophisticated but slower and costlier.
 
+### General-purpose LLM judge coverage (current runner)
+
+The general LLM judge now marks each grade with `parse_ok`. Malformed,
+truncated, unavailable, or provider-error judgments are **missing measurements**,
+not failed model answers. In new `results/report.json` summaries,
+`llm_judge.evaluated` counts valid grades, `unavailable` counts missing
+grades, and the pass rate uses **evaluated**, not total cases, as its
+denominator. When no valid judge result exists, `pass_rate` is `N/A`
+rather than a misleading 0%. Exact-match and rule-based rates still use
+all completed model responses.
+
+General judge evidence is JSON-serialized with non-finite values rejected
+and capped at **40,000 characters** before paid requests. Invalid evidence
+is marked `parse_ok: false`; it is not a model-quality measurement. This
+limit is a resource guard, not a guarantee of provider context-window fit.
+The tracked v0.2 historical report below predates these coverage fields;
+its numbers have **not** been retroactively recomputed.
+
 ## Results (v0.2) — Claude vs GPT
 
 Ran a head-to-head evaluation of **Claude Haiku 4.5** and **GPT-4o-mini** on the same 19 test cases (38 total evaluations). All numbers come from an actual `python main.py` run committed to `results/report.json` — reproduce them yourself.
