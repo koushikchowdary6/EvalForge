@@ -11,6 +11,7 @@ from datetime import datetime
 import unicodedata
 
 from dotenv import load_dotenv
+from evalforge.artifacts import atomic_json_dump
 from evalforge.agent_tools import has_visible_argument_text
 from evalforge.graders import ExactMatchGrader, RuleBasedGrader, LLMJudgeGrader
 from evalforge.identifiers import valid_benchmark_id
@@ -403,17 +404,19 @@ class EvalForgeRunner:
 
     def save_results(self):
         """Save detailed results and report to JSON."""
-        # Save raw results
+        # Match the RAG and agent runners: write standard JSON to a sibling
+        # temporary file and atomically replace each destination only after
+        # successful serialization. Invalid or interrupted writes must not
+        # truncate the previous complete benchmark artifact.
         results_file = os.path.join(self.output_dir, "results.json")
-        with open(results_file, 'w') as f:
-            json.dump(self.results, f, indent=2)
+        atomic_json_dump(results_file, self.results)
         print(f"Saved detailed results to {results_file}")
 
-        # Do not leave a previous sweep's report in place after an aborted run.
+        # A failed sweep must not leave a previous report looking current.
+        # Results and report are published separately, not as a transaction.
         report_file = os.path.join(self.output_dir, "report.json")
         if self.report is not None:
-            with open(report_file, 'w') as f:
-                json.dump(self.report, f, indent=2)
+            atomic_json_dump(report_file, self.report)
             print(f"Saved report to {report_file}")
         elif os.path.exists(report_file):
             os.remove(report_file)
