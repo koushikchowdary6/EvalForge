@@ -230,6 +230,14 @@ Ran a head-to-head evaluation of **Claude Haiku 4.5** and **GPT-4o-mini** on the
 
 > Note: `results/*.json` is gitignored to avoid committing API responses, but aggregate reports (`report.json`, `rag_report.json`, `agent_report.json`) are tracked so all numbers are auditable.
 
+**Artifact integrity:** General, RAG, and agent evaluation runners publish each JSON
+artifact through a flushed, fsynced temporary file and atomic replacement.
+Serialization errors (including `NaN`/`Infinity`) or a failed replacement do
+not truncate the previous artifact. A general evaluation aborted by a provider
+error removes its stale report when results are saved. The results and report
+are **separate atomic files**, not a cross-file transaction; consumers should
+not assume a pair was published together.
+
 ## Results (v0.3) — RAG Evaluation
 
 The tracked artifact in `results/rag_report.json` is a **3-question k=3 smoke run**, not the full 14-question top-k sweep implemented by the evaluation harness. Publishing the artifact exactly as it exists keeps the benchmark provenance auditable.
