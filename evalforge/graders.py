@@ -45,6 +45,20 @@ STOPWORDS = {
 }
 
 
+def _visible_rubric_length(text: str) -> int:
+    """Count visible response characters for minimum-length grading.
+
+    Format controls, lone surrogates, and nonspacing/enclosing marks cannot
+    be used as padding to satisfy a minimum answer-length requirement.
+    Keep ordinary whitespace and spacing marks for compatibility with
+    existing character-based rubrics.
+    """
+    return sum(
+        1 for char in text
+        if char.isspace() or unicodedata.category(char) not in {"Cf", "Cs", "Mn", "Me", "Cc"}
+    )
+
+
 class ExactMatchGrader:
     """Grades responses that must match exactly (case-insensitive)."""
 
@@ -150,7 +164,7 @@ class RuleBasedGrader:
 
             if rule_type == "min_length":
                 min_len = rule.get("value", 10)
-                if len(actual) < min_len:
+                if _visible_rubric_length(actual) < min_len:
                     results["failed_rules"].append(f"Response too short (min {min_len} chars)")
                     results["passed"] = False
                     results["score"] -= 0.2
