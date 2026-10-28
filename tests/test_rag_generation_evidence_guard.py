@@ -79,8 +79,8 @@ def test_valid_generation_context_still_reaches_provider(provider):
 
 
 def test_generation_budget_applies_to_serialized_payload_not_raw_text():
-    # JSON escaping expands control characters. A raw-text-only size check
-    # would underestimate the actual provider request.
+    # JSON escaping expands literal backslashes. A raw-text-only size
+    # check would underestimate the actual provider request.
     pipeline, calls = _pipeline("gpt")
     result = pipeline.generate("Question", [
         {"doc_id": "d1", "title": "title", "text": "\\n" * 15_000}
