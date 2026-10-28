@@ -11,7 +11,9 @@ from evalforge.agent_runner import AgentEvalRunner
 def test_valid_token_usage_keeps_existing_provider_pricing():
     assert estimate_cost({"input": 1_000_000, "output": 1_000_000}, "claude") == 6.0
     assert estimate_cost({"input": 0, "output": 0}, "gpt") == 0.0
-    assert estimate_cost({}, "claude") == 0.0
+    assert estimate_cost({}, "claude") is None
+    assert estimate_cost({"input": 0}, "claude") is None
+    assert estimate_cost({"output": 0}, "claude") is None
 
 
 @pytest.mark.parametrize("tokens", [
