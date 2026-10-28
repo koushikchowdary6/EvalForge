@@ -89,6 +89,28 @@ class RuleBasedGrader:
         """
         if rules is None:
             rules = []
+        # A misspelled rule type was previously ignored, and an empty
+        # "contains" value always matched. Both silently inflated benchmark
+        # grades. Reject malformed rubrics before evaluating any answer.
+        if not isinstance(rules, (list, tuple)):
+            raise ValueError("rules must be a list of rule mappings")
+        for rule in rules:
+            if not isinstance(rule, dict):
+                raise ValueError("each rule must be a mapping")
+            rule_type = rule.get("type")
+            if (not isinstance(rule_type, str) or rule_type not in
+                    {"min_length", "max_length", "contains", "not_contains"}):
+                raise ValueError("unsupported rule type")
+            if rule_type in {"min_length", "max_length"}:
+                default = 10 if rule_type == "min_length" else 500
+                bound = rule.get("value", default)
+                minimum = 1 if rule_type == "min_length" else 0
+                if isinstance(bound, bool) or not isinstance(bound, int) or bound < minimum:
+                    raise ValueError("length rule requires a nonnegative integer bound")
+            else:
+                needle = rule.get("value")
+                if not isinstance(needle, str) or not needle.strip():
+                    raise ValueError("text rule requires non-empty text")
 
         results = {
             "passed": True,
