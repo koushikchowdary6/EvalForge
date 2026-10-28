@@ -278,7 +278,7 @@ class VectorStore:
                 if (not has_visible_argument_text(value)
                         or any("\ud800" <= char <= "\udfff" for char in value)):
                     raise ValueError(
-                        f"Document {doc_id}: {field} must contain visible, valid Unicode text"
+                        f"Document {doc_id}: {field} must be a non-empty string with visible, valid Unicode text"
                     )
         # Never allow vectors from a previous corpus to be queried as current.
         self.documents = documents
