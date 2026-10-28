@@ -14,6 +14,7 @@ from collections import Counter
 from datetime import datetime
 
 from evalforge.artifacts import atomic_json_dump
+from evalforge.identifiers import valid_benchmark_id
 from evalforge.agent_tools import TOOL_REGISTRY, has_visible_argument_text
 from evalforge.agent import ToolCallingAgent
 from evalforge.agent_graders import (
@@ -53,7 +54,7 @@ def validate_agent_tasks(tasks):
             raise ValueError(f"{location} must be an object")
 
         task_id = task.get("id")
-        if not isinstance(task_id, str) or not task_id.strip():
+        if not valid_benchmark_id(task_id):
             raise ValueError(f"{location} must have a non-empty string id")
         if task_id in seen_ids:
             raise ValueError(f"duplicate agent task id: {task_id}")

@@ -19,6 +19,7 @@ import time
 from dotenv import load_dotenv
 
 from evalforge.artifacts import atomic_json_dump
+from evalforge.identifiers import valid_benchmark_id
 
 load_dotenv()
 
@@ -258,8 +259,7 @@ class VectorStore:
             if not isinstance(doc, dict):
                 raise ValueError(f"Document #{index} must be an object")
             doc_id = doc.get("doc_id")
-            if (not isinstance(doc_id, str) or not doc_id.strip()
-                    or doc_id != doc_id.strip()):
+            if not valid_benchmark_id(doc_id):
                 raise ValueError(f"Document #{index} needs an unpadded, non-empty string doc_id")
             if doc_id in seen_ids:
                 raise ValueError(f"Duplicate RAG doc_id: {doc_id}")
