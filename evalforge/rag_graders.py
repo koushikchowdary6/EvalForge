@@ -376,10 +376,18 @@ class RAGJudge:
         # Keep untrusted question, reference and model output in JSON fields.
         # Raw QUESTION:/ACTUAL ANSWER: delimiters let adversarial answers
         # masquerade as new rubric sections in the judge's user prompt.
-        evidence = json.dumps(
-            {"question": question, "reference_answer": expected, "model_answer": actual},
-            ensure_ascii=True,
-        )
+        try:
+            # Fail closed before calling a paid judge: json.dumps otherwise
+            # permits NaN/Infinity, and malformed provider evidence can raise
+            # before the normal judge-error handling below.
+            evidence = json.dumps(
+                {"question": question, "reference_answer": expected, "model_answer": actual},
+                ensure_ascii=True,
+                allow_nan=False,
+            )
+        except (TypeError, ValueError, OverflowError, RecursionError):
+            return {"metric": "correctness", "score": None, "passed": None,
+                    "reason": "invalid judge evidence", "parse_ok": False}
         if len(evidence) > MAX_JUDGE_EVIDENCE_CHARS:
             return {"metric": "correctness", "score": None, "passed": None,
                     "reason": "judge evidence exceeds size limit", "parse_ok": False}
@@ -417,16 +425,21 @@ class RAGJudge:
         # Serialize every retrieved document separately. A document may
         # contain forged CONTEXT:/ANSWER: headers or score instructions;
         # these must remain inside JSON strings rather than prompt sections.
-        evidence = json.dumps(
-            {
-                "model_answer": answer,
-                "documents": [
-                    {"doc_id": doc["doc_id"], "text": doc["text"]}
-                    for doc in retrieved_docs
-                ],
-            },
-            ensure_ascii=True,
-        )
+        try:
+            evidence = json.dumps(
+                {
+                    "model_answer": answer,
+                    "documents": [
+                        {"doc_id": doc["doc_id"], "text": doc["text"]}
+                        for doc in retrieved_docs
+                    ],
+                },
+                ensure_ascii=True,
+                allow_nan=False,
+            )
+        except (TypeError, ValueError, KeyError, OverflowError, RecursionError):
+            return {"metric": "groundedness", "score": None, "passed": None,
+                    "reason": "invalid judge evidence", "parse_ok": False}
         if len(evidence) > MAX_JUDGE_EVIDENCE_CHARS:
             return {"metric": "groundedness", "score": None, "passed": None,
                     "reason": "judge evidence exceeds size limit", "parse_ok": False}
