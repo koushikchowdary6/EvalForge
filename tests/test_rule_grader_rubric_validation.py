@@ -12,6 +12,8 @@ from evalforge.graders import RuleBasedGrader
     ["contains"],
     [{}],
     [{"type": "contians", "value": "Canberra"}],
+    [{"type": []}],
+    [{"type": {}}],
     [{"type": "contains"}],
     [{"type": "contains", "value": ""}],
     [{"type": "contains", "value": "  "}],
