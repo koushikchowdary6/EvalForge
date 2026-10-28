@@ -119,9 +119,13 @@ described as provenance-verified.
 Corpus JSON is decoded with duplicate-key rejection at every object depth.
 Without this check, standard JSON decoding silently takes the last value for
 repeated `doc_id`, `title`, or `text` keys, making retrieved evidence and
-evaluation results ambiguous. An invalid reload fails before replacing the
-previous in-memory corpus/index. This is an offline input-integrity control,
-not validation of whether the corpus evidence is factually correct.
+evaluation results ambiguous. Corpus titles and document text must contain
+visible characters and valid Unicode: lone UTF-16 surrogates and invisible-only
+evidence fail at load time, before embedding or cache writes. Visible Unicode
+and adversarial text containing hidden controls remain supported for security
+evaluations. An invalid reload preserves the last-good in-memory corpus/index.
+This is an offline input-integrity control, not validation of whether the
+corpus evidence is factually correct.
 
 ## RAG prompt-injection trust boundaries
 
