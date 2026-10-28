@@ -198,8 +198,11 @@ class RAGEvalRunner:
                         "recall_at_k": recall_at_k(retrieved_ids, relevant_ids, k=k),
                         "ndcg_at_k": ndcg_at_k(retrieved_ids, relevant_ids, k=k),
                         "average_precision_at_k": average_precision_at_k(retrieved_ids, relevant_ids, k=k),
-                        "reciprocal_rank": reciprocal_rank(retrieved_ids, relevant_ids),
-                        "hit_rate": hit_rate(retrieved_ids, relevant_ids),
+                        # A misbehaving retriever can return more than top_k.
+                        # MRR and hit rate must use the same cutoff as P/R,
+                        # nDCG and AP or evidence beyond k inflates results.
+                        "reciprocal_rank": reciprocal_rank(retrieved_ids[:k], relevant_ids),
+                        "hit_rate": hit_rate(retrieved_ids[:k], relevant_ids),
                     }
                 )
 
