@@ -8,7 +8,10 @@ import json
 import math
 import re
 import os
+import unicodedata
 from dotenv import load_dotenv
+
+from evalforge.agent_tools import has_visible_argument_text
 
 load_dotenv()
 
@@ -379,16 +382,27 @@ class LLMJudgeGrader:
             return invalid
         raw_score = judgment.get("score")
         reason = judgment.get("reason")
+        if isinstance(raw_score, bool) or not isinstance(raw_score, (int, float)):
+            return invalid
+        # JSON can contain arbitrarily large integer literals. Converting
+        # those to float may overflow; no malformed grade should crash an
+        # offline benchmark parser or accidentally receive partial credit.
+        try:
+            numeric_score = float(raw_score)
+        except (OverflowError, ValueError):
+            return invalid
+        if not math.isfinite(numeric_score) or not 0 <= numeric_score <= 10:
+            return invalid
+        # A whitespace-only, zero-width, or combining-mark-only explanation
+        # is not reviewable evidence. Direction-changing Unicode controls can
+        # spoof the apparent justification; lone surrogates cannot be safely
+        # serialized as UTF-8. Match the RAG judge's fail-closed policy.
         if (
-            isinstance(raw_score, bool)
-            or not isinstance(raw_score, (int, float))
-            or not math.isfinite(raw_score)
-            or not 0 <= raw_score <= 10
-            or not isinstance(reason, str)
-            or not reason.strip()
+            not has_visible_argument_text(reason)
+            or any(unicodedata.category(char) in ("Cf", "Cs") for char in reason)
         ):
             return invalid
-        score = raw_score / 10.0
+        score = numeric_score / 10.0
         return {
             "passed": score >= 0.6,
             "score": score,
