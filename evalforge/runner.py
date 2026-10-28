@@ -278,7 +278,16 @@ class EvalForgeRunner:
         for model, results in by_model.items():
             exact_passes = sum(1 for r in results if r["grading"]["exact_match"]["passed"])
             rule_passes = sum(1 for r in results if r["grading"]["rule_based"]["passed"])
-            judge_passes = sum(1 for r in results if r["grading"]["llm_judge"]["passed"])
+            # Provider failures and malformed judge JSON are missing measurements,
+            # not model failures. Preserve the total denominator for exact/rule
+            # grades, but calculate judge pass rate over valid judgments only.
+            # Legacy custom graders without parse_ok are treated as valid.
+            valid_judgments = [
+                r["grading"]["llm_judge"] for r in results
+                if r["grading"]["llm_judge"].get("parse_ok", True) is True
+            ]
+            judge_passes = sum(1 for grade in valid_judgments if grade["passed"])
+            judge_count = len(valid_judgments)
 
             # By category
             by_category = {}
@@ -311,8 +320,13 @@ class EvalForgeRunner:
                 },
                 "llm_judge": {
                     "pass": judge_passes,
-                    "fail": len(results) - judge_passes,
-                    "pass_rate": f"{(judge_passes / len(results) * 100):.1f}%"
+                    "fail": judge_count - judge_passes,
+                    "evaluated": judge_count,
+                    "unavailable": len(results) - judge_count,
+                    "pass_rate": (
+                        f"{(judge_passes / judge_count * 100):.1f}%"
+                        if judge_count else "N/A"
+                    ),
                 },
                 "by_category": category_stats
             }
@@ -355,7 +369,12 @@ class EvalForgeRunner:
             print(f"{'-'*70}")
             print(f"  Exact Match: {stats['exact_match']['pass']}/{stats['exact_match']['pass_rate']}")
             print(f"  Rule-Based:  {stats['rule_based']['pass']}/{stats['rule_based']['pass_rate']}")
-            print(f"  LLM Judge:   {stats['llm_judge']['pass']}/{stats['llm_judge']['pass_rate']}")
+            print(
+                f"  LLM Judge:   {stats['llm_judge']['pass']}/"
+                f"{stats['llm_judge']['evaluated']} valid "
+                f"({stats['llm_judge']['pass_rate']}); "
+                f"{stats['llm_judge']['unavailable']} unavailable"
+            )
 
             # Show latency if available
             model_results = [r for r in self.results if r["model"] == model]
