@@ -12,6 +12,7 @@ import os
 from datetime import datetime
 
 from evalforge.artifacts import atomic_json_dump as _atomic_json_dump
+from evalforge.identifiers import valid_benchmark_id
 from evalforge.rag import (
     VectorStore, RAGPipeline, EmbeddingClient, EMBED_MODEL,
     _unique_json_keys, _reject_nonfinite_json_constant,
@@ -35,7 +36,7 @@ def validate_rag_questions(questions, document_ids):
         if not isinstance(case, dict):
             raise ValueError(f"RAG question #{index} must be an object")
         case_id = case.get("id")
-        if not isinstance(case_id, str) or not case_id.strip():
+        if not valid_benchmark_id(case_id):
             raise ValueError(f"RAG question #{index}: id must be a non-empty string")
         if case_id in seen_ids:
             raise ValueError(f"Duplicate RAG question id: {case_id}")
@@ -48,7 +49,7 @@ def validate_rag_questions(questions, document_ids):
             raise ValueError(f"RAG question {case_id}: answerable must be a boolean")
         relevant = case.get("relevant_doc_ids")
         if not isinstance(relevant, list) or any(
-            not isinstance(doc_id, str) or not doc_id.strip() for doc_id in relevant
+            not valid_benchmark_id(doc_id) for doc_id in relevant
         ):
             raise ValueError(f"RAG question {case_id}: relevant_doc_ids must be a list of IDs")
         if len(relevant) != len(set(relevant)):
