@@ -247,6 +247,11 @@ class AgentEvalRunner:
             by_category.setdefault(r.get("category") or "uncategorized", []).append(r)
 
         evaluated = [r for r in self.results if not r.get("error")]
+        # Do not present a partial or unpriced sweep as a zero-dollar total.
+        # Retain observed spend separately, with explicit coverage.
+        known_costs = [
+            r["cost_usd"] for r in self.results if r.get("cost_usd") is not None
+        ]
 
         failure_counts = Counter(
             r["grade"]["failure_category"] for r in self.results
@@ -290,7 +295,11 @@ class AgentEvalRunner:
                 # them into completed-run means rewards provider outages.
                 "avg_latency_ms": self._mean([r["latency_ms"] for r in evaluated]),
                 "avg_turns": self._mean([r["turns"] for r in evaluated]),
-                "total_cost_usd": sum(r["cost_usd"] or 0 for r in self.results),
+                "cost_samples": len(known_costs),
+                "observed_cost_usd": sum(known_costs),
+                "total_cost_usd": (
+                    sum(known_costs) if len(known_costs) == len(self.results) else None
+                ),
             },
             "failure_categories": dict(failure_counts),
             "by_category": {},
@@ -351,7 +360,12 @@ class AgentEvalRunner:
         avg_turns = "n/a" if o["avg_turns"] is None else f"{o['avg_turns']:.2f}"
         print(f"  Avg latency ................ {avg_latency}")
         print(f"  Avg turns .................. {avg_turns}")
-        print(f"  Estimated cost ............. ${o['total_cost_usd']:.4f}")
+        total_cost = o["total_cost_usd"]
+        cost_text = f"${total_cost:.4f}" if total_cost is not None else "n/a (incomplete usage)"
+        print(f"  Estimated cost ............. {cost_text}")
+        print(f"  Cost coverage .............. {o['cost_samples']}/{self.report['total_tasks']}")
+        if total_cost is None:
+            print(f"  Observed partial cost ...... ${o['observed_cost_usd']:.4f}")
 
         print("\n  By category:")
         print(f"    {'category':24}{'tasks':>7}{'success':>10}{'tool_acc':>10}{'seq_acc':>10}")
