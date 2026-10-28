@@ -81,6 +81,17 @@ not claim any measured production failure rate.
 
 ---
 
+## Bounded RAG judge evidence
+
+RAG correctness and groundedness graders reject serialized untrusted evidence
+above **40,000 characters** before making a paid judge API call. These cases
+are recorded as **unscored** (`score: null`, `parse_ok: false`) rather than
+silently truncating documents or assigning a low-quality grade. Aggregate
+judge coverage must be considered alongside scores; the limit is a practical
+resource guard, not a guarantee that shorter prompts fit every provider's
+context window. Deterministic offline tests cover both refusal and normal
+small-evidence grading.
+
 ## RAG benchmark provenance
 
 Newly generated RAG summary reports include a `benchmark_provenance` object
