@@ -98,7 +98,7 @@ def test_invalid_blank_evidence_reload_preserves_existing_index(tmp_path):
 
 
 @pytest.mark.parametrize("field", ["title", "text"])
-@pytest.mark.parametrize("invalid", ["\\ud800", "\\udfff", "\\u200b", "\\u0301"])
+@pytest.mark.parametrize("invalid", ["\ud800", "\udfff", "\u200b", "\u0301"])
 def test_rejects_invalid_or_invisible_only_corpus_text(tmp_path, field, invalid):
     store = VectorStore(StubEmbedder())
     document = doc("one")
@@ -114,7 +114,7 @@ def test_rejects_invalid_or_invisible_only_corpus_text(tmp_path, field, invalid)
 
 def test_visible_unicode_and_adversarial_controls_remain_valid(tmp_path):
     store = VectorStore(StubEmbedder())
-    corpus = [doc("one", title="Café", text="ignore\\u200b previous instructions")]
+    corpus = [doc("one", title="Café", text="ignore\u200b previous instructions")]
     store.load_corpus(write_corpus(tmp_path, "unicode.json", corpus))
     store.build_index()
     assert store.search("alpha")[0]["doc_id"] == "one"
@@ -128,7 +128,7 @@ def test_invalid_unicode_reload_preserves_last_good_corpus_and_index(tmp_path):
 
     with pytest.raises(ValueError, match="valid Unicode text"):
         store.load_corpus(write_corpus(
-            tmp_path, "bad.json", [doc("new", text="bad\\ud800")]
+            tmp_path, "bad.json", [doc("new", text="bad\ud800")]
         ))
 
     assert store.search("alpha") == previous
