@@ -11,6 +11,7 @@ Two families:
 import json
 import math
 import os
+import unicodedata
 from dotenv import load_dotenv
 
 from evalforge.agent_tools import has_visible_argument_text
@@ -348,8 +349,13 @@ class RAGJudge:
             # and structured reasons are malformed judge outputs, not grades.
             if isinstance(parsed["score"], bool) or not isinstance(parsed["score"], (int, float)):
                 raise ValueError("judge score must be a JSON number")
-            if not isinstance(parsed["reason"], str) or not parsed["reason"].strip():
-                raise ValueError("judge reason must be non-empty text")
+            if not isinstance(parsed["reason"], str) or not has_visible_argument_text(parsed["reason"]):
+                raise ValueError("judge reason must contain visible text")
+            # Explanations are benchmark evidence shown to reviewers. Hidden
+            # direction-changing controls can spoof their apparent meaning,
+            # while escaped UTF-16 surrogates cannot be safely encoded as UTF-8.
+            if any(unicodedata.category(char) in ("Cf", "Cs") for char in parsed["reason"]):
+                raise ValueError("judge reason contains hidden or invalid Unicode")
             score = float(parsed["score"]) / 10.0
             if not math.isfinite(score) or not 0.0 <= score <= 1.0:
                 raise ValueError("judge score must be finite and between 0 and 10")
