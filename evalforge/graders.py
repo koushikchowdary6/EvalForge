@@ -372,7 +372,10 @@ class LLMJudgeGrader:
             )
         except (json.JSONDecodeError, ValueError):
             return invalid
-        if not isinstance(judgment, dict):
+        # The rubric requests exactly these two fields. Extra evidence can
+        # hide conflicting claims or malformed grades and must not silently
+        # count as a completed benchmark measurement.
+        if not isinstance(judgment, dict) or set(judgment) != {"score", "reason"}:
             return invalid
         raw_score = judgment.get("score")
         reason = judgment.get("reason")
