@@ -183,8 +183,8 @@ class LLMJudgeGrader:
                 api_key = os.getenv("ANTHROPIC_API_KEY")
                 if api_key:
                     self.anthropic_client = Anthropic(api_key=api_key)
-            except Exception as e:
-                print(f"⚠ LLMJudgeGrader: Could not initialize Anthropic client: {e}")
+            except Exception as exc:
+                print(f"⚠ LLMJudgeGrader: Could not initialize Anthropic client ({type(exc).__name__})")
 
         elif judge_model == "gpt":
             try:
@@ -192,8 +192,8 @@ class LLMJudgeGrader:
                 api_key = os.getenv("OPENAI_API_KEY")
                 if api_key:
                     self.openai_client = OpenAI(api_key=api_key)
-            except Exception as e:
-                print(f"⚠ LLMJudgeGrader: Could not initialize OpenAI client: {e}")
+            except Exception as exc:
+                print(f"⚠ LLMJudgeGrader: Could not initialize OpenAI client ({type(exc).__name__})")
 
     def grade(self, expected, actual, category=None):
         """
@@ -294,8 +294,8 @@ class LLMJudgeGrader:
                 "passed": False,
                 "score": 0.0,
                 "method": "llm_judge",
-                "feedback": f"Claude judging error: {str(e)[:80]}",
-                "details": str(e)
+                "feedback": f"Claude judging error ({type(e).__name__})",
+                "details": "judge provider request failed"
             }
 
     def _judge_with_gpt(self, expected, actual, category):
@@ -331,8 +331,8 @@ class LLMJudgeGrader:
                 "passed": False,
                 "score": 0.0,
                 "method": "llm_judge",
-                "feedback": f"GPT judging error: {str(e)[:80]}",
-                "details": str(e)
+                "feedback": f"GPT judging error ({type(e).__name__})",
+                "details": "judge provider request failed"
             }
 
     def _parse_judgment(self, response_text, judge_name):
