@@ -234,14 +234,19 @@ class EvalForgeRunner:
         Args:
             models: List of model names to evaluate (default: ["claude", "gpt"])
         """
-        if models is None:
-            models = ["claude", "gpt"]
-        if not models or any(model not in ("claude", "gpt") for model in models):
-            raise ValueError("models must be a non-empty list containing only 'claude' or 'gpt'")
-
-        # Every sweep is independent; previous scores and reports must not leak.
+        # Every sweep is independent, even when model selection is invalid.
+        # Do not leave a previous report available after a rejected rerun.
         self.results = []
         self.report = None
+        if models is None:
+            models = ["claude", "gpt"]
+        # Duplicates silently spend twice on the same model/case and inflate
+        # the per-model denominator. Sets and generators also have unstable or
+        # consumed iteration semantics. Require a unique, ordered selection.
+        if (not isinstance(models, (list, tuple)) or not models
+                or any(model not in ("claude", "gpt") for model in models)
+                or len(set(models)) != len(models)):
+            raise ValueError("models must be a unique, non-empty list or tuple of 'claude' and 'gpt'")
 
         if not self.dataset:
             self.load_dataset()
