@@ -73,10 +73,20 @@ class ExactMatchGrader:
         Returns:
             dict with 'passed' (bool) and 'details' (str)
         """
-        expected_clean = expected.strip().lower()
-        actual_clean = actual.strip().lower()
+        # Exact matching is case-insensitive and Unicode-canonical, but an
+        # empty or invisible-only response is not a correct benchmark answer.
+        # NFC treats visually identical composed/decomposed text alike while
+        # preserving meaningful punctuation and internal whitespace.
+        if not isinstance(expected, str) or not isinstance(actual, str):
+            raise ValueError("exact-match answers must be strings")
+        expected_clean = unicodedata.normalize("NFC", expected.strip()).casefold()
+        actual_clean = unicodedata.normalize("NFC", actual.strip()).casefold()
 
-        passed = expected_clean == actual_clean
+        passed = (
+            has_visible_argument_text(expected)
+            and has_visible_argument_text(actual)
+            and expected_clean == actual_clean
+        )
 
         return {
             "passed": passed,

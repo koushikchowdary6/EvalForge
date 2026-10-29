@@ -49,11 +49,39 @@ class TestExactMatchGrader:
         assert result["score"] == 0.0
 
     def test_exact_match_empty_expected(self):
-        """Test behavior with empty expected (edge case)."""
+        """An empty reference and completion cannot count as a successful grade."""
         grader = ExactMatchGrader()
         result = grader.grade("", "")
+        assert result["passed"] is False
+        assert result["score"] == 0.0
+
+    @pytest.mark.parametrize("expected, actual", [
+        ("   ", "  "),
+        ("\u200b", "\u200b"),
+        ("\u0301", "\u0301"),
+        ("Paris", " \u200b "),
+    ])
+    def test_exact_match_rejects_invisible_only_answers(self, expected, actual):
+        result = ExactMatchGrader().grade(expected, actual)
+        assert result["passed"] is False
+        assert result["score"] == 0.0
+
+    @pytest.mark.parametrize("expected, actual", [
+        ("caf\u00e9", "cafe\u0301"),
+        ("Stra\u00dfe", "STRASSE"),
+        ("\u6771\u4eac", "\u6771\u4eac"),
+    ])
+    def test_exact_match_accepts_unicode_equivalent_answers(self, expected, actual):
+        result = ExactMatchGrader().grade(expected, actual)
         assert result["passed"] is True
         assert result["score"] == 1.0
+
+    @pytest.mark.parametrize("expected, actual", [
+        (None, "Paris"), ("Paris", None), (42, "42"),
+    ])
+    def test_exact_match_rejects_non_string_inputs(self, expected, actual):
+        with pytest.raises(ValueError, match="must be strings"):
+            ExactMatchGrader().grade(expected, actual)
 
 
 class TestRuleBasedGrader:
