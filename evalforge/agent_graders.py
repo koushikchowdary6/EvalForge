@@ -180,9 +180,10 @@ def answer_contains_all(final_answer, required_substrings):
                 sign, digits = r"\+", compact[1:]
             else:
                 sign, digits = r"\+?", compact
+            # Fractions and clock times are not standalone numeric answers.
             pattern = (
-                r"(?<![A-Za-z0-9_.,+−-])" + sign + re.escape(digits)
-                + r"(?:°?[cCfFkK])?(?![A-Za-z0-9_]|[.,]\d)"
+                r"(?<![A-Za-z0-9_.,+−-/])" + sign + re.escape(digits)
+                + r"(?:°?[cCfFkK])?(?![A-Za-z0-9_/]|[.,:]\d)"
             )
             if not re.search(pattern, text_grouped):
                 return False
