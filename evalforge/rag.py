@@ -29,6 +29,19 @@ EMBED_CACHE_PATH = "results/embedding_cache.json"
 # Bound untrusted retrieved context before any paid generation request. This
 # is a serialized-character budget, not a provider-specific token guarantee.
 MAX_RAG_GENERATION_EVIDENCE_CHARS = 40_000
+# A character budget for individual embedding inputs, enforced before cache
+# lookup or any paid API call. This is not a provider token-count guarantee.
+MAX_EMBED_INPUT_CHARS = 12_000
+
+def _validate_embedding_text(text):
+    """Reject blank, invalid-Unicode, or oversized embedding inputs early."""
+    if not has_visible_argument_text(text):
+        raise ValueError("embedding input must contain visible text")
+    if len(text) > MAX_EMBED_INPUT_CHARS:
+        raise ValueError("embedding input exceeds character limit")
+    if any("\ud800" <= char <= "\udfff" for char in text):
+        raise ValueError("embedding input contains invalid Unicode surrogate")
+
 
 def _embedding_cache_key(text):
     """Hash model and input so cached keys never contain raw document text.
@@ -200,6 +213,9 @@ class EmbeddingClient:
         must not re-pay for embeddings, otherwise comparing retrieval
         settings costs money proportional to the number of settings.
         """
+        # Validate before cache lookup and paid API requests. A cache hit must
+        # not bypass the same input contract as a fresh embedding.
+        _validate_embedding_text(text)
         # Include the model in the digest to avoid cross-model cache reuse.
         # Unlike the legacy key, this does not serialize raw input text.
         cache_key = _embedding_cache_key(text)
@@ -280,6 +296,11 @@ class VectorStore:
                     raise ValueError(
                         f"Document {doc_id}: {field} must be a non-empty string with visible, valid Unicode text"
                     )
+            # The embedding API receives title + newline + text as one input.
+            # Reject an oversized document during corpus validation so a
+            # later document cannot fail after earlier paid embedding calls.
+            if len(doc["title"]) + 1 + len(doc["text"]) > MAX_EMBED_INPUT_CHARS:
+                raise ValueError(f"Document {doc_id}: embedding input exceeds character limit")
         # Never allow vectors from a previous corpus to be queried as current.
         self.documents = documents
         self.vectors = {}
@@ -322,6 +343,8 @@ class VectorStore:
             raise ValueError("top_k must be a positive integer")
         if not self.vectors:
             raise RuntimeError("Index is empty - call build_index() first.")
+        # Custom embedders must not bypass the same untrusted-query boundary.
+        _validate_embedding_text(query)
 
         query_vector = _validated_embedding(
             self.embedder.embed(query),
