@@ -149,23 +149,27 @@ class RuleBasedGrader:
         # Repeating the same reference term must not weight it multiple
         # times or produce duplicate failures. Keep distinct terms in their
         # first-seen order for deterministic benchmark explanations.
+        # Normalize once for every deterministic text check. Canonically
+        # equivalent Unicode and casefold expansions (e.g. Straße/STRASSE)
+        # must not change benchmark outcomes between grading strategies.
+        actual_canonical = unicodedata.normalize("NFC", actual).casefold()
         key_words = []
         seen_terms = set()
         for word in expected.split():
             keyword = word.strip('.,!?;:')
-            canonical = keyword.casefold()
+            canonical = unicodedata.normalize("NFC", keyword).casefold()
             if len(word) <= 3 or not keyword or canonical in STOPWORDS:
                 continue
             if canonical not in seen_terms:
                 seen_terms.add(canonical)
-                key_words.append(keyword)
+                key_words.append((keyword, canonical))
 
         # Substring checks credit "capital" inside "capitalization" or
         # "Canberra" inside "Canberran", inflating benchmark pass rates.
         # Match complete terms while preserving punctuation-bearing terms.
-        for keyword in key_words:
-            pattern = r"(?<!\w)" + re.escape(keyword) + r"(?!\w)"
-            if not re.search(pattern, actual, flags=re.IGNORECASE):
+        for keyword, canonical in key_words:
+            pattern = r"(?<!\w)" + re.escape(canonical) + r"(?!\w)"
+            if not re.search(pattern, actual_canonical):
                 results["failed_rules"].append(f"Missing key term: '{keyword}'")
                 results["passed"] = False
                 results["score"] -= 0.1
@@ -197,14 +201,14 @@ class RuleBasedGrader:
 
             elif rule_type == "contains":
                 required_text = rule.get("value", "")
-                if required_text.lower() not in actual.lower():
+                if unicodedata.normalize("NFC", required_text).casefold() not in actual_canonical:
                     results["failed_rules"].append(f"Must contain: '{required_text}'")
                     results["passed"] = False
                     results["score"] -= 0.2
 
             elif rule_type == "not_contains":
                 forbidden_text = rule.get("value", "")
-                if forbidden_text.lower() in actual.lower():
+                if unicodedata.normalize("NFC", forbidden_text).casefold() in actual_canonical:
                     results["failed_rules"].append(f"Must NOT contain: '{forbidden_text}'")
                     results["passed"] = False
                     results["score"] -= 0.2
