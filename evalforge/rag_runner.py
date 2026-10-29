@@ -103,12 +103,11 @@ def _dataset_sha256(data):
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-def _wilson_hit_rate_interval(hits, trials):
-    """95% Wilson score interval for binary retrieval hit rate.
+def _wilson_rate_interval(hits, trials):
+    """95% Wilson score interval for a binary event rate.
 
-    Use only the answerable, successfully retrieved queries in the report.
-    This is sampling uncertainty under an independent-query assumption,
-    not a guarantee of generalization to real-world queries.
+    Report sampling uncertainty under an independent-query assumption;
+    this is not a guarantee of generalization to real-world queries.
     """
     if trials == 0:
         return None
@@ -119,6 +118,11 @@ def _wilson_hit_rate_interval(hits, trials):
     center = (p + z2 / (2 * trials)) / scale
     margin = z * math.sqrt(p * (1 - p) / trials + z2 / (4 * trials * trials)) / scale
     return {"lower": max(0.0, center - margin), "upper": min(1.0, center + margin)}
+
+
+def _wilson_hit_rate_interval(hits, trials):
+    """Backward-compatible name for the retrieval hit-rate interval."""
+    return _wilson_rate_interval(hits, trials)
 
 
 class RAGEvalRunner:
@@ -401,10 +405,16 @@ class RAGEvalRunner:
                     "hallucinations": len(hallucinations),
                     "hallucination_rate": (len(hallucinations) / len(evaluated_unanswerable)
                                            if evaluated_unanswerable else None),
+                    "hallucination_rate_95ci": _wilson_rate_interval(
+                        len(hallucinations), len(evaluated_unanswerable)
+                    ),
                     "over_abstention_evaluated": len(evaluated_answerable),
                     "over_abstentions": len(over_abstentions),
                     "over_abstention_rate": (len(over_abstentions) / len(evaluated_answerable)
                                              if evaluated_answerable else None),
+                    "over_abstention_rate_95ci": _wilson_rate_interval(
+                        len(over_abstentions), len(evaluated_answerable)
+                    ),
                 },
                 "latency": {
                     # A retrieval outage has no generation latency (recorded
