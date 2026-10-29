@@ -11,6 +11,7 @@ import json
 import os
 from datetime import datetime
 
+from evalforge.agent_tools import has_visible_argument_text
 from evalforge.artifacts import atomic_json_dump as _atomic_json_dump
 from evalforge.identifiers import valid_benchmark_id
 from evalforge.rag import (
@@ -43,8 +44,16 @@ def validate_rag_questions(questions, document_ids):
         seen_ids.add(case_id)
         for field in ("question", "expected_answer"):
             value = case.get(field)
-            if not isinstance(value, str) or not value.strip():
-                raise ValueError(f"RAG question {case_id}: {field} must be a non-empty string")
+            # A zero-width-only prompt can pass str.strip() and consume paid
+            # embeddings while carrying no visible benchmark question. JSON
+            # also permits escaped lone surrogates that provider APIs cannot
+            # encode as valid Unicode. Validate both fields before indexing.
+            if (not has_visible_argument_text(value)
+                    or any("\ud800" <= char <= "\udfff" for char in value)):
+                raise ValueError(
+                    f"RAG question {case_id}: {field} must be a non-empty string "
+                    "with valid Unicode text"
+                )
         if not isinstance(case.get("answerable"), bool):
             raise ValueError(f"RAG question {case_id}: answerable must be a boolean")
         relevant = case.get("relevant_doc_ids")
