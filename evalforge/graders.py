@@ -484,7 +484,9 @@ class LLMJudgeGrader:
         # serialized as UTF-8. Match the RAG judge's fail-closed policy.
         if (
             not has_visible_argument_text(reason)
-            or any(unicodedata.category(char) in ("Cf", "Cs") for char in reason)
+            or len(reason) > 2048
+            or any(unicodedata.category(char) in ("Cc", "Cf", "Cs", "Zl", "Zp")
+                   for char in reason)
         ):
             return invalid
         score = numeric_score / 10.0
