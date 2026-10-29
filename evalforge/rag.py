@@ -534,6 +534,10 @@ class RAGPipeline:
         """Full RAG turn with monotonic retrieval and generation durations."""
         retrieval_start = time.perf_counter()
         try:
+            # Custom retrievers may not enforce the VectorStore cutoff contract.
+            # Reject invalid rank settings before retrieval or paid generation.
+            if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k < 1:
+                raise ValueError("top_k must be a positive integer")
             retrieved = self.store.search(question, top_k=top_k)
         except Exception as exc:
             # Retrieval failures are not "zero relevant hits" and must not
@@ -566,6 +570,37 @@ class RAGPipeline:
                 "error": "retriever violated top_k result contract",
                 "error_stage": "retrieval",
             }
+
+        # A third-party adapter can return duplicate IDs, missing keys, or
+        # non-text evidence even when its result count is within top_k. The
+        # report later indexes doc_id directly; reject malformed rankings here
+        # rather than crashing a sweep or asking a paid model to grade them.
+        seen_ids = set()
+        for doc in retrieved:
+            valid = (
+                isinstance(doc, dict)
+                and valid_benchmark_id(doc.get("doc_id"))
+                and has_visible_argument_text(doc.get("title"))
+                and has_visible_argument_text(doc.get("text"))
+            )
+            if valid:
+                valid = not any(
+                    "\ud800" <= char <= "\udfff"
+                    for field in ("title", "text")
+                    for char in doc[field]
+                )
+            if not valid or doc["doc_id"] in seen_ids:
+                return {
+                    "question": question,
+                    "retrieved": [],
+                    "answer": "",
+                    "retrieval_ms": retrieval_ms,
+                    "generation_ms": 0.0,
+                    "total_ms": retrieval_ms,
+                    "error": "retriever returned invalid or duplicate document evidence",
+                    "error_stage": "retrieval",
+                }
+            seen_ids.add(doc["doc_id"])
 
         generation = self.generate(question, retrieved)
 
