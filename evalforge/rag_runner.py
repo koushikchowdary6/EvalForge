@@ -125,6 +125,74 @@ def _wilson_hit_rate_interval(hits, trials):
     return _wilson_rate_interval(hits, trials)
 
 
+
+def _paired_retrieval_comparisons(rows):
+    """Compare the same answerable questions across top-k settings.
+
+    Only complete, successful retrievals are paired. Counts describe
+    within-benchmark changes, not independent statistical significance.
+    """
+    from itertools import combinations
+
+    by_k = {}
+    for row in rows:
+        by_k.setdefault(row["top_k"], {}).setdefault(row.get("case_id"), []).append(row)
+
+    comparisons = {}
+    for smaller, larger in combinations(sorted(by_k), 2):
+        counts = {
+            name: {"improved": 0, "regressed": 0, "unchanged": 0}
+            for name in ("hit_rate", "recall_at_k")
+        }
+        regressions = {"hit_rate": [], "recall_at_k": []}
+        paired = excluded = 0
+        case_ids = set(by_k[smaller]) | set(by_k[larger])
+        for case_id in sorted(case_ids, key=str):
+            left_rows = by_k[smaller].get(case_id, [])
+            right_rows = by_k[larger].get(case_id, [])
+            if (not isinstance(case_id, str) or not case_id
+                    or len(left_rows) != 1 or len(right_rows) != 1):
+                excluded += 1
+                continue
+            left, right = left_rows[0], right_rows[0]
+            if (left.get("answerable") is not True
+                    or right.get("answerable") is not True
+                    or left.get("retrieval_error") or right.get("retrieval_error")):
+                excluded += 1
+                continue
+            values = {}
+            for name in counts:
+                a = left.get("retrieval", {}).get(name)
+                b = right.get("retrieval", {}).get(name)
+                if (isinstance(a, bool) or isinstance(b, bool)
+                        or not isinstance(a, (int, float))
+                        or not isinstance(b, (int, float))
+                        or not math.isfinite(a) or not math.isfinite(b)
+                        or not (0 <= a <= 1 and 0 <= b <= 1)):
+                    break
+                values[name] = (a, b)
+            if len(values) != len(counts):
+                excluded += 1
+                continue
+            paired += 1
+            for name, (a, b) in values.items():
+                change = ("improved" if b > a + 1e-12 else
+                          "regressed" if b < a - 1e-12 else "unchanged")
+                counts[name][change] += 1
+                if change == "regressed":
+                    regressions[name].append(case_id)
+        comparisons[f"{smaller}_to_{larger}"] = {
+            "smaller_k": smaller,
+            "larger_k": larger,
+            "paired_answerable_queries": paired,
+            "excluded_unpaired_or_failed": excluded,
+            "hit_rate": counts["hit_rate"],
+            "recall_at_k": counts["recall_at_k"],
+            "regressed_case_ids": regressions,
+        }
+    return comparisons
+
+
 class RAGEvalRunner:
     """Runs RAG evaluation across retrieval configurations."""
 
@@ -336,6 +404,7 @@ class RAGEvalRunner:
             "embedding_api_calls": self.embedder.api_calls,
             "embedding_cache_hits": self.embedder.cache_hits,
             "by_top_k": {},
+            "paired_retrieval_comparisons": _paired_retrieval_comparisons(self.results),
         }
 
         for k, rows in sorted(by_k.items()):

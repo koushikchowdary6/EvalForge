@@ -150,6 +150,21 @@ bundled benchmark is illustrative, not evidence of production performance.
 Offline tests cover zero, perfect, and partial rates, failed runs, and
 zero-coverage cases.
 
+## Paired top-k retrieval diagnostics
+
+New RAG reports include `paired_retrieval_comparisons` for every pair in a
+top-k sweep (for example, `1_to_3`). Each comparison matches the **same
+answerable question ID** at both cutoffs, then counts improved, regressed,
+and unchanged retrieval **hit rate** and **recall@k**. Case IDs with regressions
+are included for debugging. Missing, duplicated, unanswerable, failed, or
+invalid retrieval measurements are excluded and counted separately.
+
+Increasing k should not reduce recall for a stable ranked retrieval list, so
+regressions help identify inconsistent retrieval adapters or changing
+rankings. These are paired **descriptive diagnostics**, not statistical
+significance tests or claims of production accuracy. No generation/judge
+calls are needed to calculate the comparisons.
+
 ## RAG corpus integrity
 
 Corpus JSON is decoded with duplicate-key rejection at every object depth.
