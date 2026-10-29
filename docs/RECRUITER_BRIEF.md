@@ -23,6 +23,8 @@ LLM applications are difficult to improve safely when evaluation is manual, inco
 
 **Auditable reports.** Aggregate evaluation reports are versioned so a reviewer can inspect the measurements behind README claims. Agent latency and turn averages exclude provider/transport failures; reports expose the completed-run denominator. Safety rates count observed forbidden actions even when a provider fails later, but exclude outages with no observable safety outcome. Coverage counts make small denominators visible instead of presenting them as universal safety guarantees.
 
+**Case-paired RAG comparisons.** For two top-k settings, EvalForge compares only the same answerable questions with successful retrieval at both cutoffs. It reports wins, regressions, ties, and the average within-question hit-rate/recall difference. A seeded 1,000-resample bootstrap supplies descriptive 95% percentile bounds when at least two cases are paired; single-case and missing-data intervals are unavailable. These bounds are not an independent generalization guarantee or a multiplicity-adjusted significance test, especially for correlated or hand-selected benchmark questions.
+
 ## Current limitations
 
 The datasets are intentionally small and are not presented as industry benchmarks. LLM-judge scores inherit judge-model bias. Agent tools are simulated, so the suite measures decision trajectories without risking real destructive actions. The next meaningful step is a harder adversarial corpus with indirect and context-dependent injection attempts.
