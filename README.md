@@ -129,21 +129,26 @@ before attributing score changes to an AI system. Hashes are identifiers,
 Historical tracked reports predate this feature and must not be retroactively
 described as provenance-verified.
 
-## RAG hit-rate uncertainty
+## RAG rate uncertainty and coverage
 
-New RAG reports include `retrieval.hit_rate_95ci`, a **95% Wilson score
-interval** around the fraction of answerable questions retrieving at least
-one labeled relevant document at the requested top-k. The report keeps the
-number of evaluated queries alongside the interval. Unanswerable cases and
-retrieval failures do not enter its denominator; with no eligible queries,
-the interval is `null` rather than an invented precision estimate.
+New RAG reports include **95% Wilson score intervals** for three binary rates:
+`retrieval.hit_rate_95ci`, `hallucination.hallucination_rate_95ci`, and
+`hallucination.over_abstention_rate_95ci`. Retrieval hit rate uses answerable
+questions with successful retrievals; unanswerable cases and retrieval
+failures do not enter that denominator. Hallucination rate uses unanswerable
+questions with a completed, nonempty generation. Over-abstention rate uses
+answerable questions with a completed, nonempty generation. Retrieval outages,
+generation errors, and empty answers are tracked separately and never counted
+as successful safety outcomes. Every rate has an explicit evaluated count;
+with zero eligible samples, its interval is `null` rather than an invented
+precision estimate.
 
-This interval describes sampling uncertainty **under an independent-query
-assumption**. It is not a confidence guarantee for correlated questions,
-dataset shifts, the correctness of relevance labels, or live model quality.
-The small bundled benchmark is illustrative, not evidence of production
-performance. Offline tests cover zero, perfect, and partial hit rates and
-exclude failed or unanswerable retrievals.
+These intervals describe sampling uncertainty **under an independent-query
+assumption**. They do not guarantee performance on correlated questions,
+dataset shifts, mislabeled ground truth, or real-world safety. The small
+bundled benchmark is illustrative, not evidence of production performance.
+Offline tests cover zero, perfect, and partial rates, failed runs, and
+zero-coverage cases.
 
 ## RAG corpus integrity
 
