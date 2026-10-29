@@ -51,6 +51,6 @@ def test_within_budget_evidence_still_generates():
     pipeline.generate = generate
     result = pipeline.query("Question", top_k=1)
     assert result["answer"] == "Grounded answer"
-    assert "error" not in result
+    assert result["error"] is None
     assert calls == [("Question", evidence)]
     assert result["generation_ms"] == 4.0
