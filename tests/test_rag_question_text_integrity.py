@@ -23,7 +23,7 @@ def _case():
     "\u0301",  # standalone combining accent is not a visible answer
     "\ud800",  # escaped lone surrogates are legal JSON but invalid UTF-8
     "text\udfff",  # reject malformed Unicode even with visible content
-    " \u200d\\t",
+    " \u200d\t",
 ])
 def test_invalid_benchmark_text_is_rejected(field, invalid):
     case = _case()
