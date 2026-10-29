@@ -585,7 +585,7 @@ class RAGPipeline:
             )
             if valid:
                 valid = not any(
-                    "\\ud800" <= char <= "\\udfff"
+                    "\ud800" <= char <= "\udfff"
                     for field in ("title", "text")
                     for char in doc[field]
                 )
