@@ -19,11 +19,11 @@ def _case():
 
 @pytest.mark.parametrize("field", ["question", "expected_answer"])
 @pytest.mark.parametrize("invalid", [
-    "\\u200b",  # zero-width space passes ordinary str.strip()
-    "\\u0301",  # standalone combining accent is not a visible answer
-    "\\ud800",  # escaped lone surrogates are legal JSON but invalid UTF-8
-    "text\\udfff",  # reject malformed Unicode even with visible content
-    " \\u200d\\t",
+    "\u200b",  # zero-width space passes ordinary str.strip()
+    "\u0301",  # standalone combining accent is not a visible answer
+    "\ud800",  # escaped lone surrogates are legal JSON but invalid UTF-8
+    "text\udfff",  # reject malformed Unicode even with visible content
+    " \u200d\\t",
 ])
 def test_invalid_benchmark_text_is_rejected(field, invalid):
     case = _case()
@@ -34,15 +34,15 @@ def test_invalid_benchmark_text_is_rejected(field, invalid):
 
 def test_visible_unicode_and_embedded_controls_are_preserved():
     case = _case()
-    case["question"] = "Café\\u200b facts?"
-    case["expected_answer"] = "Résumé\\u0301 evidence"
+    case["question"] = "Café\u200b facts?"
+    case["expected_answer"] = "Résumé\u0301 evidence"
     validate_rag_questions([case], {"doc-1"})
 
 
 def test_invalid_text_prevents_index_build_and_paid_embedding(tmp_path):
     path = tmp_path / "questions.json"
     case = _case()
-    case["question"] = "\\u200b"
+    case["question"] = "\u200b"
     path.write_text(json.dumps([case]), encoding="utf-8")
 
     class StubStore:
