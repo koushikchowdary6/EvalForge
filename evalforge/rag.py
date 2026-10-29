@@ -602,6 +602,42 @@ class RAGPipeline:
                 }
             seen_ids.add(doc["doc_id"])
 
+        # Ranking IDs alone do not establish that retrieved evidence belongs
+        # to the benchmark corpus. A custom adapter could return a real ID
+        # with altered text (or invent an ID), contaminating groundedness
+        # measurements before the generator sees the context. When the store
+        # exposes its indexed documents, require exact title/text provenance.
+        # Stores without a corpus attribute retain their adapter contract.
+        corpus = getattr(self.store, "documents", None)
+        if corpus is not None:
+            canonical = {}
+            valid_corpus = isinstance(corpus, (list, tuple))
+            if valid_corpus:
+                for item in corpus:
+                    if not isinstance(item, dict) or not valid_benchmark_id(item.get("doc_id")):
+                        valid_corpus = False
+                        break
+                    if item["doc_id"] in canonical:
+                        valid_corpus = False
+                        break
+                    canonical[item["doc_id"]] = item
+            if not valid_corpus or any(
+                doc["doc_id"] not in canonical
+                or doc["title"] != canonical[doc["doc_id"]].get("title")
+                or doc["text"] != canonical[doc["doc_id"]].get("text")
+                for doc in retrieved
+            ):
+                return {
+                    "question": question,
+                    "retrieved": [],
+                    "answer": "",
+                    "retrieval_ms": retrieval_ms,
+                    "generation_ms": 0.0,
+                    "total_ms": retrieval_ms,
+                    "error": "retriever returned evidence outside indexed corpus",
+                    "error_stage": "retrieval",
+                }
+
         generation = self.generate(question, retrieved)
 
         return {
