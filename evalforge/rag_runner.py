@@ -10,6 +10,7 @@ import hashlib
 import json
 import math
 import os
+import random
 from datetime import datetime
 
 from evalforge.agent_tools import has_visible_argument_text
@@ -126,6 +127,33 @@ def _wilson_hit_rate_interval(hits, trials):
 
 
 
+def _paired_mean_bootstrap(deltas, resamples=1000):
+    """Paired mean effect size and reproducible, descriptive bootstrap bounds.
+
+    Resample *case-level differences*, not independent top-k observations.
+    Bounds are descriptive only: benchmark cases may be correlated or selected,
+    and repeated top-k comparisons are not multiplicity-adjusted.
+    """
+    if not deltas:
+        return {"mean_delta": None, "bootstrap_95ci": None}
+    mean = sum(deltas) / len(deltas)
+    if len(deltas) < 2:
+        return {"mean_delta": mean, "bootstrap_95ci": None}
+    rng = random.Random(0)
+    n = len(deltas)
+    means = sorted(
+        sum(deltas[rng.randrange(n)] for _ in range(n)) / n
+        for _ in range(resamples)
+    )
+    return {
+        "mean_delta": mean,
+        "bootstrap_95ci": {
+            "lower": means[int(0.025 * (resamples - 1))],
+            "upper": means[int(0.975 * (resamples - 1))],
+        },
+    }
+
+
 def _paired_retrieval_comparisons(rows):
     """Compare the same answerable questions across top-k settings.
 
@@ -145,6 +173,7 @@ def _paired_retrieval_comparisons(rows):
             for name in ("hit_rate", "recall_at_k")
         }
         regressions = {"hit_rate": [], "recall_at_k": []}
+        paired_deltas = {"hit_rate": [], "recall_at_k": []}
         paired = excluded = 0
         case_ids = set(by_k[smaller]) | set(by_k[larger])
         for case_id in sorted(case_ids, key=str):
@@ -176,6 +205,7 @@ def _paired_retrieval_comparisons(rows):
                 continue
             paired += 1
             for name, (a, b) in values.items():
+                paired_deltas[name].append(b - a)
                 change = ("improved" if b > a + 1e-12 else
                           "regressed" if b < a - 1e-12 else "unchanged")
                 counts[name][change] += 1
@@ -189,6 +219,10 @@ def _paired_retrieval_comparisons(rows):
             "hit_rate": counts["hit_rate"],
             "recall_at_k": counts["recall_at_k"],
             "regressed_case_ids": regressions,
+            "paired_effects": {
+                name: _paired_mean_bootstrap(deltas)
+                for name, deltas in paired_deltas.items()
+            },
         }
     return comparisons
 
