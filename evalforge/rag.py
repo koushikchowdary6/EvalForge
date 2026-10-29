@@ -552,6 +552,21 @@ class RAGPipeline:
             }
         retrieval_ms = (time.perf_counter() - retrieval_start) * 1000
 
+        # A custom retrieval adapter may ignore top_k. Fail before paid
+        # generation instead of letting extra evidence influence an answer
+        # that the evaluator must subsequently discard as invalid.
+        if not isinstance(retrieved, (list, tuple)) or len(retrieved) > top_k:
+            return {
+                "question": question,
+                "retrieved": list(retrieved) if isinstance(retrieved, (list, tuple)) else [],
+                "answer": "",
+                "retrieval_ms": retrieval_ms,
+                "generation_ms": 0.0,
+                "total_ms": retrieval_ms,
+                "error": "retriever violated top_k result contract",
+                "error_stage": "retrieval",
+            }
+
         generation = self.generate(question, retrieved)
 
         return {
