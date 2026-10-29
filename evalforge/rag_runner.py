@@ -186,7 +186,18 @@ class RAGEvalRunner:
                 relevant_ids = case.get("relevant_doc_ids", [])
                 answerable = case.get("answerable", True)
 
-                retrieval_error = outcome.get("error_stage") == "retrieval"
+                # A faulty retrieval adapter can return more evidence than the
+                # requested top-k. Truncating scores while still grading the
+                # generation against all returned documents would make the
+                # benchmark internally inconsistent. Exclude that run as a
+                # retrieval-contract failure instead of crediting extra data.
+                if len(retrieved_ids) > k:
+                    retrieval_failure = "retriever returned more than top_k"
+                elif outcome.get("error_stage") == "retrieval":
+                    retrieval_failure = outcome.get("error") or "retrieval failed"
+                else:
+                    retrieval_failure = None
+                retrieval_error = retrieval_failure is not None
                 # A failed retrieval has no measured ranking. Recording zeros
                 # would silently misrepresent an outage as model quality.
                 retrieval_scores = (
@@ -208,7 +219,7 @@ class RAGEvalRunner:
 
                 # A transport/provider failure is not a model answer. Keep its
                 # retrieval measurements, but exclude it from answer-quality rates.
-                generation_error = outcome.get("error")
+                generation_error = outcome.get("error") or retrieval_failure
                 if generation_error:
                     abstention = {"outcome": "generation_error", "passed": None,
                                   "abstained": None, "reason": "generation failed"}
@@ -244,7 +255,7 @@ class RAGEvalRunner:
                     "expected": case["expected_answer"],
                     "answer": outcome["answer"],
                     "generation_error": generation_error if not retrieval_error else None,
-                    "retrieval_error": outcome.get("error") if retrieval_error else None,
+                    "retrieval_error": retrieval_failure,
                     "retrieved_ids": retrieved_ids,
                     "relevant_ids": relevant_ids,
                     "retrieval": retrieval_scores,
