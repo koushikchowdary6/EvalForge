@@ -136,10 +136,19 @@ class RuleBasedGrader:
 
         # Default rule: must contain key words from expected answer
         # Extract key words: longer than 3 chars AND not a stopword
-        key_words = [
-            word.strip('.,!?;:') for word in expected.split()
-            if len(word) > 3 and word.lower().strip('.,!?;:') not in STOPWORDS
-        ]
+        # Repeating the same reference term must not weight it multiple
+        # times or produce duplicate failures. Keep distinct terms in their
+        # first-seen order for deterministic benchmark explanations.
+        key_words = []
+        seen_terms = set()
+        for word in expected.split():
+            keyword = word.strip('.,!?;:')
+            canonical = keyword.casefold()
+            if len(word) <= 3 or not keyword or canonical in STOPWORDS:
+                continue
+            if canonical not in seen_terms:
+                seen_terms.add(canonical)
+                key_words.append(keyword)
 
         # Substring checks credit "capital" inside "capitalization" or
         # "Canberra" inside "Canberran", inflating benchmark pass rates.
