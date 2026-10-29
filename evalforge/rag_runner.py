@@ -49,7 +49,7 @@ def validate_rag_questions(questions, document_ids):
             # also permits escaped lone surrogates that provider APIs cannot
             # encode as valid Unicode. Validate both fields before indexing.
             if (not has_visible_argument_text(value)
-                    or any("\\ud800" <= char <= "\\udfff" for char in value)):
+                    or any("\ud800" <= char <= "\udfff" for char in value)):
                 raise ValueError(
                     f"RAG question {case_id}: {field} must be a non-empty string "
                     "with valid Unicode text"
