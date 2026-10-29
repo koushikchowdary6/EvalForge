@@ -358,8 +358,13 @@ class RAGJudge:
             # Explanations are benchmark evidence shown to reviewers. Hidden
             # direction-changing controls can spoof their apparent meaning,
             # while escaped UTF-16 surrogates cannot be safely encoded as UTF-8.
-            if any(unicodedata.category(char) in ("Cf", "Cs") for char in parsed["reason"]):
-                raise ValueError("judge reason contains hidden or invalid Unicode")
+            if (len(parsed["reason"]) > 2048 or any(
+                unicodedata.category(char) in ("Cc", "Cf", "Cs", "Zl", "Zp")
+                for char in parsed["reason"]
+            )):
+                # Escaped terminal controls, line separators and huge reasons
+                # must not enter benchmark reports as trusted judge evidence.
+                raise ValueError("judge reason contains controls or exceeds size limit")
             score = float(parsed["score"]) / 10.0
             if not math.isfinite(score) or not 0.0 <= score <= 1.0:
                 raise ValueError("judge score must be finite and between 0 and 10")
