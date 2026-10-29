@@ -46,17 +46,30 @@ STOPWORDS = {
 
 
 def _visible_rubric_length(text: str) -> int:
-    """Count visible response characters for minimum-length grading.
+    """Count meaningful characters and single interior whitespace separators.
 
-    Format controls, lone surrogates, and nonspacing/enclosing marks cannot
-    be used as padding to satisfy a minimum answer-length requirement.
-    Keep ordinary whitespace and spacing marks for compatibility with
-    existing character-based rubrics.
+    Repeated or edge whitespace must not satisfy a minimum-answer-length
+    rubric. Preserve one ordinary separator between visible characters, so
+    natural sentences retain their character-based length. Ignore hidden
+    format controls and unattached combining marks as padding.
     """
-    return sum(
-        1 for char in text
-        if char.isspace() or unicodedata.category(char) not in {"Cf", "Cs", "Mn", "Me", "Cc"}
-    )
+    count = 0
+    pending_space = False
+    for char in text:
+        category = unicodedata.category(char)
+        if category in {"Cf", "Cs", "Mn", "Me"}:
+            continue
+        if char.isspace():
+            if count:
+                pending_space = True
+            continue
+        if category == "Cc":
+            continue
+        if pending_space:
+            count += 1
+            pending_space = False
+        count += 1
+    return count
 
 
 class ExactMatchGrader:
