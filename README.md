@@ -81,6 +81,21 @@ not claim any measured production failure rate.
 
 ---
 
+## Embedding request preflight
+
+Each RAG document is validated as **title + newline + text** before an index
+build starts. Inputs over **12,000 characters**, blank/invisible-only strings,
+and invalid Unicode surrogates are rejected before cache lookup or a paid
+embedding request. The same boundary applies to direct embedding calls and
+queries, including when a custom embedding client is supplied. Invalid corpus
+reloads preserve the previous in-memory corpus/index.
+
+This is a conservative character-based resource guard, **not** a provider
+token-count guarantee or proof of model accuracy. A larger corpus may require
+chunking documents rather than raising the limit. Offline regression tests
+exercise oversized later documents, query validation, cache/API non-use, and
+last-good index preservation.
+
 ## Bounded RAG generation and judge evidence
 
 The RAG generator rejects malformed JSON evidence (including non-finite
