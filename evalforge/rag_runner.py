@@ -8,6 +8,7 @@ separately so a failure can be attributed to the right stage.
 
 import hashlib
 import json
+import math
 import os
 from datetime import datetime
 
@@ -100,6 +101,24 @@ def _dataset_sha256(data):
     canonical = json.dumps(data, sort_keys=True, ensure_ascii=True,
                            allow_nan=False, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _wilson_hit_rate_interval(hits, trials):
+    """95% Wilson score interval for binary retrieval hit rate.
+
+    Use only the answerable, successfully retrieved queries in the report.
+    This is sampling uncertainty under an independent-query assumption,
+    not a guarantee of generalization to real-world queries.
+    """
+    if trials == 0:
+        return None
+    z = 1.959963984540054
+    p = hits / trials
+    z2 = z * z
+    scale = 1.0 + z2 / trials
+    center = (p + z2 / (2 * trials)) / scale
+    margin = z * math.sqrt(p * (1 - p) / trials + z2 / (4 * trials * trials)) / scale
+    return {"lower": max(0.0, center - margin), "upper": min(1.0, center + margin)}
 
 
 class RAGEvalRunner:
@@ -353,6 +372,10 @@ class RAGEvalRunner:
                     "map_at_k": self._mean([r["retrieval"].get("average_precision_at_k") for r in retrieval_rows]),
                     "mrr": self._mean([r["retrieval"]["reciprocal_rank"] for r in retrieval_rows]),
                     "hit_rate": self._mean([r["retrieval"]["hit_rate"] for r in retrieval_rows]),
+                    "hit_rate_95ci": _wilson_hit_rate_interval(
+                        sum(r["retrieval"]["hit_rate"] == 1.0 for r in retrieval_rows),
+                        len(retrieval_rows),
+                    ),
                 },
                 "generation": {
                     "attempted": len(attempted_generation),
