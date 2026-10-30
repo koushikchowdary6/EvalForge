@@ -76,6 +76,14 @@ precision@k, recall@k, nDCG@k, AP@k, MRR, and hit rate using EvalForge's
 existing retrieval graders. It includes dataset SHA-256 fingerprints and
 excludes the two unanswerable questions from retrieval-quality averages.
 
+The JSON report also exposes `lexical_positive_document_count` and
+`all_zero_score_ranking` for each case, plus separate zero-overlap counts for
+answerable and unanswerable questions at each cutoff. **Important:** BM25
+still returns all corpus IDs in score order, even when every score is zero;
+those IDs are deterministic tie-breaks, not evidence that the documents
+support the question. Use the diagnostics to spot unsupported retrieval and
+avoid mistaking arbitrary zero-score rankings for meaningful matches.
+
 The output is a **retrieval-only baseline**, not an embedding model,
 generated-answer evaluation, or evidence of model correctness, groundedness,
 hallucination resistance, or production performance. Compare the same
