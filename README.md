@@ -225,12 +225,21 @@ that calls nothing when a tool was required scores 0% on both. When no
 calls are expected, recall is vacuously 100% even if the agent makes extra
 calls; precision and the existing unnecessary-call metric capture those.
 
-These are macro-averages over completed trajectories, **not** micro-averaged
-call counts or proof of tool safety. Provider errors are excluded from both
-averages and reported separately. A correct tool set executed in the wrong
-order still has 100% precision/recall but fails the existing sequence grader.
-The tracked historical agent ablation report predates these fields and has
-not been recalculated.
+The original `tool_call_precision` and `tool_call_recall` are
+**macro-averages**: each completed trajectory contributes equally. New
+`tool_call_micro_precision` and `tool_call_micro_recall` pool matched,
+predicted, and required tool-call counts across completed trajectories.
+This exposes missed or repeated invocations on longer workflows that a
+macro-average can hide. Reports include the pooled counts and evaluated-case
+coverage, both overall and by category. A benchmark consisting entirely of
+successful no-tool decisions has 100% micro precision/recall; a category with
+only provider errors reports `null`, not 100%.
+
+Provider errors are excluded from both micro and macro rates and counted
+separately. Micro rates are call-weighted, not independent safety or model
+quality estimates. A correct tool set executed in the wrong order still has
+100% precision/recall but fails the sequence grader. The tracked historical
+agent ablation report predates these fields and has not been recalculated.
 
 ## Agent cost measurement coverage
 
