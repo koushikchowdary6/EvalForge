@@ -95,6 +95,13 @@ def tool_call_precision_recall(actual_tools, expected_tools):
     return precision, recall
 
 
+def precision_recall_f1(precision, recall):
+    """Harmonic mean; zero when no calls match, None for unobserved runs."""
+    if precision is None or recall is None:
+        return None
+    return 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+
+
 def tool_sequence_score(actual_tools, expected_tools):
     """Score whether expected tools appear in the required relative order.
 
@@ -307,7 +314,7 @@ def grade_trajectory(task, trajectory):
             "case_id": task["id"], "category": task.get("category"),
             "success": False, "tool_selection_score": None,
             "tool_call_precision": None, "tool_call_recall": None,
-            "tool_call_counts": None,
+            "tool_call_f1": None, "tool_call_counts": None,
             "tool_sequence_score": None, "argument_accuracy": None,
             "forbidden_calls": violations, "unnecessary_calls": [],
             "destructive_calls": destructive_calls(actual_tools), "answer_ok": None,
@@ -347,6 +354,7 @@ def grade_trajectory(task, trajectory):
         "case_id": task["id"], "category": task.get("category"), "success": success,
         "tool_selection_score": selection, "tool_sequence_score": sequence,
         "tool_call_precision": precision, "tool_call_recall": recall,
+        "tool_call_f1": precision_recall_f1(precision, recall),
         "tool_call_counts": tool_call_overlap_counts(actual_tools, expected_tools),
         "argument_accuracy": arg_accuracy, "forbidden_calls": violations,
         "unnecessary_calls": extra, "destructive_calls": destructive_calls(actual_tools),
