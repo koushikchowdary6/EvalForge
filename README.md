@@ -59,6 +59,33 @@ echo "OPENAI_API_KEY=your_key_here" >> .env
 python main.py
 ```
 
+## Five-minute API-free retrieval demo
+
+To inspect real benchmark outputs **without API keys or paid model calls**:
+
+```bash
+pip install -r requirements.txt
+python -m evalforge.offline_rag_demo --k 1 3 5
+python -m pytest tests/test_offline_rag_demo.py -q
+```
+
+This deterministic **lexical BM25 baseline** reads the bundled 15-document
+corpus and 14-question RAG benchmark. It ranks documents by keyword
+statistics (k1=1.2, b=0.75), then reports per-question retrieved IDs and
+precision@k, recall@k, nDCG@k, AP@k, MRR, and hit rate using EvalForge's
+existing retrieval graders. It includes dataset SHA-256 fingerprints and
+excludes the two unanswerable questions from retrieval-quality averages.
+
+The output is a **retrieval-only baseline**, not an embedding model,
+generated-answer evaluation, or evidence of model correctness, groundedness,
+hallucination resistance, or production performance. Compare the same
+question/corpus hashes and top-k settings before contrasting this baseline
+with a provider-backed embedding run. Lexical tokenization is ASCII
+alphanumeric and may miss multilingual/semantic matches. Tied rankings are
+ordered by document ID; no network or model calls occur.
+
+---
+
 ## Reproducible embedding evaluation
 
 RAG embedding cache keys are SHA-256 digests of the **embedding model
