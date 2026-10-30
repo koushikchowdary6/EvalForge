@@ -96,8 +96,32 @@ def bm25_rank(question, docs):
     return [doc_id for doc_id, _ in bm25_rank_with_scores(question, docs)]
 
 
+def _unique_json_keys(pairs):
+    """Reject ambiguous duplicate keys anywhere in benchmark JSON."""
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON key in benchmark input")
+        result[key] = value
+    return result
+
+
+def _reject_nonfinite_json(value):
+    """NaN and Infinity are not JSON and cannot be benchmark provenance."""
+    raise ValueError("non-finite JSON constant in benchmark input")
+
+
+def load_benchmark_json(path):
+    """Read unambiguous, standards-compliant JSON before ranking documents."""
+    with path.open(encoding="utf-8") as stream:
+        return json.load(
+            stream, object_pairs_hook=_unique_json_keys,
+            parse_constant=_reject_nonfinite_json,
+        )
+
+
 def _fingerprint(value):
-    canonical = json.dumps(value, sort_keys=True, ensure_ascii=True, separators=(",", ":"))
+    canonical = json.dumps(value, sort_keys=True, ensure_ascii=True, separators=(",", ":"), allow_nan=False)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
@@ -183,11 +207,13 @@ def main(argv=None):
     parser.add_argument("--questions", type=Path, default=DATA_DIR / "rag_questions.json")
     parser.add_argument("--k", type=int, nargs="+", default=[1, 3, 5])
     args = parser.parse_args(argv)
-    with args.corpus.open(encoding="utf-8") as stream:
-        docs = json.load(stream)
-    with args.questions.open(encoding="utf-8") as stream:
-        questions = json.load(stream)
-    print(json.dumps(evaluate(docs, questions, args.k), indent=2))
+    try:
+        docs = load_benchmark_json(args.corpus)
+        questions = load_benchmark_json(args.questions)
+        report = evaluate(docs, questions, args.k)
+    except (ValueError, json.JSONDecodeError, OSError) as exc:
+        parser.error(str(exc))
+    print(json.dumps(report, indent=2, allow_nan=False))
 
 
 if __name__ == "__main__":
