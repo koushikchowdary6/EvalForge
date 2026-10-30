@@ -235,6 +235,17 @@ coverage, both overall and by category. A benchmark consisting entirely of
 successful no-tool decisions has 100% micro precision/recall; a category with
 only provider errors reports `null`, not 100%.
 
+**Tool-call F1:** Each completed trajectory now includes `tool_call_f1`,
+the harmonic mean of its count-aware precision and recall. The overall and
+per-category **macro F1** averages these per-trajectory F1 values; it is
+not the harmonic mean of macro precision and macro recall. The
+`tool_call_micro_f1` field is the harmonic mean of pooled micro precision
+and recall, weighting longer workflows by their observed/required calls.
+Zero matched calls yield F1=0 unless both predicted and required calls are
+empty (F1=1); provider failures remain `null` and are excluded from both
+aggregates. These are diagnostic metrics, not proof of correct tool ordering,
+argument values, or safe execution.
+
 Provider errors are excluded from both micro and macro rates and counted
 separately. Micro rates are call-weighted, not independent safety or model
 quality estimates. A correct tool set executed in the wrong order still has

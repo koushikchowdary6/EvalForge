@@ -2,7 +2,9 @@
 
 import pytest
 
-from evalforge.agent_graders import grade_trajectory, tool_call_overlap_counts
+from evalforge.agent_graders import (
+    grade_trajectory, precision_recall_f1, tool_call_overlap_counts,
+)
 from evalforge.agent_runner import AgentEvalRunner
 
 
@@ -53,14 +55,25 @@ def test_micro_metrics_pool_calls_not_per_case_rates(tmp_path, capsys):
     ) == (3, 6, 5)
     assert overall["tool_call_micro_precision"] == pytest.approx(0.5)
     assert overall["tool_call_micro_recall"] == pytest.approx(0.6)
+    assert overall["tool_call_micro_f1"] == pytest.approx(6 / 11)
+    # Macro F1 averages per-case harmonic means; it is NOT the harmonic
+    # mean of macro precision and macro recall.
+    assert overall["tool_call_f1"] == pytest.approx((1 + 0.5 + 0.4 + 1) / 4)
     assert overall["tool_call_precision"] == pytest.approx(0.8125)
     assert overall["tool_call_recall"] == pytest.approx((1 + 1 / 3 + 1 + 1) / 4)
     assert report["by_category"]["workflow"]["tool_call_micro_precision"] == 0.5
     assert report["by_category"]["workflow"]["tool_call_micro_recall"] == 0.6
+    assert report["by_category"]["workflow"]["tool_call_f1"] == pytest.approx(
+        (1 + 0.5 + 0.4) / 3
+    )
+    assert report["by_category"]["workflow"]["tool_call_micro_f1"] == pytest.approx(6 / 11)
     assert report["by_category"]["no_tool"]["tool_call_micro_precision"] == 1.0
     assert report["by_category"]["no_tool"]["tool_call_micro_recall"] == 1.0
+    assert report["by_category"]["no_tool"]["tool_call_micro_f1"] == 1.0
     assert report["by_category"]["outage"]["tool_call_micro_precision"] is None
     assert report["by_category"]["outage"]["tool_call_micro_recall"] is None
+    assert report["by_category"]["outage"]["tool_call_micro_f1"] is None
+    assert report["by_category"]["outage"]["tool_call_f1"] is None
     assert report["by_category"]["outage"]["tool_call_micro_samples"] == 0
     assert runner.results[-1]["grade"]["tool_call_counts"] is None
 
@@ -68,6 +81,8 @@ def test_micro_metrics_pool_calls_not_per_case_rates(tmp_path, capsys):
     output = capsys.readouterr().out
     assert "Micro tool precision ....... 50.0%" in output
     assert "Micro tool recall .......... 60.0%" in output
+    assert "Micro tool F1 .............. 54.5%" in output
+    assert "Tool-call F1 ............... 72.5%" in output
     assert "Pooled matched/pred/req .... 3/6/5" in output
 
 
@@ -78,6 +93,8 @@ def test_no_observed_cases_do_not_report_perfect_micro_scores(tmp_path):
     assert report["overall"]["tool_call_micro_precision"] is None
     assert report["overall"]["tool_call_micro_recall"] is None
     assert report["overall"]["tool_call_micro_samples"] == 0
+    assert report["overall"]["tool_call_micro_f1"] is None
+    assert report["overall"]["tool_call_f1"] is None
 
 
 def test_only_no_tool_cases_are_vacuously_perfect(tmp_path):
@@ -89,3 +106,15 @@ def test_only_no_tool_cases_are_vacuously_perfect(tmp_path):
     assert report["overall"]["tool_call_micro_matched"] == 0
     assert report["overall"]["tool_call_micro_predicted"] == 0
     assert report["overall"]["tool_call_micro_required"] == 0
+    assert report["overall"]["tool_call_micro_f1"] == 1.0
+    assert report["overall"]["tool_call_f1"] == 1.0
+
+
+def test_f1_zero_and_unobserved_edge_cases():
+    assert precision_recall_f1(0.0, 0.0) == 0.0
+    assert precision_recall_f1(0.0, 1.0) == 0.0
+    assert precision_recall_f1(1.0, 0.0) == 0.0
+    assert precision_recall_f1(None, None) is None
+    assert _row("missing", [], ["lookup"])["grade"]["tool_call_f1"] == 0.0
+    assert _row("extra", ["lookup"], [])["grade"]["tool_call_f1"] == 0.0
+    assert _row("outage", [], ["lookup"], error="offline")["grade"]["tool_call_f1"] is None
