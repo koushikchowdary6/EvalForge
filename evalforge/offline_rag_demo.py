@@ -65,8 +65,8 @@ def validate(docs, questions):
             raise ValueError("invalid relevance labels")
 
 
-def bm25_rank(question, docs):
-    """Rank corpus by BM25 (k1=1.2, b=0.75), breaking ties by doc ID."""
+def bm25_rank_with_scores(question, docs):
+    """Return (document ID, BM25 score) pairs, ordered by score then ID."""
     tokens = [tokenize(doc["title"] + " " + doc["text"]) for doc in docs]
     lengths = [len(words) for words in tokens]
     average_length = max(1.0, sum(lengths) / len(lengths))
@@ -88,7 +88,12 @@ def bm25_rank(question, docs):
                 count + 1.2 * (0.25 + 0.75 * length / average_length)
             )
         scores.append((doc["doc_id"], score))
-    return [doc_id for doc_id, _ in sorted(scores, key=lambda row: (-row[1], row[0]))]
+    return sorted(scores, key=lambda row: (-row[1], row[0]))
+
+
+def bm25_rank(question, docs):
+    """Rank corpus by BM25 (k1=1.2, b=0.75), breaking ties by doc ID."""
+    return [doc_id for doc_id, _ in bm25_rank_with_scores(question, docs)]
 
 
 def _fingerprint(value):
@@ -102,7 +107,18 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5)):
             or any(type(k) is not int or k < 1 for k in cutoffs)
             or len(set(cutoffs)) != len(cutoffs)):
         raise ValueError("cutoffs must be unique positive integers")
-    rankings = {case["id"]: bm25_rank(case["question"], docs) for case in questions}
+    scored_rankings = {
+        case["id"]: bm25_rank_with_scores(case["question"], docs)
+        for case in questions
+    }
+    rankings = {
+        case_id: [doc_id for doc_id, _ in scored]
+        for case_id, scored in scored_rankings.items()
+    }
+    lexical_match_counts = {
+        case_id: sum(score > 0 for _, score in scored)
+        for case_id, scored in scored_rankings.items()
+    }
     cases = []
     summaries = {}
     for k in cutoffs:
@@ -116,6 +132,8 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5)):
                 "answerable": case["answerable"],
                 "retrieved_ids": ranked,
                 "relevant_ids": relevant,
+                "lexical_positive_document_count": lexical_match_counts[case["id"]],
+                "all_zero_score_ranking": lexical_match_counts[case["id"]] == 0,
             }
             if case["answerable"]:
                 row["metrics"] = {
@@ -135,6 +153,14 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5)):
         summaries[str(k)] = {
             "answerable_count": len(rows),
             "unanswerable_excluded": len(questions) - len(rows),
+            "answerable_zero_lexical_overlap_count": sum(
+                case["answerable"] and lexical_match_counts[case["id"]] == 0
+                for case in questions
+            ),
+            "unanswerable_zero_lexical_overlap_count": sum(
+                not case["answerable"] and lexical_match_counts[case["id"]] == 0
+                for case in questions
+            ),
             **{name: sum(row[name] for row in rows) / len(rows)
                for name in ("precision_at_k", "recall_at_k", "ndcg_at_k",
                             "average_precision_at_k", "reciprocal_rank", "hit_rate")},

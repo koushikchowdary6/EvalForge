@@ -49,6 +49,29 @@ def test_rank_ties_are_deterministic_by_document_id():
     assert bm25_rank("absent", docs) == ["a", "z"]
 
 
+def test_lexical_support_diagnostics_expose_zero_overlap_without_changing_ranks():
+    report = evaluate(DOCS, QUESTIONS, (1, 3))
+    answerable, unanswerable = report["cases"][:2]
+    assert answerable["lexical_positive_document_count"] == 1
+    assert answerable["all_zero_score_ranking"] is False
+    assert unanswerable["lexical_positive_document_count"] == 0
+    assert unanswerable["all_zero_score_ranking"] is True
+    # Existing ranking semantics remain unchanged: zero-score documents
+    # still occupy slots, but the report now exposes that limitation.
+    assert unanswerable["retrieved_ids"] == ["a"]
+    assert report["by_top_k"]["1"]["answerable_zero_lexical_overlap_count"] == 0
+    assert report["by_top_k"]["1"]["unanswerable_zero_lexical_overlap_count"] == 1
+
+
+def test_answerable_zero_overlap_is_visible_even_with_ranked_ids():
+    questions = [{"id": "no_match", "question": "galactic nebula",
+                  "answerable": True, "relevant_doc_ids": ["a"]}]
+    report = evaluate(DOCS, questions, (1,))
+    assert report["cases"][0]["retrieved_ids"] == ["a"]
+    assert report["cases"][0]["all_zero_score_ranking"] is True
+    assert report["by_top_k"]["1"]["answerable_zero_lexical_overlap_count"] == 1
+
+
 @pytest.mark.parametrize("cutoffs", [(0,), (-1,), (True,), (1, 1), (), [1, "3"]])
 def test_invalid_cutoffs_fail_closed(cutoffs):
     with pytest.raises(ValueError):
