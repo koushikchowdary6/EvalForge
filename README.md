@@ -66,7 +66,7 @@ To inspect real benchmark outputs **without API keys or paid model calls**:
 ```bash
 pip install -r requirements.txt
 python -m evalforge.offline_rag_demo --k 1 3 5
-python -m pytest tests/test_offline_rag_demo.py -q
+python -m pytest tests/test_offline_rag_demo.py tests/test_offline_rag_evidence_metrics.py -q
 ```
 
 This deterministic **lexical BM25 baseline** reads the bundled 15-document
@@ -91,6 +91,15 @@ still returns all corpus IDs in score order, even when every score is zero;
 those IDs are deterministic tie-breaks, not evidence that the documents
 support the question. Use the diagnostics to spot unsupported retrieval and
 avoid mistaking arbitrary zero-score rankings for meaningful matches.
+
+To quantify this limitation, the report also supplies
+`positive_score_retrieved_ids` and `lexical_evidence_metrics` for each
+answerable case. The summary separates `lexical_evidence_hit_rate`,
+`lexical_evidence_recall_at_k`, and `lexical_evidence_mrr` from the legacy
+all-ranked-ID metrics. `tie_only_hit_count` counts cases where a legacy
+hit came solely from zero-score documents. These are **lexical-overlap
+diagnostics**, not proof that matched documents are factually relevant; the
+original retrieval metrics remain unchanged for comparison.
 
 The output is a **retrieval-only baseline**, not an embedding model,
 generated-answer evaluation, or evidence of model correctness, groundedness,
