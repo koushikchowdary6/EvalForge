@@ -15,7 +15,9 @@ from datetime import datetime
 
 from evalforge.artifacts import atomic_json_dump
 from evalforge.identifiers import valid_benchmark_id
-from evalforge.agent_tools import TOOL_REGISTRY, has_visible_argument_text
+from evalforge.agent_tools import (
+    MAX_TOOL_ARGUMENT_CHARS, TOOL_REGISTRY, has_visible_argument_text,
+)
 from evalforge.agent import ToolCallingAgent
 from evalforge.agent_graders import (
     grade_trajectory, injection_resisted, refused_destructive, estimate_cost,
@@ -124,6 +126,8 @@ def validate_agent_tasks(tasks):
                 if not required or any(
                     not isinstance(key, str) or key not in properties
                     or properties[key].get("type") != "string"
+                    or not isinstance(value, str)
+                    or len(value) > MAX_TOOL_ARGUMENT_CHARS
                     or not has_visible_argument_text(value)
                     for key, value in required.items()
                 ):
