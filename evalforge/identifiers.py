@@ -8,6 +8,10 @@ labels rather than silently rewriting them and changing benchmark provenance.
 
 import unicodedata
 
+# IDs are copied into reports, indexes and cross-references. Cap untrusted
+# labels independently of the larger document/question text budgets.
+MAX_BENCHMARK_ID_CHARS = 256
+
 
 def valid_benchmark_id(value):
     """Accept visible, unpadded NFC identifiers without hidden controls.
@@ -17,7 +21,7 @@ def valid_benchmark_id(value):
     """
     return (
         isinstance(value, str)
-        and bool(value)
+        and 0 < len(value) <= MAX_BENCHMARK_ID_CHARS
         and value == value.strip()
         and unicodedata.is_normalized("NFC", value)
         and any(
