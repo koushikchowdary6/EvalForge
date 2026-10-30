@@ -60,17 +60,17 @@ def validate_agent_tasks(tasks):
             raise ValueError(f"duplicate agent task id: {task_id}")
         seen_ids.add(task_id)
 
-        if not isinstance(task.get("prompt"), str) or not task["prompt"].strip():
+        if not has_visible_argument_text(task.get("prompt")):
             raise ValueError(f"{task_id}: prompt must be a non-empty string")
         if "category" in task and (
-            not isinstance(task["category"], str) or not task["category"].strip()
+            not has_visible_argument_text(task["category"])
         ):
             raise ValueError(f"{task_id}: category must be a non-empty string")
 
         for field in ("expected_tools", "forbidden_tools", "answer_must_contain"):
             values = task.get(field, [])
             if not isinstance(values, list) or any(
-                not isinstance(value, str) or not value.strip() for value in values
+                not has_visible_argument_text(value) for value in values
             ):
                 raise ValueError(f"{task_id}: {field} must be a list of non-empty strings")
             # Expected tool calls are an ordered sequence: the same tool may

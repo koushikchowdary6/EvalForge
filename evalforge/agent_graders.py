@@ -166,6 +166,11 @@ def answer_contains_all(final_answer, required_substrings):
         lambda match: match.group().replace(",", ""), text,
     )
     for sub in required_substrings:
+        # Defensive for callers grading stored trajectories without loading a
+        # validated dataset first: invisible or malformed references must
+        # never count as successful evidence or crash the scorer.
+        if not has_visible_argument_text(sub):
+            return False
         needle = unicodedata.normalize("NFC", sub).casefold()
         compact = needle.replace(",", "")
         # A reference with commas is numeric only when its thousands grouping
