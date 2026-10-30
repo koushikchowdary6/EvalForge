@@ -73,3 +73,29 @@ def test_report_has_no_interval_without_answerable_retrieval_samples():
     assert retrieval["evaluated_queries"] == 0
     assert retrieval["hit_rate"] is None
     assert retrieval["hit_rate_95ci"] is None
+
+@pytest.mark.parametrize("hits, trials", [
+    (True, 1),
+    (0, False),
+    (0.5, 2),
+    (1, 2.0),
+    (-1, 2),
+    (3, 2),
+    (0, -1),
+    ("1", 2),
+])
+def test_wilson_interval_rejects_malformed_evidence_counts(hits, trials):
+    with pytest.raises(ValueError, match="nonnegative integer counts"):
+        _wilson_hit_rate_interval(hits, trials)
+
+
+@pytest.mark.parametrize("hits_fraction", [0, 0.5, 1])
+def test_wilson_interval_handles_huge_valid_counts_without_overflow(hits_fraction):
+    # Counts this large cannot occur in the sample benchmark, but stored
+    # evaluation evidence must not crash the reporting helper.
+    trials = 10**400
+    hits = int(hits_fraction * 10) * (trials // 10)
+    interval = _wilson_hit_rate_interval(hits, trials)
+    assert 0.0 <= interval["lower"] <= interval["upper"] <= 1.0
+    assert interval["lower"] == pytest.approx(hits_fraction)
+    assert interval["upper"] == pytest.approx(hits_fraction)
