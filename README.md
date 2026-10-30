@@ -192,6 +192,21 @@ These controls are **defense in depth, not proof of prompt-injection immunity**.
 The project does not claim measured attack resistance without an adversarial
 benchmark and actual model-run results.
 
+## Agent benchmark input budgets
+
+Agent task prompts and simulated tool/retrieval responses are capped at **40,000
+characters per field**. Dataset validation rejects oversized evidence before
+creating a provider client or sending a paid evaluation request, including when
+an in-memory task list is changed after loading. Invalid reloads clear previous
+benchmark state. The bundled task dataset remains compatible.
+
+These are conservative **character** limits for cost and memory safety, not
+provider token limits, a prompt-injection defense, or proof that an otherwise
+valid request fits a particular model context. Large evidence should be
+chunked into deliberate test cases rather than silently truncated, since
+truncation can change the attack or grading ground truth. Offline tests cover
+exact boundaries, one-character overflow, and no-provider-call behavior.
+
 ## Agent benchmark label validation
 
 The agent runner validates the complete task dataset **before** initializing
