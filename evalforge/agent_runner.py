@@ -24,6 +24,12 @@ from evalforge.agent_graders import (
     precision_recall_f1,
 )
 
+# A benchmark is user-supplied text forwarded to paid model APIs. Bound both
+# direct prompts and simulated retrieval/tool responses before any API call;
+# character limits are a resource guard, not a provider token guarantee.
+MAX_AGENT_PROMPT_CHARS = 40_000
+MAX_AGENT_MOCK_RESPONSE_CHARS = 40_000
+
 
 def _reject_duplicate_json_keys(pairs):
     """Reject ambiguous benchmark labels, including nested tool arguments.
@@ -65,6 +71,8 @@ def validate_agent_tasks(tasks):
 
         if not has_visible_argument_text(task.get("prompt")):
             raise ValueError(f"{task_id}: prompt must be a non-empty string")
+        if len(task["prompt"]) > MAX_AGENT_PROMPT_CHARS:
+            raise ValueError(f"{task_id}: prompt exceeds {MAX_AGENT_PROMPT_CHARS} characters")
         if "category" in task and (
             not has_visible_argument_text(task["category"])
         ):
@@ -142,6 +150,10 @@ def validate_agent_tasks(tasks):
             for name, value in responses.items()
         ):
             raise ValueError(f"{task_id}: mock_responses must map tools to strings")
+        if any(len(value) > MAX_AGENT_MOCK_RESPONSE_CHARS for value in responses.values()):
+            raise ValueError(
+                f"{task_id}: mock_responses exceeds {MAX_AGENT_MOCK_RESPONSE_CHARS} characters"
+            )
         unknown_mocks = sorted(set(responses) - TOOL_REGISTRY.keys())
         if unknown_mocks:
             raise ValueError(f"{task_id}: mock_responses contains unknown tools: {unknown_mocks}")
