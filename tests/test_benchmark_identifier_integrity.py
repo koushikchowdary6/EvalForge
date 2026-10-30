@@ -23,6 +23,7 @@ BAD_IDS = [
     "e\u0301",  # visually identical to NFC é, but a distinct byte sequence
     " case ",  # padding creates ambiguous joins
     "case\u00a01",  # non-ASCII whitespace looks like an ordinary space
+    "x" * 257,  # unbounded join keys can inflate report/index memory
 ]
 
 
@@ -75,3 +76,9 @@ def test_nfc_unicode_and_internal_plain_spaces_remain_valid():
     for label in ("évidence-1", "caso-東京", "case 1", "document_42"):
         assert valid_benchmark_id(label)
         validate_agent_tasks([{"id": label, "prompt": "Summarize this evidence."}])
+
+
+def test_benchmark_id_length_boundary():
+    assert valid_benchmark_id("x" * 256)
+    assert not valid_benchmark_id("x" * 257)
+    assert not valid_benchmark_id("x" * 10_000)
