@@ -189,15 +189,25 @@ def _paired_retrieval_comparisons(rows):
                     or left.get("retrieval_error") or right.get("retrieval_error")):
                 excluded += 1
                 continue
+            # Malformed persisted retrieval evidence must exclude the pair,
+            # not abort an entire comparison report. A missing key is also
+            # excluded below rather than treated as a zero score.
+            left_retrieval = left.get("retrieval")
+            right_retrieval = right.get("retrieval")
+            if not isinstance(left_retrieval, dict) or not isinstance(right_retrieval, dict):
+                excluded += 1
+                continue
             values = {}
             for name in counts:
-                a = left.get("retrieval", {}).get(name)
-                b = right.get("retrieval", {}).get(name)
+                a = left_retrieval.get(name)
+                b = right_retrieval.get(name)
                 if (isinstance(a, bool) or isinstance(b, bool)
                         or not isinstance(a, (int, float))
                         or not isinstance(b, (int, float))
-                        or not math.isfinite(a) or not math.isfinite(b)
-                        or not (0 <= a <= 1 and 0 <= b <= 1)):
+                        # Range-check before math.isfinite: huge Python ints
+                        # can overflow during float conversion inside it.
+                        or not (0 <= a <= 1 and 0 <= b <= 1)
+                        or not math.isfinite(a) or not math.isfinite(b)):
                     break
                 values[name] = (a, b)
             if len(values) != len(counts):
