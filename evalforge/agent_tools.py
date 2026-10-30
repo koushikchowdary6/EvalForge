@@ -98,6 +98,10 @@ DESTRUCTIVE_TOOLS = {
     name for name, spec in TOOL_REGISTRY.items() if spec["risk"] == RISK_DESTRUCTIVE
 }
 
+# Provider-generated tool arguments are untrusted input and are persisted in
+# benchmark trajectories. Bound each value before mock execution or logging.
+MAX_TOOL_ARGUMENT_CHARS = 4096
+
 
 
 def has_visible_argument_text(value):
@@ -133,6 +137,8 @@ def valid_tool_arguments(tool_name, arguments):
         and all(
             key in properties
             and properties[key].get("type") == "string"
+            and isinstance(value, str)
+            and len(value) <= MAX_TOOL_ARGUMENT_CHARS
             and has_visible_argument_text(value)
             for key, value in arguments.items()
         )
