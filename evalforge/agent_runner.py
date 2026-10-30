@@ -279,6 +279,10 @@ class AgentEvalRunner:
                 "task_success_rate": self._rate([r["grade"]["success"] for r in evaluated]),
                 "tool_selection_accuracy": self._mean(
                     [r["grade"]["tool_selection_score"] for r in evaluated]),
+                "tool_call_precision": self._mean(
+                    [r["grade"].get("tool_call_precision") for r in evaluated]),
+                "tool_call_recall": self._mean(
+                    [r["grade"].get("tool_call_recall") for r in evaluated]),
                 "tool_sequence_accuracy": self._mean(
                     [r["grade"].get("tool_sequence_score") for r in evaluated]),
                 "argument_accuracy": self._mean(
@@ -318,6 +322,10 @@ class AgentEvalRunner:
                     [r["grade"]["success"] for r in valid_rows]),
                 "tool_selection_accuracy": self._mean(
                     [r["grade"]["tool_selection_score"] for r in valid_rows]),
+                "tool_call_precision": self._mean(
+                    [r["grade"].get("tool_call_precision") for r in valid_rows]),
+                "tool_call_recall": self._mean(
+                    [r["grade"].get("tool_call_recall") for r in valid_rows]),
                 "tool_sequence_accuracy": self._mean(
                     [r["grade"].get("tool_sequence_score") for r in valid_rows]),
                 "latency_samples": len(valid_rows),
@@ -351,6 +359,8 @@ class AgentEvalRunner:
         print(f"  Destructive safety observed  {self.report['destructive_refusal_evaluated']}")
         print(f"  Task success rate .......... {pct(o['task_success_rate'])}")
         print(f"  Tool selection accuracy .... {pct(o['tool_selection_accuracy'])}")
+        print(f"  Tool-call precision ........ {pct(o['tool_call_precision'])}")
+        print(f"  Tool-call recall ........... {pct(o['tool_call_recall'])}")
         print(f"  Tool sequence accuracy ..... {pct(o['tool_sequence_accuracy'])}")
         print(f"  Argument accuracy .......... {pct(o['argument_accuracy'])}")
         print(f"  Injection resistance ....... {pct(o['injection_resistance_rate'])}")
@@ -368,11 +378,13 @@ class AgentEvalRunner:
             print(f"  Observed partial cost ...... ${o['observed_cost_usd']:.4f}")
 
         print("\n  By category:")
-        print(f"    {'category':24}{'tasks':>7}{'success':>10}{'tool_acc':>10}{'seq_acc':>10}")
+        print(f"    {'category':24}{'tasks':>7}{'success':>10}{'tool_acc':>10}{'precision':>10}{'recall':>10}{'seq_acc':>10}")
         for category, stats in self.report["by_category"].items():
             print(f"    {category:24}{stats['tasks']:>7}"
                   f"{pct(stats['success_rate']):>10}"
                   f"{pct(stats['tool_selection_accuracy']):>10}"
+                  f"{pct(stats['tool_call_precision']):>10}"
+                  f"{pct(stats['tool_call_recall']):>10}"
                   f"{pct(stats['tool_sequence_accuracy']):>10}")
 
         if self.report["failure_categories"]:
