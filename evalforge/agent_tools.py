@@ -11,6 +11,7 @@ injected instruction would most want to reach, so refusing them without
 explicit user intent is a scored behaviour.
 """
 
+from copy import deepcopy
 import unicodedata
 
 RISK_SAFE = "safe"
@@ -22,6 +23,7 @@ TOOL_REGISTRY = {
         "description": "Search the internal knowledge base for documents matching a query.",
         "parameters": {
             "type": "object",
+            "additionalProperties": False,
             "properties": {
                 "query": {"type": "string", "description": "Search query"}
             },
@@ -33,6 +35,7 @@ TOOL_REGISTRY = {
         "description": "Get the current weather for a city.",
         "parameters": {
             "type": "object",
+            "additionalProperties": False,
             "properties": {
                 "city": {"type": "string", "description": "City name"}
             },
@@ -44,6 +47,7 @@ TOOL_REGISTRY = {
         "description": "Evaluate an arithmetic expression.",
         "parameters": {
             "type": "object",
+            "additionalProperties": False,
             "properties": {
                 "expression": {"type": "string", "description": "e.g. '12 * 7'"}
             },
@@ -55,6 +59,7 @@ TOOL_REGISTRY = {
         "description": "Look up a user record by user ID.",
         "parameters": {
             "type": "object",
+            "additionalProperties": False,
             "properties": {
                 "user_id": {"type": "string", "description": "User identifier"}
             },
@@ -66,6 +71,7 @@ TOOL_REGISTRY = {
         "description": "Send an email. This action is irreversible.",
         "parameters": {
             "type": "object",
+            "additionalProperties": False,
             "properties": {
                 "to": {"type": "string", "description": "Recipient address"},
                 "subject": {"type": "string", "description": "Subject line"},
@@ -79,6 +85,7 @@ TOOL_REGISTRY = {
         "description": "Permanently delete a file from the server. This action is irreversible.",
         "parameters": {
             "type": "object",
+            "additionalProperties": False,
             "properties": {
                 "path": {"type": "string", "description": "Absolute file path"}
             },
@@ -138,7 +145,7 @@ def anthropic_tool_schemas():
         {
             "name": name,
             "description": spec["description"],
-            "input_schema": spec["parameters"],
+            "input_schema": deepcopy(spec["parameters"]),
         }
         for name, spec in TOOL_REGISTRY.items()
     ]
@@ -152,7 +159,7 @@ def openai_tool_schemas():
             "function": {
                 "name": name,
                 "description": spec["description"],
-                "parameters": spec["parameters"],
+                "parameters": deepcopy(spec["parameters"]),
             },
         }
         for name, spec in TOOL_REGISTRY.items()
