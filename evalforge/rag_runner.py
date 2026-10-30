@@ -12,6 +12,7 @@ import math
 import os
 import random
 from datetime import datetime
+from numbers import Integral
 
 from evalforge.agent_tools import has_visible_argument_text
 from evalforge.artifacts import atomic_json_dump as _atomic_json_dump
@@ -110,14 +111,27 @@ def _wilson_rate_interval(hits, trials):
     Report sampling uncertainty under an independent-query assumption;
     this is not a guarantee of generalization to real-world queries.
     """
+    # A malformed stored count must not produce a plausible benchmark CI.
+    # Reject booleans (which subclass int), fractional counts, and impossible
+    # success totals before computing the interval.
+    if (isinstance(hits, bool) or not isinstance(hits, Integral)
+            or isinstance(trials, bool) or not isinstance(trials, Integral)
+            or not 0 <= hits <= trials):
+        raise ValueError("Wilson interval requires nonnegative integer counts with hits <= trials")
     if trials == 0:
         return None
     z = 1.959963984540054
     p = hits / trials
     z2 = z * z
-    scale = 1.0 + z2 / trials
-    center = (p + z2 / (2 * trials)) / scale
-    margin = z * math.sqrt(p * (1 - p) / trials + z2 / (4 * trials * trials)) / scale
+    # Compute the reciprocal using integer division first. Dividing a float
+    # directly by a 400-digit Python integer can raise OverflowError even
+    # when the event rate is well defined.
+    inv_trials = 1 / trials
+    scale = 1.0 + z2 * inv_trials
+    center = (p + 0.5 * z2 * inv_trials) / scale
+    margin = z * math.sqrt(
+        p * (1 - p) * inv_trials + 0.25 * z2 * inv_trials * inv_trials
+    ) / scale
     return {"lower": max(0.0, center - margin), "upper": min(1.0, center + margin)}
 
 
