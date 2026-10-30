@@ -241,6 +241,33 @@ class AgentEvalRunner:
         vals = [v for v in values if v is not None]
         return sum(vals) / len(vals) if vals else None
 
+    @staticmethod
+    def _pooled_tool_metrics(rows):
+        """Micro-average observed tool calls, excluding provider outages.
+
+        Unlike the per-case macro mean, each actual/required invocation
+        contributes one count. No-tool cases contribute zero calls; an entirely
+        no-tool benchmark still reports perfect precision and recall.
+        """
+        counts = [
+            row["grade"].get("tool_call_counts")
+            for row in rows if not row.get("error")
+            and row["grade"].get("tool_call_counts") is not None
+        ]
+        matched = sum(item["matched"] for item in counts)
+        predicted = sum(item["predicted"] for item in counts)
+        required = sum(item["required"] for item in counts)
+        return {
+            "precision": (
+                matched / predicted if predicted else (1.0 if not required else 0.0)
+            ) if counts else None,
+            "recall": (matched / required if required else 1.0) if counts else None,
+            "samples": len(counts),
+            "matched": matched,
+            "predicted": predicted,
+            "required": required,
+        }
+
     def generate_report(self):
         by_category = {}
         for r in self.results:
@@ -309,6 +336,16 @@ class AgentEvalRunner:
             "by_category": {},
         }
 
+        pooled = self._pooled_tool_metrics(evaluated)
+        report["overall"].update({
+            "tool_call_micro_precision": pooled["precision"],
+            "tool_call_micro_recall": pooled["recall"],
+            "tool_call_micro_samples": pooled["samples"],
+            "tool_call_micro_matched": pooled["matched"],
+            "tool_call_micro_predicted": pooled["predicted"],
+            "tool_call_micro_required": pooled["required"],
+        })
+
         for category, rows in sorted(by_category.items()):
             # Match the overall success-rate denominator: transport/provider
             # errors are not observed agent behavior. A category with only
@@ -331,6 +368,15 @@ class AgentEvalRunner:
                 "latency_samples": len(valid_rows),
                 "avg_latency_ms": self._mean([r["latency_ms"] for r in valid_rows]),
             }
+            category_pooled = self._pooled_tool_metrics(valid_rows)
+            report["by_category"][category].update({
+                "tool_call_micro_precision": category_pooled["precision"],
+                "tool_call_micro_recall": category_pooled["recall"],
+                "tool_call_micro_samples": category_pooled["samples"],
+                "tool_call_micro_matched": category_pooled["matched"],
+                "tool_call_micro_predicted": category_pooled["predicted"],
+                "tool_call_micro_required": category_pooled["required"],
+            })
 
         self.report = report
         return report
@@ -361,6 +407,11 @@ class AgentEvalRunner:
         print(f"  Tool selection accuracy .... {pct(o['tool_selection_accuracy'])}")
         print(f"  Tool-call precision ........ {pct(o['tool_call_precision'])}")
         print(f"  Tool-call recall ........... {pct(o['tool_call_recall'])}")
+        print(f"  Micro tool precision ....... {pct(o['tool_call_micro_precision'])}")
+        print(f"  Micro tool recall .......... {pct(o['tool_call_micro_recall'])}")
+        print(f"  Pooled matched/pred/req .... {o['tool_call_micro_matched']}/"
+              f"{o['tool_call_micro_predicted']}/{o['tool_call_micro_required']}"
+              f" ({o['tool_call_micro_samples']} evaluated cases)")
         print(f"  Tool sequence accuracy ..... {pct(o['tool_sequence_accuracy'])}")
         print(f"  Argument accuracy .......... {pct(o['argument_accuracy'])}")
         print(f"  Injection resistance ....... {pct(o['injection_resistance_rate'])}")
