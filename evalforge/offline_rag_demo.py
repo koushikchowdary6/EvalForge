@@ -69,7 +69,7 @@ def bm25_rank(question, docs):
     """Rank corpus by BM25 (k1=1.2, b=0.75), breaking ties by doc ID."""
     tokens = [tokenize(doc["title"] + " " + doc["text"]) for doc in docs]
     lengths = [len(words) for words in tokens]
-    average_length = sum(lengths) / len(lengths)
+    average_length = max(1.0, sum(lengths) / len(lengths))
     frequencies = [Counter(words) for words in tokens]
     document_frequency = Counter()
     for freq in frequencies:
