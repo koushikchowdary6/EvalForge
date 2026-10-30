@@ -1,0 +1,168 @@
+"""API-free, deterministic BM25 retrieval baseline for the bundled RAG benchmark.
+
+This is *retrieval only*: it never generates answers or measures groundedness,
+hallucinations, or LLM performance. It uses the same retrieval graders as the
+embedding-backed RAG evaluator for an honest baseline comparison.
+"""
+import argparse
+from collections import Counter
+import hashlib
+import json
+import math
+from pathlib import Path
+import re
+
+from evalforge.rag_graders import (
+    average_precision_at_k, hit_rate, ndcg_at_k, precision_at_k,
+    recall_at_k, reciprocal_rank,
+)
+
+DATA_DIR = Path(__file__).resolve().parents[1] / "datasets"
+_TOKEN = re.compile(r"[a-z0-9]+", re.IGNORECASE)
+
+
+def tokenize(text):
+    """Transparent lexical tokenizer, not an embedding or language model."""
+    return _TOKEN.findall(text.casefold())
+
+
+def validate(docs, questions):
+    """Reject ambiguous benchmark IDs/labels before computing any scores."""
+    if not isinstance(docs, list) or not docs:
+        raise ValueError("corpus must be a nonempty list")
+    if not isinstance(questions, list) or not questions:
+        raise ValueError("questions must be a nonempty list")
+    ids = set()
+    for doc in docs:
+        if (not isinstance(doc, dict)
+                or not isinstance(doc.get("doc_id"), str)
+                or not doc["doc_id"].strip()
+                or not isinstance(doc.get("title"), str)
+                or not isinstance(doc.get("text"), str)
+                or not (doc["title"].strip() or doc["text"].strip())):
+            raise ValueError("invalid corpus document")
+        if doc["doc_id"] in ids:
+            raise ValueError("duplicate corpus document ID")
+        ids.add(doc["doc_id"])
+    case_ids = set()
+    for case in questions:
+        if (not isinstance(case, dict)
+                or not isinstance(case.get("id"), str)
+                or not case["id"].strip()
+                or not isinstance(case.get("question"), str)
+                or not case["question"].strip()
+                or type(case.get("answerable")) is not bool
+                or not isinstance(case.get("relevant_doc_ids"), list)):
+            raise ValueError("invalid benchmark question")
+        if case["id"] in case_ids:
+            raise ValueError("duplicate question ID")
+        case_ids.add(case["id"])
+        labels = case["relevant_doc_ids"]
+        if (any(not isinstance(doc_id, str) or doc_id not in ids for doc_id in labels)
+                or len(set(labels)) != len(labels)
+                or (case["answerable"] and not labels)
+                or (not case["answerable"] and labels)):
+            raise ValueError("invalid relevance labels")
+
+
+def bm25_rank(question, docs):
+    """Rank corpus by BM25 (k1=1.2, b=0.75), breaking ties by doc ID."""
+    tokens = [tokenize(doc["title"] + " " + doc["text"]) for doc in docs]
+    lengths = [len(words) for words in tokens]
+    average_length = sum(lengths) / len(lengths)
+    frequencies = [Counter(words) for words in tokens]
+    document_frequency = Counter()
+    for freq in frequencies:
+        document_frequency.update(freq.keys())
+    query_terms = set(tokenize(question))
+    scores = []
+    for doc, freq, length in zip(docs, frequencies, lengths):
+        score = 0.0
+        for term in query_terms:
+            count = freq[term]
+            if not count:
+                continue
+            df = document_frequency[term]
+            idf = math.log1p((len(docs) - df + 0.5) / (df + 0.5))
+            score += idf * count * 2.2 / (
+                count + 1.2 * (0.25 + 0.75 * length / average_length)
+            )
+        scores.append((doc["doc_id"], score))
+    return [doc_id for doc_id, _ in sorted(scores, key=lambda row: (-row[1], row[0]))]
+
+
+def _fingerprint(value):
+    canonical = json.dumps(value, sort_keys=True, ensure_ascii=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def evaluate(docs, questions, cutoffs=(1, 3, 5)):
+    validate(docs, questions)
+    if (not isinstance(cutoffs, (list, tuple)) or not cutoffs
+            or any(type(k) is not int or k < 1 for k in cutoffs)
+            or len(set(cutoffs)) != len(cutoffs)):
+        raise ValueError("cutoffs must be unique positive integers")
+    rankings = {case["id"]: bm25_rank(case["question"], docs) for case in questions}
+    cases = []
+    summaries = {}
+    for k in cutoffs:
+        rows = []
+        for case in questions:
+            ranked = rankings[case["id"]][:k]
+            relevant = case["relevant_doc_ids"]
+            row = {
+                "case_id": case["id"],
+                "top_k": k,
+                "answerable": case["answerable"],
+                "retrieved_ids": ranked,
+                "relevant_ids": relevant,
+            }
+            if case["answerable"]:
+                row["metrics"] = {
+                    "precision_at_k": precision_at_k(ranked, relevant, k=k),
+                    "recall_at_k": recall_at_k(ranked, relevant, k=k),
+                    "ndcg_at_k": ndcg_at_k(ranked, relevant, k=k),
+                    "average_precision_at_k": average_precision_at_k(ranked, relevant, k=k),
+                    "reciprocal_rank": reciprocal_rank(ranked, relevant),
+                    "hit_rate": hit_rate(ranked, relevant),
+                }
+                rows.append(row["metrics"])
+            else:
+                # Unanswerable questions have no relevant documents. Their
+                # retrieval scores are undefined for this answerable-only report.
+                row["metrics"] = None
+            cases.append(row)
+        summaries[str(k)] = {
+            "answerable_count": len(rows),
+            "unanswerable_excluded": len(questions) - len(rows),
+            **{name: sum(row[name] for row in rows) / len(rows)
+               for name in ("precision_at_k", "recall_at_k", "ndcg_at_k",
+                            "average_precision_at_k", "reciprocal_rank", "hit_rate")},
+        }
+    return {
+        "method": "lexical_bm25_retrieval_only",
+        "parameters": {"k1": 1.2, "b": 0.75, "tokenizer": "ascii_alphanumeric"},
+        "corpus_sha256": _fingerprint(docs),
+        "questions_sha256": _fingerprint(questions),
+        "corpus_size": len(docs),
+        "question_count": len(questions),
+        "by_top_k": summaries,
+        "cases": cases,
+    }
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--corpus", type=Path, default=DATA_DIR / "rag_corpus.json")
+    parser.add_argument("--questions", type=Path, default=DATA_DIR / "rag_questions.json")
+    parser.add_argument("--k", type=int, nargs="+", default=[1, 3, 5])
+    args = parser.parse_args(argv)
+    with args.corpus.open(encoding="utf-8") as stream:
+        docs = json.load(stream)
+    with args.questions.open(encoding="utf-8") as stream:
+        questions = json.load(stream)
+    print(json.dumps(evaluate(docs, questions, args.k), indent=2))
+
+
+if __name__ == "__main__":
+    main()
