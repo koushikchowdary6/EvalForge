@@ -75,6 +75,9 @@ statistics (k1=1.2, b=0.75), then reports per-question retrieved IDs and
 precision@k, recall@k, nDCG@k, AP@k, MRR, and hit rate using EvalForge's
 existing retrieval graders. It includes dataset SHA-256 fingerprints and
 excludes the two unanswerable questions from retrieval-quality averages.
+The CLI rejects duplicate JSON object keys (including nested metadata) and
+non-standard `NaN`/`Infinity` values rather than silently changing labels or
+publishing scores from ambiguous benchmark inputs.
 
 The JSON report also exposes `lexical_positive_document_count` and
 `all_zero_score_ranking` for each case, plus separate zero-overlap counts for
