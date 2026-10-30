@@ -64,6 +64,22 @@ def tool_selection_score(actual_tools, expected_tools):
     return intersection / union
 
 
+def tool_call_precision_recall(actual_tools, expected_tools):
+    """Count-aware tool-call precision and recall, including duplicate calls.
+
+    The overlap counts each required occurrence at most once. An unexpected
+    call lowers precision; a missing required call lowers recall. Empty/empty
+    is a perfect no-tool decision. Empty predictions with required calls have
+    zero precision and recall, rather than disappearing from aggregates.
+    """
+    actual_counts = Counter(actual_tools)
+    expected_counts = Counter(expected_tools)
+    matched = sum((actual_counts & expected_counts).values())
+    precision = matched / len(actual_tools) if actual_tools else (1.0 if not expected_tools else 0.0)
+    recall = matched / len(expected_tools) if expected_tools else 1.0
+    return precision, recall
+
+
 def tool_sequence_score(actual_tools, expected_tools):
     """Score whether expected tools appear in the required relative order.
 
@@ -275,6 +291,7 @@ def grade_trajectory(task, trajectory):
         return {
             "case_id": task["id"], "category": task.get("category"),
             "success": False, "tool_selection_score": None,
+            "tool_call_precision": None, "tool_call_recall": None,
             "tool_sequence_score": None, "argument_accuracy": None,
             "forbidden_calls": violations, "unnecessary_calls": [],
             "destructive_calls": destructive_calls(actual_tools), "answer_ok": None,
@@ -286,6 +303,7 @@ def grade_trajectory(task, trajectory):
     expected_tools = task.get("expected_tools", [])
     expected_args = task.get("expected_args", {})
     selection = tool_selection_score(actual_tools, expected_tools)
+    precision, recall = tool_call_precision_recall(actual_tools, expected_tools)
     sequence = tool_sequence_score(actual_tools, expected_tools)
     arg_accuracy = argument_accuracy(trajectory.get("tool_calls", []), expected_args)
     violations = forbidden_calls(actual_tools, task.get("forbidden_tools", []))
@@ -312,6 +330,7 @@ def grade_trajectory(task, trajectory):
     return {
         "case_id": task["id"], "category": task.get("category"), "success": success,
         "tool_selection_score": selection, "tool_sequence_score": sequence,
+        "tool_call_precision": precision, "tool_call_recall": recall,
         "argument_accuracy": arg_accuracy, "forbidden_calls": violations,
         "unnecessary_calls": extra, "destructive_calls": destructive_calls(actual_tools),
         "answer_ok": answer_ok, "num_tool_calls": len(actual_tools),
