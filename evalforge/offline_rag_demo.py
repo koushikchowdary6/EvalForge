@@ -146,14 +146,22 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5)):
     summaries = {}
     for k in cutoffs:
         rows = []
+        evidence_rows = []
         for case in questions:
             ranked = rankings[case["id"]][:k]
+            # Zero-score BM25 results are arbitrary ID-order tie breakers,
+            # not evidence that the query matched a document.
+            evidence_ranked = [
+                doc_id for doc_id, score in scored_rankings[case["id"]]
+                if score > 0
+            ][:k]
             relevant = case["relevant_doc_ids"]
             row = {
                 "case_id": case["id"],
                 "top_k": k,
                 "answerable": case["answerable"],
                 "retrieved_ids": ranked,
+                "positive_score_retrieved_ids": evidence_ranked,
                 "relevant_ids": relevant,
                 "lexical_positive_document_count": lexical_match_counts[case["id"]],
                 "all_zero_score_ranking": lexical_match_counts[case["id"]] == 0,
@@ -168,10 +176,20 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5)):
                     "hit_rate": hit_rate(ranked, relevant),
                 }
                 rows.append(row["metrics"])
+                # Keep legacy rank metrics for comparisons, but report
+                # evidence-backed quality separately so zero-score ID ties
+                # cannot masquerade as successful lexical retrieval.
+                row["lexical_evidence_metrics"] = {
+                    "hit_rate": hit_rate(evidence_ranked, relevant),
+                    "recall_at_k": recall_at_k(evidence_ranked, relevant, k=k),
+                    "reciprocal_rank": reciprocal_rank(evidence_ranked, relevant),
+                }
+                evidence_rows.append(row["lexical_evidence_metrics"])
             else:
                 # Unanswerable questions have no relevant documents. Their
                 # retrieval scores are undefined for this answerable-only report.
                 row["metrics"] = None
+                row["lexical_evidence_metrics"] = None
             cases.append(row)
         summaries[str(k)] = {
             "answerable_count": len(rows),
@@ -183,6 +201,19 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5)):
             "unanswerable_zero_lexical_overlap_count": sum(
                 not case["answerable"] and lexical_match_counts[case["id"]] == 0
                 for case in questions
+            ),
+            "lexical_evidence_hit_rate": sum(
+                row["hit_rate"] for row in evidence_rows
+            ) / len(evidence_rows),
+            "lexical_evidence_recall_at_k": sum(
+                row["recall_at_k"] for row in evidence_rows
+            ) / len(evidence_rows),
+            "lexical_evidence_mrr": sum(
+                row["reciprocal_rank"] for row in evidence_rows
+            ) / len(evidence_rows),
+            "tie_only_hit_count": sum(
+                legacy["hit_rate"] > 0 and evidence["hit_rate"] == 0
+                for legacy, evidence in zip(rows, evidence_rows)
             ),
             **{name: sum(row[name] for row in rows) / len(rows)
                for name in ("precision_at_k", "recall_at_k", "ndcg_at_k",
