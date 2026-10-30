@@ -12,6 +12,7 @@ import math
 from pathlib import Path
 import re
 
+from evalforge.identifiers import valid_benchmark_id
 from evalforge.rag_graders import (
     average_precision_at_k, hit_rate, ndcg_at_k, precision_at_k,
     recall_at_k, reciprocal_rank,
@@ -35,8 +36,7 @@ def validate(docs, questions):
     ids = set()
     for doc in docs:
         if (not isinstance(doc, dict)
-                or not isinstance(doc.get("doc_id"), str)
-                or not doc["doc_id"].strip()
+                or not valid_benchmark_id(doc.get("doc_id"))
                 or not isinstance(doc.get("title"), str)
                 or not isinstance(doc.get("text"), str)
                 or not (doc["title"].strip() or doc["text"].strip())):
@@ -47,8 +47,7 @@ def validate(docs, questions):
     case_ids = set()
     for case in questions:
         if (not isinstance(case, dict)
-                or not isinstance(case.get("id"), str)
-                or not case["id"].strip()
+                or not valid_benchmark_id(case.get("id"))
                 or not isinstance(case.get("question"), str)
                 or not case["question"].strip()
                 or type(case.get("answerable")) is not bool

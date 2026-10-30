@@ -78,6 +78,11 @@ excludes the two unanswerable questions from retrieval-quality averages.
 The CLI rejects duplicate JSON object keys (including nested metadata) and
 non-standard `NaN`/`Infinity` values rather than silently changing labels or
 publishing scores from ambiguous benchmark inputs.
+The offline evaluator uses the same visible, NFC-normalized, 256-character
+benchmark identifier contract as the embedding-backed RAG and agent evaluators.
+It rejects hidden Unicode controls, ambiguous non-NFC IDs, and oversized join
+keys before ranking or scoring. This validates identifier integrity, not the
+factual correctness of corpus evidence or relevance labels.
 
 The JSON report also exposes `lexical_positive_document_count` and
 `all_zero_score_ranking` for each case, plus separate zero-overlap counts for
