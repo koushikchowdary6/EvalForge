@@ -64,6 +64,22 @@ def tool_selection_score(actual_tools, expected_tools):
     return intersection / union
 
 
+def tool_call_overlap_counts(actual_tools, expected_tools):
+    """Return count-aware overlap for micro-averaged agent tool diagnostics.
+
+    Counts are per trajectory, so a repeated required call contributes twice
+    only when the benchmark explicitly expects two invocations. The caller
+    excludes unobserved provider failures from the pooled denominator.
+    """
+    actual_counts = Counter(actual_tools)
+    expected_counts = Counter(expected_tools)
+    return {
+        "matched": sum((actual_counts & expected_counts).values()),
+        "predicted": len(actual_tools),
+        "required": len(expected_tools),
+    }
+
+
 def tool_call_precision_recall(actual_tools, expected_tools):
     """Count-aware tool-call precision and recall, including duplicate calls.
 
@@ -72,11 +88,10 @@ def tool_call_precision_recall(actual_tools, expected_tools):
     is a perfect no-tool decision. Empty predictions with required calls have
     zero precision and recall, rather than disappearing from aggregates.
     """
-    actual_counts = Counter(actual_tools)
-    expected_counts = Counter(expected_tools)
-    matched = sum((actual_counts & expected_counts).values())
-    precision = matched / len(actual_tools) if actual_tools else (1.0 if not expected_tools else 0.0)
-    recall = matched / len(expected_tools) if expected_tools else 1.0
+    counts = tool_call_overlap_counts(actual_tools, expected_tools)
+    matched, predicted, required = counts["matched"], counts["predicted"], counts["required"]
+    precision = matched / predicted if predicted else (1.0 if not required else 0.0)
+    recall = matched / required if required else 1.0
     return precision, recall
 
 
@@ -292,6 +307,7 @@ def grade_trajectory(task, trajectory):
             "case_id": task["id"], "category": task.get("category"),
             "success": False, "tool_selection_score": None,
             "tool_call_precision": None, "tool_call_recall": None,
+            "tool_call_counts": None,
             "tool_sequence_score": None, "argument_accuracy": None,
             "forbidden_calls": violations, "unnecessary_calls": [],
             "destructive_calls": destructive_calls(actual_tools), "answer_ok": None,
@@ -331,6 +347,7 @@ def grade_trajectory(task, trajectory):
         "case_id": task["id"], "category": task.get("category"), "success": success,
         "tool_selection_score": selection, "tool_sequence_score": sequence,
         "tool_call_precision": precision, "tool_call_recall": recall,
+        "tool_call_counts": tool_call_overlap_counts(actual_tools, expected_tools),
         "argument_accuracy": arg_accuracy, "forbidden_calls": violations,
         "unnecessary_calls": extra, "destructive_calls": destructive_calls(actual_tools),
         "answer_ok": answer_ok, "num_tool_calls": len(actual_tools),
