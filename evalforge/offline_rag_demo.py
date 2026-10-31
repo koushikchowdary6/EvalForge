@@ -31,10 +31,27 @@ def tokenize(text):
 
 
 def tokenize_unicode(text):
-    """Unicode-aware word baseline; no stemming, translation, or CJK segmentation."""
-    normalized = unicodedata.normalize("NFC", text.casefold())
-    return re.findall(r"[^\W_]+", normalized, flags=re.UNICODE)
+    """Unicode word baseline, retaining combining marks within words.
 
+    Python's word regex excludes combining vowel signs and accents. Splitting
+    on them turns one Devanagari word into unrelated fragments and can create
+    misleading lexical matches. Preserve marks attached to a preceding word
+    character, but do not treat isolated marks or punctuation as terms.
+    This remains lexical only: no stemming, translation, or CJK segmentation.
+    """
+    normalized = unicodedata.normalize("NFC", text.casefold())
+    tokens, current = [], []
+    for char in normalized:
+        if char.isalnum() or (
+            current and unicodedata.category(char).startswith("M")
+        ):
+            current.append(char)
+        elif current:
+            tokens.append("".join(current))
+            current = []
+    if current:
+        tokens.append("".join(current))
+    return tokens
 
 def _select_tokenizer(mode):
     if mode == "ascii":
