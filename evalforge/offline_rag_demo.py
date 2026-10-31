@@ -202,20 +202,26 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5)):
                 not case["answerable"] and lexical_match_counts[case["id"]] == 0
                 for case in questions
             ),
-            "lexical_evidence_hit_rate": sum(
-                row["hit_rate"] for row in evidence_rows
-            ) / len(evidence_rows),
-            "lexical_evidence_recall_at_k": sum(
-                row["recall_at_k"] for row in evidence_rows
-            ) / len(evidence_rows),
-            "lexical_evidence_mrr": sum(
-                row["reciprocal_rank"] for row in evidence_rows
-            ) / len(evidence_rows),
+            # An unanswerable-only benchmark has no relevant-document
+            # denominator. Preserve its coverage diagnostics, but report
+            # undefined retrieval quality as null instead of dividing by zero.
+            "lexical_evidence_hit_rate": (
+                sum(row["hit_rate"] for row in evidence_rows) / len(evidence_rows)
+                if evidence_rows else None
+            ),
+            "lexical_evidence_recall_at_k": (
+                sum(row["recall_at_k"] for row in evidence_rows) / len(evidence_rows)
+                if evidence_rows else None
+            ),
+            "lexical_evidence_mrr": (
+                sum(row["reciprocal_rank"] for row in evidence_rows) / len(evidence_rows)
+                if evidence_rows else None
+            ),
             "tie_only_hit_count": sum(
                 legacy["hit_rate"] > 0 and evidence["hit_rate"] == 0
                 for legacy, evidence in zip(rows, evidence_rows)
             ),
-            **{name: sum(row[name] for row in rows) / len(rows)
+            **{name: (sum(row[name] for row in rows) / len(rows) if rows else None)
                for name in ("precision_at_k", "recall_at_k", "ndcg_at_k",
                             "average_precision_at_k", "reciprocal_rank", "hit_rate")},
         }
