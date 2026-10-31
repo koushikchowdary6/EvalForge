@@ -132,6 +132,33 @@ lexical coverage; they do not change rankings or measure multilingual model
 performance. Tied rankings are ordered by document ID; no network or model
 calls occur.
 
+### Opt-in Unicode lexical BM25 baseline
+
+The default offline demo retains its original **ASCII** tokenizer and existing
+benchmark output semantics. To compare a Unicode-aware **word-token** baseline
+on the exact same corpus and question labels:
+
+```bash
+python -m evalforge.offline_rag_demo --tokenizer ascii --k 1 3 5
+python -m evalforge.offline_rag_demo --tokenizer unicode --k 1 3 5
+```
+
+The opt-in `unicode` mode applies Unicode case-folding and NFC normalization,
+then matches Unicode alphanumeric word sequences. It can recover lexical
+overlap for identical Japanese strings or canonically equivalent accented
+words that the ASCII baseline drops. The report records the selected tokenizer
+in `parameters.tokenizer`, selected-token counts per question, and
+`selected_tokenizer_diagnostics`; corpus/question SHA-256 hashes remain
+comparable across modes. The original ASCII coverage diagnostics are retained
+to make legacy comparisons explicit.
+
+**Limitations:** This is still deterministic BM25 keyword matching, not
+language identification, morphological analysis, translation, CJK word
+segmentation, semantic retrieval, or an LLM evaluation. Longer CJK phrases
+may not match substrings. Any improvement on the tiny bundled benchmark is
+not evidence of multilingual production performance; use independent,
+labeled datasets before making effectiveness claims.
+
 ---
 
 ## Reproducible embedding evaluation
