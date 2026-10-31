@@ -134,6 +134,16 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5)):
         case["id"]: bm25_rank_with_scores(case["question"], docs)
         for case in questions
     }
+    # The baseline intentionally uses an ASCII-only lexical tokenizer. Record
+    # where that tokenizer drops an entire query or encounters non-ASCII
+    # alphanumeric text, so tie-only retrieval is not mistaken for coverage.
+    query_token_counts = {
+        case["id"]: len(tokenize(case["question"])) for case in questions
+    }
+    query_has_non_ascii_alphanumeric = {
+        case["id"]: any(ch.isalnum() and not ch.isascii() for ch in case["question"])
+        for case in questions
+    }
     rankings = {
         case_id: [doc_id for doc_id, _ in scored]
         for case_id, scored in scored_rankings.items()
@@ -172,6 +182,11 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5)):
                 "relevant_ids": relevant,
                 "lexical_positive_document_count": lexical_match_counts[case["id"]],
                 "all_zero_score_ranking": lexical_match_counts[case["id"]] == 0,
+                "query_ascii_token_count": query_token_counts[case["id"]],
+                "query_has_no_ascii_tokens": query_token_counts[case["id"]] == 0,
+                "query_contains_non_ascii_alphanumeric": (
+                    query_has_non_ascii_alphanumeric[case["id"]]
+                ),
             }
             if case["answerable"]:
                 row["metrics"] = {
@@ -203,6 +218,17 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5)):
             cases.append(row)
         summaries[str(k)] = {
             "answerable_count": len(rows),
+            "answerable_without_ascii_query_tokens": sum(
+                case["answerable"] and query_token_counts[case["id"]] == 0
+                for case in questions
+            ),
+            "unanswerable_without_ascii_query_tokens": sum(
+                not case["answerable"] and query_token_counts[case["id"]] == 0
+                for case in questions
+            ),
+            "questions_with_non_ascii_alphanumeric": sum(
+                query_has_non_ascii_alphanumeric.values()
+            ),
             "unanswerable_excluded": len(questions) - len(rows),
             "unanswerable_positive_lexical_match_count": unanswerable_with_lexical_matches,
             "unanswerable_positive_lexical_match_rate": (
@@ -247,6 +273,12 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5)):
         "questions_sha256": _fingerprint(questions),
         "corpus_size": len(docs),
         "question_count": len(questions),
+        "tokenizer_diagnostics": {
+            "questions_without_ascii_tokens": sum(count == 0 for count in query_token_counts.values()),
+            "questions_with_non_ascii_alphanumeric": sum(
+                query_has_non_ascii_alphanumeric.values()
+            ),
+        },
         "by_top_k": summaries,
         "cases": cases,
     }
