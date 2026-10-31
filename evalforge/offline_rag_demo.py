@@ -33,7 +33,7 @@ def tokenize(text):
 def tokenize_unicode(text):
     """Unicode-aware word baseline; no stemming, translation, or CJK segmentation."""
     normalized = unicodedata.normalize("NFC", text.casefold())
-    return re.findall(r"[^\\W_]+", normalized, flags=re.UNICODE)
+    return re.findall(r"[^\W_]+", normalized, flags=re.UNICODE)
 
 
 def _select_tokenizer(mode):
