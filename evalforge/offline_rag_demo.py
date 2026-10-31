@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 import re
 import stat
+import unicodedata
 
 from evalforge.identifiers import valid_benchmark_id
 from evalforge.rag_graders import (
@@ -27,6 +28,20 @@ _TOKEN = re.compile(r"[a-z0-9]+", re.IGNORECASE)
 def tokenize(text):
     """Transparent lexical tokenizer, not an embedding or language model."""
     return _TOKEN.findall(text.casefold())
+
+
+def tokenize_unicode(text):
+    """Unicode-aware word baseline; no stemming, translation, or CJK segmentation."""
+    normalized = unicodedata.normalize("NFC", text.casefold())
+    return re.findall(r"[^\\W_]+", normalized, flags=re.UNICODE)
+
+
+def _select_tokenizer(mode):
+    if mode == "ascii":
+        return tokenize
+    if mode == "unicode":
+        return tokenize_unicode
+    raise ValueError("tokenizer_mode must be 'ascii' or 'unicode'")
 
 
 def validate(docs, questions):
@@ -66,9 +81,11 @@ def validate(docs, questions):
             raise ValueError("invalid relevance labels")
 
 
-def _build_bm25_index(docs):
+def _build_bm25_index(docs, tokenizer=None):
     """Compute immutable-per-evaluation corpus statistics once, not per query."""
-    tokens = [tokenize(doc["title"] + " " + doc["text"]) for doc in docs]
+    if tokenizer is None:
+        tokenizer = tokenize
+    tokens = [tokenizer(doc["title"] + " " + doc["text"]) for doc in docs]
     lengths = [len(words) for words in tokens]
     average_length = max(1.0, sum(lengths) / len(lengths))
     frequencies = [Counter(words) for words in tokens]
@@ -78,10 +95,12 @@ def _build_bm25_index(docs):
     return frequencies, lengths, average_length, document_frequency
 
 
-def _rank_with_bm25_index(question, docs, index):
+def _rank_with_bm25_index(question, docs, index, tokenizer=None):
     """Score a query against the same corpus snapshot as every other query."""
+    if tokenizer is None:
+        tokenizer = tokenize
     frequencies, lengths, average_length, document_frequency = index
-    query_terms = set(tokenize(question))
+    query_terms = set(tokenizer(question))
     scores = []
     for doc, freq, length in zip(docs, frequencies, lengths):
         score = 0.0
@@ -98,14 +117,20 @@ def _rank_with_bm25_index(question, docs, index):
     return sorted(scores, key=lambda row: (-row[1], row[0]))
 
 
-def bm25_rank_with_scores(question, docs):
+def bm25_rank_with_scores(question, docs, *, tokenizer_mode="ascii"):
     """Return (document ID, BM25 score) pairs, ordered by score then ID."""
-    return _rank_with_bm25_index(question, docs, _build_bm25_index(docs))
+    selected = _select_tokenizer(tokenizer_mode)
+    return _rank_with_bm25_index(
+        question, docs, _build_bm25_index(docs, selected), selected
+    )
 
 
-def bm25_rank(question, docs):
+def bm25_rank(question, docs, *, tokenizer_mode="ascii"):
     """Rank corpus by BM25 (k1=1.2, b=0.75), breaking ties by doc ID."""
-    return [doc_id for doc_id, _ in bm25_rank_with_scores(question, docs)]
+    return [
+        doc_id for doc_id, _ in
+        bm25_rank_with_scores(question, docs, tokenizer_mode=tokenizer_mode)
+    ]
 
 
 def _unique_json_keys(pairs):
@@ -159,8 +184,9 @@ def _fingerprint(value):
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-def evaluate(docs, questions, cutoffs=(1, 3, 5)):
+def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
     validate(docs, questions)
+    selected_tokenizer = _select_tokenizer(tokenizer_mode)
     if (not isinstance(cutoffs, (list, tuple)) or not cutoffs
             or any(type(k) is not int or k < 1 for k in cutoffs)
             or len(set(cutoffs)) != len(cutoffs)):
@@ -168,9 +194,11 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5)):
     # The corpus is identical for every question in this evaluation. Reuse
     # document frequencies and lengths rather than retokenizing all documents
     # for each question; retain the standalone ranking API for callers.
-    index = _build_bm25_index(docs)
+    index = _build_bm25_index(docs, selected_tokenizer)
     scored_rankings = {
-        case["id"]: _rank_with_bm25_index(case["question"], docs, index)
+        case["id"]: _rank_with_bm25_index(
+            case["question"], docs, index, selected_tokenizer
+        )
         for case in questions
     }
     # The baseline intentionally uses an ASCII-only lexical tokenizer. Record
@@ -179,6 +207,12 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5)):
     query_token_counts = {
         case["id"]: len(tokenize(case["question"])) for case in questions
     }
+    selected_query_token_counts = (
+        query_token_counts if tokenizer_mode == "ascii" else {
+            case["id"]: len(selected_tokenizer(case["question"]))
+            for case in questions
+        }
+    )
     query_has_non_ascii_alphanumeric = {
         case["id"]: any(ch.isalnum() and not ch.isascii() for ch in case["question"])
         for case in questions
@@ -222,6 +256,8 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5)):
                 "lexical_positive_document_count": lexical_match_counts[case["id"]],
                 "all_zero_score_ranking": lexical_match_counts[case["id"]] == 0,
                 "query_ascii_token_count": query_token_counts[case["id"]],
+                "query_selected_token_count": selected_query_token_counts[case["id"]],
+                "query_has_no_selected_tokens": selected_query_token_counts[case["id"]] == 0,
                 "query_has_no_ascii_tokens": query_token_counts[case["id"]] == 0,
                 "query_contains_non_ascii_alphanumeric": (
                     query_has_non_ascii_alphanumeric[case["id"]]
@@ -307,11 +343,21 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5)):
         }
     return {
         "method": "lexical_bm25_retrieval_only",
-        "parameters": {"k1": 1.2, "b": 0.75, "tokenizer": "ascii_alphanumeric"},
+        "parameters": {
+            "k1": 1.2, "b": 0.75,
+            "tokenizer": ("ascii_alphanumeric" if tokenizer_mode == "ascii"
+                          else "unicode_alphanumeric"),
+        },
         "corpus_sha256": _fingerprint(docs),
         "questions_sha256": _fingerprint(questions),
         "corpus_size": len(docs),
         "question_count": len(questions),
+        "selected_tokenizer_diagnostics": {
+            "questions_without_selected_tokens": sum(
+                count == 0 for count in selected_query_token_counts.values()
+            ),
+            "tokenizer_mode": tokenizer_mode,
+        },
         "tokenizer_diagnostics": {
             "questions_without_ascii_tokens": sum(count == 0 for count in query_token_counts.values()),
             "questions_with_non_ascii_alphanumeric": sum(
@@ -328,11 +374,15 @@ def main(argv=None):
     parser.add_argument("--corpus", type=Path, default=DATA_DIR / "rag_corpus.json")
     parser.add_argument("--questions", type=Path, default=DATA_DIR / "rag_questions.json")
     parser.add_argument("--k", type=int, nargs="+", default=[1, 3, 5])
+    parser.add_argument(
+        "--tokenizer", choices=("ascii", "unicode"), default="ascii",
+        help="ASCII legacy baseline or Unicode-aware lexical tokenization",
+    )
     args = parser.parse_args(argv)
     try:
         docs = load_benchmark_json(args.corpus)
         questions = load_benchmark_json(args.questions)
-        report = evaluate(docs, questions, args.k)
+        report = evaluate(docs, questions, args.k, tokenizer_mode=args.tokenizer)
     except (ValueError, json.JSONDecodeError, OSError) as exc:
         parser.error(str(exc))
     print(json.dumps(report, indent=2, allow_nan=False))
