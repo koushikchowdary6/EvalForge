@@ -9,8 +9,10 @@ from collections import Counter
 import hashlib
 import json
 import math
+import os
 from pathlib import Path
 import re
+import stat
 
 from evalforge.identifiers import valid_benchmark_id
 from evalforge.rag_graders import (
@@ -110,13 +112,35 @@ def _reject_nonfinite_json(value):
     raise ValueError("non-finite JSON constant in benchmark input")
 
 
+MAX_BENCHMARK_JSON_BYTES = 2_000_000
+
+
 def load_benchmark_json(path):
-    """Read unambiguous, standards-compliant JSON before ranking documents."""
-    with path.open(encoding="utf-8") as stream:
-        return json.load(
-            stream, object_pairs_hook=_unique_json_keys,
-            parse_constant=_reject_nonfinite_json,
-        )
+    """Read bounded, regular-file JSON before ranking or reporting metrics."""
+    source = Path(path)
+    metadata = source.lstat()
+    if not stat.S_ISREG(metadata.st_mode):
+        raise ValueError("benchmark input must be a regular file")
+    if metadata.st_size > MAX_BENCHMARK_JSON_BYTES:
+        raise ValueError("benchmark input exceeds 2,000,000 bytes")
+
+    # Check the opened descriptor as well as the path: a swapped FIFO must
+    # not block the CLI, and a replacement symlink must not escape the input.
+    flags = os.O_RDONLY | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_NOFOLLOW", 0)
+    with os.fdopen(os.open(source, flags), "rb") as handle:
+        if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode):
+            raise ValueError("benchmark input must be a regular file")
+        raw = handle.read(MAX_BENCHMARK_JSON_BYTES + 1)
+    if len(raw) > MAX_BENCHMARK_JSON_BYTES:
+        raise ValueError("benchmark input exceeds 2,000,000 bytes")
+    try:
+        payload = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("benchmark input must be UTF-8") from exc
+    return json.loads(
+        payload, object_pairs_hook=_unique_json_keys,
+        parse_constant=_reject_nonfinite_json,
+    )
 
 
 def _fingerprint(value):
