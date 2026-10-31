@@ -134,6 +134,41 @@ def _rank_with_bm25_index(question, docs, index, tokenizer=None):
     return sorted(scores, key=lambda row: (-row[1], row[0]))
 
 
+def _lexical_equivalence_diagnostics(docs, questions, frequencies, tokenizer_mode):
+    """Audit distinct IDs that BM25 cannot distinguish by term counts.
+
+    Documents with identical token-count multisets have identical lengths,
+    term frequencies, and BM25 scores for every query. If relevance labels
+    mark only some IDs in such a group, ID tie-breaking can change measured
+    retrieval quality without a meaningful lexical distinction. This is an
+    evaluation-label warning, not evidence of train/test contamination.
+    """
+    by_signature = {}
+    for doc, counts in zip(docs, frequencies):
+        signature = tuple(sorted(counts.items()))
+        by_signature.setdefault(signature, []).append(doc["doc_id"])
+    groups = sorted(
+        (sorted(ids) for ids in by_signature.values() if len(ids) > 1),
+        key=lambda ids: ids[0],
+    )
+    partial_case_ids = []
+    for case in questions:
+        if not case["answerable"]:
+            continue
+        relevant = set(case["relevant_doc_ids"])
+        if any(relevant.intersection(group) and not relevant.issuperset(group)
+               for group in groups):
+            partial_case_ids.append(case["id"])
+    return {
+        "tokenizer_mode": tokenizer_mode,
+        "equivalent_group_count": len(groups),
+        "equivalent_document_count": sum(len(group) for group in groups),
+        "equivalent_document_id_groups": groups,
+        "answerable_cases_with_partial_equivalence_labels": partial_case_ids,
+        "scope": "identical_bm25_token_frequency_multisets_not_semantic_duplicates",
+    }
+
+
 def bm25_rank_with_scores(question, docs, *, tokenizer_mode="ascii"):
     """Return (document ID, BM25 score) pairs, ordered by score then ID."""
     selected = _select_tokenizer(tokenizer_mode)
@@ -212,6 +247,9 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
     # document frequencies and lengths rather than retokenizing all documents
     # for each question; retain the standalone ranking API for callers.
     index = _build_bm25_index(docs, selected_tokenizer)
+    lexical_equivalence = _lexical_equivalence_diagnostics(
+        docs, questions, index[0], tokenizer_mode
+    )
     scored_rankings = {
         case["id"]: _rank_with_bm25_index(
             case["question"], docs, index, selected_tokenizer
@@ -368,6 +406,7 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
         "corpus_sha256": _fingerprint(docs),
         "questions_sha256": _fingerprint(questions),
         "corpus_size": len(docs),
+        "corpus_lexical_equivalence": lexical_equivalence,
         "question_count": len(questions),
         "selected_tokenizer_diagnostics": {
             "questions_without_selected_tokens": sum(
