@@ -66,8 +66,8 @@ def validate(docs, questions):
             raise ValueError("invalid relevance labels")
 
 
-def bm25_rank_with_scores(question, docs):
-    """Return (document ID, BM25 score) pairs, ordered by score then ID."""
+def _build_bm25_index(docs):
+    """Compute immutable-per-evaluation corpus statistics once, not per query."""
     tokens = [tokenize(doc["title"] + " " + doc["text"]) for doc in docs]
     lengths = [len(words) for words in tokens]
     average_length = max(1.0, sum(lengths) / len(lengths))
@@ -75,6 +75,12 @@ def bm25_rank_with_scores(question, docs):
     document_frequency = Counter()
     for freq in frequencies:
         document_frequency.update(freq.keys())
+    return frequencies, lengths, average_length, document_frequency
+
+
+def _rank_with_bm25_index(question, docs, index):
+    """Score a query against the same corpus snapshot as every other query."""
+    frequencies, lengths, average_length, document_frequency = index
     query_terms = set(tokenize(question))
     scores = []
     for doc, freq, length in zip(docs, frequencies, lengths):
@@ -90,6 +96,11 @@ def bm25_rank_with_scores(question, docs):
             )
         scores.append((doc["doc_id"], score))
     return sorted(scores, key=lambda row: (-row[1], row[0]))
+
+
+def bm25_rank_with_scores(question, docs):
+    """Return (document ID, BM25 score) pairs, ordered by score then ID."""
+    return _rank_with_bm25_index(question, docs, _build_bm25_index(docs))
 
 
 def bm25_rank(question, docs):
@@ -154,8 +165,12 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5)):
             or any(type(k) is not int or k < 1 for k in cutoffs)
             or len(set(cutoffs)) != len(cutoffs)):
         raise ValueError("cutoffs must be unique positive integers")
+    # The corpus is identical for every question in this evaluation. Reuse
+    # document frequencies and lengths rather than retokenizing all documents
+    # for each question; retain the standalone ranking API for callers.
+    index = _build_bm25_index(docs)
     scored_rankings = {
-        case["id"]: bm25_rank_with_scores(case["question"], docs)
+        case["id"]: _rank_with_bm25_index(case["question"], docs, index)
         for case in questions
     }
     # The baseline intentionally uses an ASCII-only lexical tokenizer. Record
