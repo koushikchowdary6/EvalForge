@@ -95,7 +95,9 @@ avoid mistaking arbitrary zero-score rankings for meaningful matches.
 To quantify this limitation, the report also supplies
 `positive_score_retrieved_ids` and `lexical_evidence_metrics` for each
 answerable case. The summary separates `lexical_evidence_hit_rate`,
-`lexical_evidence_recall_at_k`, and `lexical_evidence_mrr` from the legacy
+`lexical_evidence_recall_at_k`, `lexical_evidence_mrr`,
+`lexical_evidence_precision_at_k`, `lexical_evidence_ndcg_at_k`, and
+`lexical_evidence_average_precision_at_k` from the legacy
 all-ranked-ID metrics. `tie_only_hit_count` counts cases where a legacy
 hit came solely from zero-score documents. These are **lexical-overlap
 diagnostics**, not proof that matched documents are factually relevant; the
