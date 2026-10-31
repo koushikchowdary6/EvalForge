@@ -152,6 +152,14 @@ in `parameters.tokenizer`, selected-token counts per question, and
 comparable across modes. The original ASCII coverage diagnostics are retained
 to make legacy comparisons explicit.
 
+The `corpus_lexical_equivalence` report section identifies different document
+IDs with **identical BM25 token-count multisets** under the selected tokenizer.
+Such documents always receive equal BM25 scores; `answerable_cases_with_partial_equivalence_labels`
+flags questions that label only part of an indistinguishable group relevant.
+This is an audit of possible label/tie-break bias, **not** proof of duplicate
+source documents or train/test leakage. The audit does not alter rankings,
+relevance labels, or reported retrieval metrics.
+
 **Limitations:** This is still deterministic BM25 keyword matching, not
 language identification, morphological analysis, translation, CJK word
 segmentation, semantic retrieval, or an LLM evaluation. Longer CJK phrases
