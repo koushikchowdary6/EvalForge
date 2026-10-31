@@ -122,8 +122,15 @@ generated-answer evaluation, or evidence of model correctness, groundedness,
 hallucination resistance, or production performance. Compare the same
 question/corpus hashes and top-k settings before contrasting this baseline
 with a provider-backed embedding run. Lexical tokenization is ASCII
-alphanumeric and may miss multilingual/semantic matches. Tied rankings are
-ordered by document ID; no network or model calls occur.
+alphanumeric and may miss multilingual/semantic matches. The report now
+exposes `tokenizer_diagnostics` (queries with no ASCII tokens or with
+non-ASCII alphanumeric characters), per-case `query_ascii_token_count`,
+`query_has_no_ascii_tokens`, and `query_contains_non_ascii_alphanumeric`,
+and answerable/unanswerable no-ASCII-token counts by cutoff. These reveal
+when multilingual or mixed-script questions fall outside the baseline's
+lexical coverage; they do not change rankings or measure multilingual model
+performance. Tied rankings are ordered by document ID; no network or model
+calls occur.
 
 ---
 
