@@ -142,6 +142,13 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5)):
         case_id: sum(score > 0 for _, score in scored)
         for case_id, scored in scored_rankings.items()
     }
+    # A lexical match on an unanswerable question is a useful abstention
+    # diagnostic, not evidence that a generated answer was hallucinated.
+    unanswerable_count = sum(not case["answerable"] for case in questions)
+    unanswerable_with_lexical_matches = sum(
+        not case["answerable"] and lexical_match_counts[case["id"]] > 0
+        for case in questions
+    )
     cases = []
     summaries = {}
     for k in cutoffs:
@@ -190,10 +197,18 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5)):
                 # retrieval scores are undefined for this answerable-only report.
                 row["metrics"] = None
                 row["lexical_evidence_metrics"] = None
+                row["unanswerable_positive_lexical_match"] = (
+                    lexical_match_counts[case["id"]] > 0
+                )
             cases.append(row)
         summaries[str(k)] = {
             "answerable_count": len(rows),
             "unanswerable_excluded": len(questions) - len(rows),
+            "unanswerable_positive_lexical_match_count": unanswerable_with_lexical_matches,
+            "unanswerable_positive_lexical_match_rate": (
+                unanswerable_with_lexical_matches / unanswerable_count
+                if unanswerable_count else None
+            ),
             "answerable_zero_lexical_overlap_count": sum(
                 case["answerable"] and lexical_match_counts[case["id"]] == 0
                 for case in questions

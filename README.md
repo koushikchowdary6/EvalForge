@@ -101,6 +101,15 @@ hit came solely from zero-score documents. These are **lexical-overlap
 diagnostics**, not proof that matched documents are factually relevant; the
 original retrieval metrics remain unchanged for comparison.
 
+For **unanswerable** questions, the report records `unanswerable_positive_lexical_match`
+per case and summarizes its count and rate with
+`unanswerable_positive_lexical_match_count` and
+`unanswerable_positive_lexical_match_rate`. A positive BM25 score means some
+query token matched a document; it does **not** prove relevance,
+answerability, or an LLM hallucination. The rate is JSON `null` when no
+unanswerable questions are present. These are abstention diagnostics, not a
+measured hallucination rate.
+
 For a benchmark containing **only unanswerable questions**, the report keeps
 per-case rankings, zero-overlap counts, provenance hashes, and excluded-case
 coverage, but sets answerable-only retrieval-quality averages to JSON `null`
