@@ -101,6 +101,13 @@ hit came solely from zero-score documents. These are **lexical-overlap
 diagnostics**, not proof that matched documents are factually relevant; the
 original retrieval metrics remain unchanged for comparison.
 
+For a benchmark containing **only unanswerable questions**, the report keeps
+per-case rankings, zero-overlap counts, provenance hashes, and excluded-case
+coverage, but sets answerable-only retrieval-quality averages to JSON `null`
+instead of reporting zero accuracy or failing with a division-by-zero error.
+A `null` metric means *undefined because no answerable cases were evaluated*,
+not a successful or failed retrieval result.
+
 The output is a **retrieval-only baseline**, not an embedding model,
 generated-answer evaluation, or evidence of model correctness, groundedness,
 hallucination resistance, or production performance. Compare the same
