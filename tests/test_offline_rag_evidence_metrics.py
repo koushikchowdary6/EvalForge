@@ -27,9 +27,12 @@ def test_zero_score_tie_cannot_claim_evidence_backed_hit():
     assert case["metrics"]["hit_rate"] == 1.0  # legacy metric remains available
     assert case["positive_score_retrieved_ids"] == []
     assert case["lexical_evidence_metrics"] == {
-        "hit_rate": 0.0,
+        "precision_at_k": 0.0,
         "recall_at_k": 0.0,
+        "ndcg_at_k": 0.0,
+        "average_precision_at_k": 0.0,
         "reciprocal_rank": 0.0,
+        "hit_rate": 0.0,
     }
     assert report["by_top_k"]["1"]["tie_only_hit_count"] == 1
     assert report["by_top_k"]["1"]["lexical_evidence_hit_rate"] == 0.0
@@ -61,3 +64,33 @@ def test_true_lexical_hit_and_no_overlap_are_aggregated_separately():
     assert summary["lexical_evidence_mrr"] == pytest.approx(0.5)
     assert summary["tie_only_hit_count"] == 1
     assert report["cases"][2]["lexical_evidence_metrics"] is None
+
+
+def test_zero_score_tie_does_not_inflate_evidence_precision_ndcg_or_ap():
+    report = evaluate(DOCS, [_question("tie", "galactic nebula", ["a"])], (1, 3))
+    for cutoff in ("1", "3"):
+        row = next(row for row in report["cases"] if row["top_k"] == int(cutoff))
+        assert row["metrics"]["ndcg_at_k"] > 0
+        assert row["metrics"]["average_precision_at_k"] > 0
+        for name in ("precision_at_k", "ndcg_at_k", "average_precision_at_k"):
+            assert row["lexical_evidence_metrics"][name] == 0.0
+            assert report["by_top_k"][cutoff]["lexical_evidence_" + name] == 0.0
+
+
+def test_evidence_metrics_aggregate_only_answerable_questions():
+    questions = [
+        _question("matched", "battery", ["a"]),
+        _question("unmatched", "galactic nebula", ["a"]),
+        _question("unanswerable", "unseen terms", []),
+    ]
+    report = evaluate(DOCS, questions, (1,))
+    summary = report["by_top_k"]["1"]
+    for name in ("precision_at_k", "ndcg_at_k", "average_precision_at_k"):
+        assert summary["lexical_evidence_" + name] == pytest.approx(0.5)
+    assert report["cases"][2]["lexical_evidence_metrics"] is None
+
+
+def test_evidence_quality_undefined_without_answerable_cases():
+    report = evaluate(DOCS, [_question("unknown", "unseen terms", [])], (1,))
+    for name in ("precision_at_k", "ndcg_at_k", "average_precision_at_k"):
+        assert report["by_top_k"]["1"]["lexical_evidence_" + name] is None
