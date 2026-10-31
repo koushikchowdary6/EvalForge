@@ -10,6 +10,8 @@ attributable rather than averaged away.
 import hashlib
 import json
 import os
+import stat
+from pathlib import Path
 from collections import Counter
 from datetime import datetime
 
@@ -29,6 +31,51 @@ from evalforge.agent_graders import (
 # character limits are a resource guard, not a provider token guarantee.
 MAX_AGENT_PROMPT_CHARS = 40_000
 MAX_AGENT_MOCK_RESPONSE_CHARS = 40_000
+
+MAX_AGENT_BENCHMARK_JSON_BYTES = 2_000_000
+
+
+def _reject_nonfinite_json(value):
+    """NaN and Infinity cannot be valid benchmark labels or provenance."""
+    raise ValueError(f"non-finite JSON constant in agent benchmark: {value}")
+
+
+def _load_agent_benchmark(path):
+    """Read only a bounded regular UTF-8 file before decoding benchmark JSON.
+
+    lstat checks the selected path; fstat validates the opened descriptor after
+    any path swap. O_NONBLOCK avoids hanging on a swapped FIFO, while O_NOFOLLOW
+    prevents following a swapped symlink where the platform supports it.
+    """
+    source = Path(path)
+    metadata = source.lstat()
+    if not stat.S_ISREG(metadata.st_mode):
+        raise ValueError("agent benchmark input must be a regular file")
+    if metadata.st_size > MAX_AGENT_BENCHMARK_JSON_BYTES:
+        raise ValueError("agent benchmark input exceeds 2,000,000 bytes")
+    flags = os.O_RDONLY | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(source, flags)
+    except OSError as exc:
+        raise ValueError("agent benchmark input could not be opened safely") from exc
+    with os.fdopen(descriptor, "rb") as handle:
+        if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode):
+            raise ValueError("agent benchmark input must be a regular file")
+        raw = handle.read(MAX_AGENT_BENCHMARK_JSON_BYTES + 1)
+    if len(raw) > MAX_AGENT_BENCHMARK_JSON_BYTES:
+        raise ValueError("agent benchmark input exceeds 2,000,000 bytes")
+    try:
+        decoded = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("agent benchmark input must be UTF-8") from exc
+    try:
+        return json.loads(
+            decoded, object_pairs_hook=_reject_duplicate_json_keys,
+            parse_constant=_reject_nonfinite_json,
+        )
+    except RecursionError as exc:
+        raise ValueError("agent benchmark JSON exceeds nesting limits") from exc
+
 
 
 def _reject_duplicate_json_keys(pairs):
@@ -192,8 +239,7 @@ class AgentEvalRunner:
         self.results = []
         self.report = None
         self.tasks_sha256 = None
-        with open(self.tasks_path, "r", encoding="utf-8") as f:
-            candidate = json.load(f, object_pairs_hook=_reject_duplicate_json_keys)
+        candidate = _load_agent_benchmark(self.tasks_path)
         validate_agent_tasks(candidate)
         fingerprint = _agent_dataset_sha256(candidate)
         self.tasks = candidate
