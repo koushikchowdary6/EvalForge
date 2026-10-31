@@ -29,12 +29,17 @@ def test_unanswerable_only_reports_null_quality_without_losing_coverage():
         summary = report["by_top_k"][k]
         assert summary["answerable_count"] == 0
         assert summary["unanswerable_excluded"] == 2
+        assert summary["unanswerable_positive_lexical_match_count"] == 1
+        assert summary["unanswerable_positive_lexical_match_rate"] == 0.5
         assert summary["answerable_zero_lexical_overlap_count"] == 0
         assert summary["unanswerable_zero_lexical_overlap_count"] == 1
         assert summary["tie_only_hit_count"] == 0
         assert all(summary[key] is None for key in QUALITY_KEYS)
     assert all(case["metrics"] is None and case["lexical_evidence_metrics"] is None
                for case in report["cases"])
+    assert [case["unanswerable_positive_lexical_match"] for case in report["cases"]] == [
+        False, True, False, True,
+    ]
     assert len(report["corpus_sha256"]) == len(report["questions_sha256"]) == 64
 
 
@@ -47,6 +52,8 @@ def test_mixed_benchmark_still_aggregates_only_answerable_cases():
     summary = report["by_top_k"]["1"]
     assert summary["answerable_count"] == 1
     assert summary["unanswerable_excluded"] == 2
+    assert summary["unanswerable_positive_lexical_match_count"] == 1
+    assert summary["unanswerable_positive_lexical_match_rate"] == 0.5
     assert summary["hit_rate"] == 1.0
     assert summary["lexical_evidence_hit_rate"] == 1.0
 
@@ -64,3 +71,16 @@ def test_cli_serializes_undefined_metrics_as_json_null(tmp_path):
     report = json.loads(result.stdout)
     assert all(report["by_top_k"]["1"][key] is None for key in QUALITY_KEYS)
     assert report["by_top_k"]["1"]["unanswerable_excluded"] == 2
+
+
+def test_answerable_only_has_undefined_unanswerable_match_rate():
+    answerable = {
+        "id": "a1", "question": "battery voltage", "answerable": True,
+        "relevant_doc_ids": ["a"],
+    }
+    report = evaluate(DOCS, [answerable], (1,))
+    summary = report["by_top_k"]["1"]
+    assert summary["unanswerable_positive_lexical_match_count"] == 0
+    assert summary["unanswerable_positive_lexical_match_rate"] is None
+    assert "unanswerable_positive_lexical_match" not in report["cases"][0]
+    json.dumps(report, allow_nan=False)
