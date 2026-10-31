@@ -332,9 +332,14 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
                 # evidence-backed quality separately so zero-score ID ties
                 # cannot masquerade as successful lexical retrieval.
                 row["lexical_evidence_metrics"] = {
-                    "hit_rate": hit_rate(evidence_ranked, relevant),
+                    "precision_at_k": precision_at_k(evidence_ranked, relevant, k=k),
                     "recall_at_k": recall_at_k(evidence_ranked, relevant, k=k),
+                    "ndcg_at_k": ndcg_at_k(evidence_ranked, relevant, k=k),
+                    "average_precision_at_k": average_precision_at_k(
+                        evidence_ranked, relevant, k=k
+                    ),
                     "reciprocal_rank": reciprocal_rank(evidence_ranked, relevant),
+                    "hit_rate": hit_rate(evidence_ranked, relevant),
                 }
                 evidence_rows.append(row["lexical_evidence_metrics"])
             else:
@@ -376,6 +381,15 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
             # An unanswerable-only benchmark has no relevant-document
             # denominator. Preserve its coverage diagnostics, but report
             # undefined retrieval quality as null instead of dividing by zero.
+            # The full retrieval-quality vector excludes zero-score ID ties.
+            # Retain the legacy metrics below for side-by-side auditing.
+            **{
+                "lexical_evidence_" + name: (
+                    sum(row[name] for row in evidence_rows) / len(evidence_rows)
+                    if evidence_rows else None
+                )
+                for name in ("precision_at_k", "ndcg_at_k", "average_precision_at_k")
+            },
             "lexical_evidence_hit_rate": (
                 sum(row["hit_rate"] for row in evidence_rows) / len(evidence_rows)
                 if evidence_rows else None
