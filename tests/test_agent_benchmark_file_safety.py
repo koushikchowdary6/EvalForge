@@ -69,7 +69,7 @@ def test_exact_byte_limit_allows_valid_json(tmp_path):
 
 def test_invalid_utf8_and_nonfinite_json_rejected(tmp_path):
     source = tmp_path / "agent.json"
-    source.write_bytes(b"\\xff")
+    source.write_bytes(bytes([0xFF]))
     with pytest.raises(ValueError, match="UTF-8"):
         _load_agent_benchmark(source)
     source.write_text('[{"id": "x", "prompt": "ok", "extra": NaN}]', encoding="utf-8")
