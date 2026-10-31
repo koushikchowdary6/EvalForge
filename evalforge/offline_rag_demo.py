@@ -169,6 +169,34 @@ def _lexical_equivalence_diagnostics(docs, questions, frequencies, tokenizer_mod
     }
 
 
+
+def _positive_score_hit_bounds(scored, relevant, k):
+    """Bound hit@k over every ordering of a positive-score cutoff tie.
+
+    BM25 assigns the same score to multiple documents, then uses document IDs
+    to choose which fit at k. The returned bounds consider all equally scored
+    choices, without claiming any of them is semantically preferable.
+    Zero-score documents never count as lexical evidence.
+    """
+    positive = [(doc_id, score) for doc_id, score in scored if score > 0]
+    if not positive:
+        return 0, 0
+    relevant = set(relevant)
+    if len(positive) <= k or positive[k - 1][1] != positive[k][1]:
+        hit = int(any(doc_id in relevant for doc_id, _ in positive[:k]))
+        return hit, hit
+
+    boundary = positive[k - 1][1]
+    fixed = [doc_id for doc_id, score in positive if score > boundary]
+    tied = [doc_id for doc_id, score in positive if score == boundary]
+    available_slots = k - len(fixed)
+    relevant_in_tie = sum(doc_id in relevant for doc_id in tied)
+    minimum_tie_hits = max(0, available_slots - (len(tied) - relevant_in_tie))
+    maximum_tie_hits = min(available_slots, relevant_in_tie)
+    fixed_hit = any(doc_id in relevant for doc_id in fixed)
+    return int(fixed_hit or minimum_tie_hits > 0), int(fixed_hit or maximum_tie_hits > 0)
+
+
 def bm25_rank_with_scores(question, docs, *, tokenizer_mode="ascii"):
     """Return (document ID, BM25 score) pairs, ordered by score then ID."""
     selected = _select_tokenizer(tokenizer_mode)
@@ -365,12 +393,17 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
                     "reciprocal_rank": reciprocal_rank(evidence_ranked, relevant),
                     "hit_rate": hit_rate(evidence_ranked, relevant),
                 }
+                lower_hit, upper_hit = _positive_score_hit_bounds(scored, relevant, k)
+                row["lexical_evidence_hit_lower_bound"] = lower_hit
+                row["lexical_evidence_hit_upper_bound"] = upper_hit
                 evidence_rows.append(row["lexical_evidence_metrics"])
             else:
                 # Unanswerable questions have no relevant documents. Their
                 # retrieval scores are undefined for this answerable-only report.
                 row["metrics"] = None
                 row["lexical_evidence_metrics"] = None
+                row["lexical_evidence_hit_lower_bound"] = None
+                row["lexical_evidence_hit_upper_bound"] = None
                 row["unanswerable_positive_lexical_match"] = (
                     lexical_match_counts[case["id"]] > 0
                 )
@@ -387,6 +420,19 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
             ),
             "unanswerable_positive_score_cutoff_tie_count": sum(
                 not row["answerable"] and row["positive_score_cutoff_tie"]
+                for row in cutoff_cases
+            ),
+            "lexical_evidence_hit_lower_bound": (
+                sum(row["lexical_evidence_hit_lower_bound"] for row in cutoff_cases
+                    if row["answerable"]) / len(rows) if rows else None
+            ),
+            "lexical_evidence_hit_upper_bound": (
+                sum(row["lexical_evidence_hit_upper_bound"] for row in cutoff_cases
+                    if row["answerable"]) / len(rows) if rows else None
+            ),
+            "answerable_hit_uncertain_due_to_positive_ties": sum(
+                row["answerable"]
+                and row["lexical_evidence_hit_lower_bound"] != row["lexical_evidence_hit_upper_bound"]
                 for row in cutoff_cases
             ),
             "answerable_count": len(rows),
