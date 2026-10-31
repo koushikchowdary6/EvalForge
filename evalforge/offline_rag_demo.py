@@ -292,8 +292,29 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
     for k in cutoffs:
         rows = []
         evidence_rows = []
+        cutoff_cases = []
         for case in questions:
+            scored = scored_rankings[case["id"]]
             ranked = rankings[case["id"]][:k]
+            # A positive BM25 tie straddling the requested cutoff means the
+            # selected IDs depend on the arbitrary secondary doc-ID sort.
+            # Zero-score ties are already handled by evidence-only metrics.
+            boundary_tie = (
+                k < len(scored) and scored[k - 1][1] > 0
+                and scored[k - 1][1] == scored[k][1]
+            )
+            tied_ids = (
+                [doc_id for doc_id, score in scored
+                 if score == scored[k - 1][1]]
+                if boundary_tie else []
+            )
+            relevant_at_boundary = set(tied_ids).intersection(
+                case["relevant_doc_ids"]
+            )
+            mixed_boundary_labels = (
+                bool(relevant_at_boundary)
+                and len(relevant_at_boundary) != len(tied_ids)
+            )
             # Zero-score BM25 results are arbitrary ID-order tie breakers,
             # not evidence that the query matched a document.
             evidence_ranked = [
@@ -310,6 +331,9 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
                 "relevant_ids": relevant,
                 "lexical_positive_document_count": lexical_match_counts[case["id"]],
                 "all_zero_score_ranking": lexical_match_counts[case["id"]] == 0,
+                "positive_score_cutoff_tie": boundary_tie,
+                "positive_score_cutoff_tied_doc_ids": tied_ids,
+                "positive_score_cutoff_tie_mixed_relevance": mixed_boundary_labels,
                 "query_ascii_token_count": query_token_counts[case["id"]],
                 "query_selected_token_count": selected_query_token_counts[case["id"]],
                 "query_has_no_selected_tokens": selected_query_token_counts[case["id"]] == 0,
@@ -351,7 +375,20 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
                     lexical_match_counts[case["id"]] > 0
                 )
             cases.append(row)
+            cutoff_cases.append(row)
         summaries[str(k)] = {
+            "answerable_positive_score_cutoff_tie_count": sum(
+                row["answerable"] and row["positive_score_cutoff_tie"]
+                for row in cutoff_cases
+            ),
+            "answerable_mixed_relevance_cutoff_tie_count": sum(
+                row["answerable"] and row["positive_score_cutoff_tie_mixed_relevance"]
+                for row in cutoff_cases
+            ),
+            "unanswerable_positive_score_cutoff_tie_count": sum(
+                not row["answerable"] and row["positive_score_cutoff_tie"]
+                for row in cutoff_cases
+            ),
             "answerable_count": len(rows),
             "answerable_without_ascii_query_tokens": sum(
                 case["answerable"] and query_token_counts[case["id"]] == 0
