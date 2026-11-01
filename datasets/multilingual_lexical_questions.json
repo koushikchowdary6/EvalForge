@@ -1,0 +1,48 @@
+[
+  {
+    "id": "q-en",
+    "question": "battery voltage",
+    "answerable": true,
+    "relevant_doc_ids": [
+      "d-en"
+    ]
+  },
+  {
+    "id": "q-hi",
+    "question": "बैटरी",
+    "answerable": true,
+    "relevant_doc_ids": [
+      "d-hi"
+    ]
+  },
+  {
+    "id": "q-jp",
+    "question": "温度",
+    "answerable": true,
+    "relevant_doc_ids": [
+      "d-jp"
+    ]
+  },
+  {
+    "id": "q-ar",
+    "question": "حرارة",
+    "answerable": true,
+    "relevant_doc_ids": [
+      "d-ar"
+    ]
+  },
+  {
+    "id": "q-fr",
+    "question": "Café",
+    "answerable": true,
+    "relevant_doc_ids": [
+      "d-fr"
+    ]
+  },
+  {
+    "id": "q-unanswerable",
+    "question": "未掲載",
+    "answerable": false,
+    "relevant_doc_ids": []
+  }
+]
