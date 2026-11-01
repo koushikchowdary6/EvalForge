@@ -52,8 +52,8 @@ def test_unique_term_oov_counts_do_not_count_repeated_words():
     assert no_tokens["query_oov_term_fraction"] is None
     assert no_tokens["query_all_selected_terms_oov"] is False
 
-    diagnostics = report["selected_tokenizer_diagnostics"]
-    assert diagnostics["questions_without_selected_tokens"] == 1
+    assert report["selected_tokenizer_diagnostics"]["questions_without_selected_tokens"] == 1
+    diagnostics = report["query_vocabulary_diagnostics"]
     assert diagnostics["questions_with_all_selected_terms_oov"] == 1
     assert diagnostics["questions_with_partial_selected_terms_oov"] == 1
     for k in ("1", "2"):
@@ -82,4 +82,4 @@ def test_no_oov_terms_when_all_selected_terms_in_corpus():
     row = report["cases"][0]
     assert row["query_oov_term_count"] == 0
     assert row["query_oov_term_fraction"] == 0.0
-    assert report["selected_tokenizer_diagnostics"]["questions_with_all_selected_terms_oov"] == 0
+    assert report["query_vocabulary_diagnostics"]["questions_with_all_selected_terms_oov"] == 0
