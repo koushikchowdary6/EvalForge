@@ -61,6 +61,19 @@ def _select_tokenizer(mode):
     raise ValueError("tokenizer_mode must be 'ascii' or 'unicode'")
 
 
+def _valid_scalar_text(value):
+    """Reject lone UTF-16 surrogates before UTF-8 report fingerprinting.
+
+    Python's JSON decoder accepts escaped unpaired surrogates, but the
+    resulting strings cannot be encoded to UTF-8 with strict errors. Fail
+    with a benchmark validation error instead of crashing during report
+    hashing after retrieval work has already been performed.
+    """
+    return isinstance(value, str) and not any(
+        "\ud800" <= char <= "\udfff" for char in value
+    )
+
+
 def validate(docs, questions):
     """Reject ambiguous benchmark IDs/labels before computing any scores."""
     if not isinstance(docs, list) or not docs:
@@ -71,8 +84,8 @@ def validate(docs, questions):
     for doc in docs:
         if (not isinstance(doc, dict)
                 or not valid_benchmark_id(doc.get("doc_id"))
-                or not isinstance(doc.get("title"), str)
-                or not isinstance(doc.get("text"), str)
+                or not _valid_scalar_text(doc.get("title"))
+                or not _valid_scalar_text(doc.get("text"))
                 or not (doc["title"].strip() or doc["text"].strip())):
             raise ValueError("invalid corpus document")
         if doc["doc_id"] in ids:
@@ -82,7 +95,7 @@ def validate(docs, questions):
     for case in questions:
         if (not isinstance(case, dict)
                 or not valid_benchmark_id(case.get("id"))
-                or not isinstance(case.get("question"), str)
+                or not _valid_scalar_text(case.get("question"))
                 or not case["question"].strip()
                 or type(case.get("answerable")) is not bool
                 or not isinstance(case.get("relevant_doc_ids"), list)):
