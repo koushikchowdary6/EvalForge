@@ -15,6 +15,7 @@ import hashlib
 import json
 import math
 import os
+import stat
 import time
 from dotenv import load_dotenv
 
@@ -26,6 +27,8 @@ load_dotenv()
 
 EMBED_MODEL = "text-embedding-3-small"
 EMBED_CACHE_PATH = "results/embedding_cache.json"
+# Prevent an untrusted or accidentally corrupted cache from exhausting RAM.
+MAX_EMBED_CACHE_BYTES = 64_000_000
 # Bound untrusted retrieved context before any paid generation request. This
 # is a serialized-character budget, not a provider-specific token guarantee.
 MAX_RAG_GENERATION_EVIDENCE_CHARS = 40_000
@@ -162,36 +165,49 @@ class EmbeddingClient:
             self.client = None
 
     def _load_cache(self):
-        if os.path.exists(self.cache_path):
-            try:
-                # Duplicate JSON keys are ambiguous: the default decoder silently
-                # keeps the last vector, which can change retrieval rankings.
-                # Discard the cache rather than trusting a last-key-wins value.
-                with open(self.cache_path, "r", encoding="utf-8") as f:
-                    loaded = json.load(f, object_pairs_hook=_unique_json_keys)
-                # Legacy keys contained raw document/query text. Do not
-                # load or re-persist those entries; regenerate embeddings
-                # using the v2 digest-based key format.
-                if not isinstance(loaded, dict):
-                    return {}
-                validated = {}
-                for key, vector in loaded.items():
-                    if (not isinstance(key, str) or len(key) != 67
-                            or not key.startswith("v2:")
-                            or any(ch not in "0123456789abcdef" for ch in key[3:])):
-                        continue
-                    try:
-                        validated[key] = _validated_embedding(
-                            vector, label="cached embedding"
-                        )
-                    except ValueError:
-                        # One corrupt entry must not poison an otherwise
-                        # healthy cache or block saving fresh embeddings.
-                        continue
-                return validated
-            except (json.JSONDecodeError, OSError, ValueError):
+        """Read a bounded regular-file cache without following symlinks.
+
+        The cache is an optimization, never trusted evaluation evidence.
+        Malformed, oversized or substituted files are discarded rather than
+        parsed, including FIFOs that could otherwise block the evaluator.
+        """
+        try:
+            metadata = os.lstat(self.cache_path)
+            if not stat.S_ISREG(metadata.st_mode) or metadata.st_size > MAX_EMBED_CACHE_BYTES:
                 return {}
-        return {}
+            flags = os.O_RDONLY | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_NOFOLLOW", 0)
+            with os.fdopen(os.open(self.cache_path, flags), "rb") as handle:
+                if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode):
+                    return {}
+                raw = handle.read(MAX_EMBED_CACHE_BYTES + 1)
+            if len(raw) > MAX_EMBED_CACHE_BYTES:
+                return {}
+            loaded = json.loads(
+                raw.decode("utf-8"),
+                object_pairs_hook=_unique_json_keys,
+                parse_constant=_reject_nonfinite_json_constant,
+            )
+            # Legacy keys contained raw document/query text. Do not
+            # load or re-persist those entries; regenerate embeddings
+            # using the v2 digest-based key format.
+            if not isinstance(loaded, dict):
+                return {}
+            validated = {}
+            for key, vector in loaded.items():
+                if (not isinstance(key, str) or len(key) != 67
+                        or not key.startswith("v2:")
+                        or any(ch not in "0123456789abcdef" for ch in key[3:])):
+                    continue
+                try:
+                    validated[key] = _validated_embedding(
+                        vector, label="cached embedding"
+                    )
+                except ValueError:
+                    # One corrupt entry must not poison a healthy cache.
+                    continue
+            return validated
+        except (OSError, UnicodeError, json.JSONDecodeError, ValueError, RecursionError):
+            return {}
 
     def save_cache(self):
         """Atomically publish validated cache data and sync rename metadata.
