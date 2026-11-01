@@ -231,6 +231,41 @@ def _positive_score_ndcg_bounds(scored, relevant, k):
     return lower_gain / ideal_gain, upper_gain / ideal_gain
 
 
+def _positive_score_ap_bounds(scored, relevant, k):
+    """Exact evidence-only binary AP@k bounds across positive-score BM25 ties.
+
+    Within each equal-score group, relevant-first maximizes AP and
+    relevant-last minimizes it: exchanging an adjacent nonrelevant/relevant
+    pair moves a precision contribution earlier without changing later hit
+    counts. This handles ties wholly inside top-k as well as cutoff ties.
+    Zero-score documents are not retrieval evidence.
+    """
+    relevant = set(relevant)
+    if not relevant:
+        return 1.0, 1.0
+    denominator = min(len(relevant), k)
+    positive = [(doc_id, score) for doc_id, score in scored if score > 0]
+    lower_sum = upper_sum = 0.0
+    hits_before = 0
+    start = 0
+    while start < len(positive) and start < k:
+        end = start + 1
+        while end < len(positive) and positive[end][1] == positive[start][1]:
+            end += 1
+        size = end - start
+        relevant_count = sum(doc_id in relevant for doc_id, _ in positive[start:end])
+        nonrelevant_count = size - relevant_count
+        for offset in range(min(size, k - start)):
+            rank = start + offset + 1
+            if offset < relevant_count:
+                upper_sum += (hits_before + offset + 1) / rank
+            if offset >= nonrelevant_count:
+                lower_sum += (hits_before + offset - nonrelevant_count + 1) / rank
+        hits_before += relevant_count
+        start = end
+    return lower_sum / denominator, upper_sum / denominator
+
+
 def _positive_score_mrr_bounds(scored, relevant, k):
     """Exact evidence-only reciprocal-rank bounds under positive BM25 ties.
 
@@ -548,6 +583,9 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
                 ndcg_lower, ndcg_upper = _positive_score_ndcg_bounds(scored, relevant, k)
                 row["lexical_evidence_ndcg_lower_bound"] = ndcg_lower
                 row["lexical_evidence_ndcg_upper_bound"] = ndcg_upper
+                ap_lower, ap_upper = _positive_score_ap_bounds(scored, relevant, k)
+                row["lexical_evidence_ap_lower_bound"] = ap_lower
+                row["lexical_evidence_ap_upper_bound"] = ap_upper
                 mrr_lower, mrr_upper = _positive_score_mrr_bounds(scored, relevant, k)
                 row["lexical_evidence_mrr_lower_bound"] = mrr_lower
                 row["lexical_evidence_mrr_upper_bound"] = mrr_upper
@@ -565,6 +603,8 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
                 row["lexical_evidence_precision_upper_bound"] = None
                 row["lexical_evidence_ndcg_lower_bound"] = None
                 row["lexical_evidence_ndcg_upper_bound"] = None
+                row["lexical_evidence_ap_lower_bound"] = None
+                row["lexical_evidence_ap_upper_bound"] = None
                 row["lexical_evidence_mrr_lower_bound"] = None
                 row["lexical_evidence_mrr_upper_bound"] = None
                 row["unanswerable_positive_lexical_match"] = (
@@ -617,6 +657,14 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
                 sum(row["lexical_evidence_ndcg_upper_bound"] for row in cutoff_cases
                     if row["answerable"]) / len(rows) if rows else None
             ),
+            "lexical_evidence_ap_lower_bound": (
+                sum(row["lexical_evidence_ap_lower_bound"] for row in cutoff_cases
+                    if row["answerable"]) / len(rows) if rows else None
+            ),
+            "lexical_evidence_ap_upper_bound": (
+                sum(row["lexical_evidence_ap_upper_bound"] for row in cutoff_cases
+                    if row["answerable"]) / len(rows) if rows else None
+            ),
             "lexical_evidence_mrr_lower_bound": (
                 sum(row["lexical_evidence_mrr_lower_bound"] for row in cutoff_cases
                     if row["answerable"]) / len(rows) if rows else None
@@ -624,6 +672,13 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
             "lexical_evidence_mrr_upper_bound": (
                 sum(row["lexical_evidence_mrr_upper_bound"] for row in cutoff_cases
                     if row["answerable"]) / len(rows) if rows else None
+            ),
+            "answerable_ap_uncertain_due_to_positive_ties": sum(
+                row["answerable"]
+                and not math.isclose(row["lexical_evidence_ap_lower_bound"],
+                                     row["lexical_evidence_ap_upper_bound"],
+                                     abs_tol=1e-12)
+                for row in cutoff_cases
             ),
             "answerable_mrr_uncertain_due_to_positive_ties": sum(
                 row["answerable"]
