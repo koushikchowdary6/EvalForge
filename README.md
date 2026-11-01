@@ -139,14 +139,15 @@ and answerable/unanswerable no-ASCII-token counts by cutoff. These reveal
 when multilingual or mixed-script questions fall outside the baseline's
 lexical coverage; they do not change rankings or measure multilingual model
 performance. Tied rankings are ordered by document ID; no network or model
-calls occur. For positive-score ties that straddle top-k, the report also
-computes exact evidence-only **hit@k and recall@k lower/upper bounds** over
-every possible selection of equally scored documents. Per-case
-`lexical_evidence_recall_lower_bound` and
-`lexical_evidence_recall_upper_bound` are averaged over answerable questions
-in `by_top_k`, with an uncertainty-case count. These bounds expose
-ID-order sensitivity in lexical retrieval; they do not measure semantic
-relevance, LLM answer quality, or independent benchmark validity.
+calls occur. For positive-score BM25 ties, the report computes exact
+evidence-only **hit@k, precision@k, recall@k, nDCG@k, and MRR lower/upper
+bounds** over possible equal-score orders. MRR and nDCG can vary even when a
+tie lies entirely *inside* top-k; a cutoff-tie flag alone misses this
+uncertainty. Per-case bounds and answerable-only aggregate bounds appear in
+`by_top_k`, with metric-specific uncertainty-case counts. Zero-score IDs
+never count as lexical evidence. These deterministic tie-order bounds do
+**not** measure statistical confidence, semantic relevance, LLM answer
+quality, or independent benchmark validity.
 
 ### Opt-in Unicode lexical BM25 baseline
 
