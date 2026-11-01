@@ -1,5 +1,12 @@
 # EvalForge
 
+**Reproducible multilingual lexical sanity check:** A small, hand-authored
+[English/Hindi/Japanese/Arabic/accented-French BM25 fixture](docs/MULTILINGUAL_LEXICAL_BASELINE.md)
+compares ASCII and Unicode tokenization using evidence-only retrieval metrics,
+with regression tests and dataset fingerprints. It is not independent sampling,
+translation, embedding evaluation, or a claim of deployment accuracy.
+
+
 An LLM and AI Agent evaluation platform. Run tests against AI models and agents, grade responses, identify failures, compare performance, and generate insightful reports.
 
 ## What is EvalForge?
