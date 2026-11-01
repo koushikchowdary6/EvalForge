@@ -231,6 +231,36 @@ def _positive_score_ndcg_bounds(scored, relevant, k):
     return lower_gain / ideal_gain, upper_gain / ideal_gain
 
 
+def _positive_score_mrr_bounds(scored, relevant, k):
+    """Exact evidence-only reciprocal-rank bounds under positive BM25 ties.
+
+    A relevant item can be placed first or last within its score-equivalent
+    group without changing retrieval evidence. Only the earliest score group
+    containing a relevant document matters for reciprocal rank. If every
+    relevant item in that group can fall beyond k, the lower bound is zero.
+    Zero-score ID-order ties never count as lexical retrieval evidence.
+    """
+    relevant = set(relevant)
+    start = 0
+    while start < len(scored) and start < k:
+        score = scored[start][1]
+        if score <= 0:
+            break
+        end = start + 1
+        while end < len(scored) and scored[end][1] == score:
+            end += 1
+        relevant_count = sum(doc_id in relevant for doc_id, _ in scored[start:end])
+        if relevant_count:
+            earliest_rank = start + 1
+            latest_rank = start + (end - start - relevant_count) + 1
+            return (
+                1 / latest_rank if latest_rank <= k else 0.0,
+                1 / earliest_rank,
+            )
+        start = end
+    return 0.0, 0.0
+
+
 def _positive_score_hit_bounds(scored, relevant, k):
     """Exact evidence-only hit@k bounds over positive-score cutoff ties."""
     lower, upper = _positive_score_relevant_count_bounds(scored, relevant, k)
@@ -518,6 +548,9 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
                 ndcg_lower, ndcg_upper = _positive_score_ndcg_bounds(scored, relevant, k)
                 row["lexical_evidence_ndcg_lower_bound"] = ndcg_lower
                 row["lexical_evidence_ndcg_upper_bound"] = ndcg_upper
+                mrr_lower, mrr_upper = _positive_score_mrr_bounds(scored, relevant, k)
+                row["lexical_evidence_mrr_lower_bound"] = mrr_lower
+                row["lexical_evidence_mrr_upper_bound"] = mrr_upper
                 evidence_rows.append(row["lexical_evidence_metrics"])
             else:
                 # Unanswerable questions have no relevant documents. Their
@@ -532,6 +565,8 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
                 row["lexical_evidence_precision_upper_bound"] = None
                 row["lexical_evidence_ndcg_lower_bound"] = None
                 row["lexical_evidence_ndcg_upper_bound"] = None
+                row["lexical_evidence_mrr_lower_bound"] = None
+                row["lexical_evidence_mrr_upper_bound"] = None
                 row["unanswerable_positive_lexical_match"] = (
                     lexical_match_counts[case["id"]] > 0
                 )
@@ -581,6 +616,21 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
             "lexical_evidence_ndcg_upper_bound": (
                 sum(row["lexical_evidence_ndcg_upper_bound"] for row in cutoff_cases
                     if row["answerable"]) / len(rows) if rows else None
+            ),
+            "lexical_evidence_mrr_lower_bound": (
+                sum(row["lexical_evidence_mrr_lower_bound"] for row in cutoff_cases
+                    if row["answerable"]) / len(rows) if rows else None
+            ),
+            "lexical_evidence_mrr_upper_bound": (
+                sum(row["lexical_evidence_mrr_upper_bound"] for row in cutoff_cases
+                    if row["answerable"]) / len(rows) if rows else None
+            ),
+            "answerable_mrr_uncertain_due_to_positive_ties": sum(
+                row["answerable"]
+                and not math.isclose(row["lexical_evidence_mrr_lower_bound"],
+                                     row["lexical_evidence_mrr_upper_bound"],
+                                     abs_tol=1e-12)
+                for row in cutoff_cases
             ),
             "answerable_ndcg_uncertain_due_to_positive_ties": sum(
                 row["answerable"]
