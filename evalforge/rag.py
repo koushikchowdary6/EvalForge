@@ -185,7 +185,6 @@ class EmbeddingClient:
             loaded = json.loads(
                 raw.decode("utf-8"),
                 object_pairs_hook=_unique_json_keys,
-                parse_constant=_reject_nonfinite_json_constant,
             )
             # Legacy keys contained raw document/query text. Do not
             # load or re-persist those entries; regenerate embeddings
