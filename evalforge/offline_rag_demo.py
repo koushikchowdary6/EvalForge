@@ -232,6 +232,37 @@ def _reject_nonfinite_json(value):
 
 
 MAX_BENCHMARK_JSON_BYTES = 2_000_000
+MAX_BENCHMARK_JSON_DEPTH = 128
+
+
+def _check_json_nesting(raw):
+    """Reject pathological JSON nesting without counting brackets in strings.
+
+    The 2 MiB byte cap does not prevent tiny deeply nested documents from
+    exhausting the JSON decoder's recursion limit. Syntax validation and
+    mismatched closing delimiters remain the JSON decoder's responsibility.
+    """
+    depth = 0
+    quoted = False
+    escaped = False
+    for char in raw:
+        if quoted:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                quoted = False
+        elif char == '"':
+            quoted = True
+        elif char in "[{":
+            depth += 1
+            if depth > MAX_BENCHMARK_JSON_DEPTH:
+                raise ValueError(
+                    f"benchmark JSON nesting exceeds {MAX_BENCHMARK_JSON_DEPTH} levels"
+                )
+        elif char in "]}":
+            depth -= 1
 
 
 def load_benchmark_json(path):
@@ -256,6 +287,7 @@ def load_benchmark_json(path):
         payload = raw.decode("utf-8")
     except UnicodeDecodeError as exc:
         raise ValueError("benchmark input must be UTF-8") from exc
+    _check_json_nesting(payload)
     return json.loads(
         payload, object_pairs_hook=_unique_json_keys,
         parse_constant=_reject_nonfinite_json,
