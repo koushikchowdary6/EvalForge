@@ -55,7 +55,7 @@ extracted words, but none appear in the indexed corpus. For each query,
 selected query terms, matching BM25's query-term set semantics. A query with
 zero selected terms has a `null` OOV fraction, not a misleading 0% or 100%.
 
-`selected_tokenizer_diagnostics` aggregates fully and partially OOV queries;
+`query_vocabulary_diagnostics` aggregates fully and partially OOV queries;
 the `by_top_k` report separates answerable and unanswerable fully OOV
 queries. These values are descriptive corpus/tokenizer coverage checks,
 **not** semantic out-of-distribution detection, model accuracy, or proof that
