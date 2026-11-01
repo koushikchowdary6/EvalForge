@@ -202,6 +202,14 @@ def _positive_score_hit_bounds(scored, relevant, k):
 
 def bm25_rank_with_scores(question, docs, *, tokenizer_mode="ascii"):
     """Return (document ID, BM25 score) pairs, ordered by score then ID."""
+    # The full evaluator validates its benchmark before ranking, but the
+    # standalone public API must also reject empty corpora, malformed docs,
+    # and ambiguous IDs rather than dividing by zero or silently ranking
+    # duplicate identifiers. Reuse the same benchmark integrity contract.
+    validate(docs, [{
+        "id": "standalone-ranking", "question": question,
+        "answerable": False, "relevant_doc_ids": [],
+    }])
     selected = _select_tokenizer(tokenizer_mode)
     return _rank_with_bm25_index(
         question, docs, _build_bm25_index(docs, selected), selected
