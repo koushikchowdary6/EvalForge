@@ -434,6 +434,11 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
                 row["lexical_evidence_hit_upper_bound"] = int(upper_count > 0)
                 row["lexical_evidence_recall_lower_bound"] = lower_count / len(relevant)
                 row["lexical_evidence_recall_upper_bound"] = upper_count / len(relevant)
+                # Precision uses the requested k slots, including unmatched
+                # slots. Bounds capture uncertainty when positive BM25 ties
+                # straddle k, rather than treating doc-ID order as evidence.
+                row["lexical_evidence_precision_lower_bound"] = lower_count / k
+                row["lexical_evidence_precision_upper_bound"] = upper_count / k
                 evidence_rows.append(row["lexical_evidence_metrics"])
             else:
                 # Unanswerable questions have no relevant documents. Their
@@ -444,6 +449,8 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
                 row["lexical_evidence_hit_upper_bound"] = None
                 row["lexical_evidence_recall_lower_bound"] = None
                 row["lexical_evidence_recall_upper_bound"] = None
+                row["lexical_evidence_precision_lower_bound"] = None
+                row["lexical_evidence_precision_upper_bound"] = None
                 row["unanswerable_positive_lexical_match"] = (
                     lexical_match_counts[case["id"]] > 0
                 )
@@ -478,10 +485,24 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
                 sum(row["lexical_evidence_recall_upper_bound"] for row in cutoff_cases
                     if row["answerable"]) / len(rows) if rows else None
             ),
+            "lexical_evidence_precision_lower_bound": (
+                sum(row["lexical_evidence_precision_lower_bound"] for row in cutoff_cases
+                    if row["answerable"]) / len(rows) if rows else None
+            ),
+            "lexical_evidence_precision_upper_bound": (
+                sum(row["lexical_evidence_precision_upper_bound"] for row in cutoff_cases
+                    if row["answerable"]) / len(rows) if rows else None
+            ),
             "answerable_recall_uncertain_due_to_positive_ties": sum(
                 row["answerable"]
                 and row["lexical_evidence_recall_lower_bound"]
                 != row["lexical_evidence_recall_upper_bound"]
+                for row in cutoff_cases
+            ),
+            "answerable_precision_uncertain_due_to_positive_ties": sum(
+                row["answerable"]
+                and row["lexical_evidence_precision_lower_bound"]
+                != row["lexical_evidence_precision_upper_bound"]
                 for row in cutoff_cases
             ),
             "answerable_hit_uncertain_due_to_positive_ties": sum(
