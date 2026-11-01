@@ -195,6 +195,42 @@ def _positive_score_relevant_count_bounds(scored, relevant, k):
     )
 
 
+def _positive_score_ndcg_bounds(scored, relevant, k):
+    """Exact binary nDCG@k range across all positive-score BM25 tie orders.
+
+    Equal-score documents can be permuted without changing lexical evidence.
+    Within each tie block, placing relevant IDs first maximizes discounted
+    gain; placing them last minimizes it, including positions beyond k.
+    Zero-score documents never count as retrieval evidence.
+    """
+    relevant = set(relevant)
+    if not relevant:
+        return 1.0, 1.0
+    ideal_hits = min(len(relevant), k)
+    ideal_gain = sum(1 / math.log2(rank + 1) for rank in range(1, ideal_hits + 1))
+    lower_gain = upper_gain = 0.0
+    start = 0
+    positive = [(doc_id, score) for doc_id, score in scored if score > 0]
+    while start < len(positive) and start < k:
+        end = start + 1
+        while end < len(positive) and positive[end][1] == positive[start][1]:
+            end += 1
+        group_size = end - start
+        relevant_count = sum(doc_id in relevant for doc_id, _ in positive[start:end])
+        visible = min(group_size, k - start)
+        # Worst case puts relevant items after all nonrelevant items, even
+        # if some of those relevant items then fall outside the cutoff.
+        first_worst_relevant = group_size - relevant_count
+        for offset in range(visible):
+            discount = 1 / math.log2(start + offset + 2)
+            if offset >= first_worst_relevant:
+                lower_gain += discount
+            if offset < relevant_count:
+                upper_gain += discount
+        start = end
+    return lower_gain / ideal_gain, upper_gain / ideal_gain
+
+
 def _positive_score_hit_bounds(scored, relevant, k):
     """Exact evidence-only hit@k bounds over positive-score cutoff ties."""
     lower, upper = _positive_score_relevant_count_bounds(scored, relevant, k)
@@ -479,6 +515,9 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
                 # straddle k, rather than treating doc-ID order as evidence.
                 row["lexical_evidence_precision_lower_bound"] = lower_count / k
                 row["lexical_evidence_precision_upper_bound"] = upper_count / k
+                ndcg_lower, ndcg_upper = _positive_score_ndcg_bounds(scored, relevant, k)
+                row["lexical_evidence_ndcg_lower_bound"] = ndcg_lower
+                row["lexical_evidence_ndcg_upper_bound"] = ndcg_upper
                 evidence_rows.append(row["lexical_evidence_metrics"])
             else:
                 # Unanswerable questions have no relevant documents. Their
@@ -491,6 +530,8 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
                 row["lexical_evidence_recall_upper_bound"] = None
                 row["lexical_evidence_precision_lower_bound"] = None
                 row["lexical_evidence_precision_upper_bound"] = None
+                row["lexical_evidence_ndcg_lower_bound"] = None
+                row["lexical_evidence_ndcg_upper_bound"] = None
                 row["unanswerable_positive_lexical_match"] = (
                     lexical_match_counts[case["id"]] > 0
                 )
@@ -532,6 +573,21 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
             "lexical_evidence_precision_upper_bound": (
                 sum(row["lexical_evidence_precision_upper_bound"] for row in cutoff_cases
                     if row["answerable"]) / len(rows) if rows else None
+            ),
+            "lexical_evidence_ndcg_lower_bound": (
+                sum(row["lexical_evidence_ndcg_lower_bound"] for row in cutoff_cases
+                    if row["answerable"]) / len(rows) if rows else None
+            ),
+            "lexical_evidence_ndcg_upper_bound": (
+                sum(row["lexical_evidence_ndcg_upper_bound"] for row in cutoff_cases
+                    if row["answerable"]) / len(rows) if rows else None
+            ),
+            "answerable_ndcg_uncertain_due_to_positive_ties": sum(
+                row["answerable"]
+                and not math.isclose(row["lexical_evidence_ndcg_lower_bound"],
+                                     row["lexical_evidence_ndcg_upper_bound"],
+                                     abs_tol=1e-12)
+                for row in cutoff_cases
             ),
             "answerable_recall_uncertain_due_to_positive_ties": sum(
                 row["answerable"]
