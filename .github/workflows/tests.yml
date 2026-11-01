@@ -6,9 +6,13 @@ on:
   pull_request:
     branches: [ main, master ]
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     strategy:
       matrix:
         python-version: ['3.10', '3.11', '3.12']
@@ -29,3 +33,35 @@ jobs:
     - name: Run unit tests (no API calls)
       run: |
         python -m pytest tests/ -v -m "not api"
+
+    - name: Generate and validate multilingual BM25 comparison evidence
+      if: matrix.python-version == '3.12'
+      run: |
+        python -m evalforge.offline_rag_demo --corpus datasets/multilingual_lexical_corpus.json --questions datasets/multilingual_lexical_questions.json --tokenizer ascii --k 1 > multilingual-ascii.json
+        python -m evalforge.offline_rag_demo --corpus datasets/multilingual_lexical_corpus.json --questions datasets/multilingual_lexical_questions.json --tokenizer unicode --k 1 > multilingual-unicode.json
+        python - <<'PY'
+        import json
+        from pathlib import Path
+        ascii_report = json.loads(Path("multilingual-ascii.json").read_text())
+        unicode_report = json.loads(Path("multilingual-unicode.json").read_text())
+        assert ascii_report["method"] == unicode_report["method"] == "lexical_bm25_retrieval_only"
+        assert ascii_report["parameters"]["tokenizer"] == "ascii_alphanumeric"
+        assert unicode_report["parameters"]["tokenizer"] == "unicode_alphanumeric"
+        assert ascii_report["corpus_sha256"] == unicode_report["corpus_sha256"]
+        assert ascii_report["questions_sha256"] == unicode_report["questions_sha256"]
+        assert ascii_report["question_count"] == unicode_report["question_count"] == 6
+        assert ascii_report["selected_tokenizer_diagnostics"]["questions_without_selected_tokens"] == 4
+        assert unicode_report["selected_tokenizer_diagnostics"]["questions_without_selected_tokens"] == 0
+        assert unicode_report["by_top_k"]["1"]["lexical_evidence_hit_rate"] == 1.0
+        PY
+
+    - name: Upload multilingual BM25 evidence
+      if: matrix.python-version == '3.12'
+      uses: actions/upload-artifact@v4
+      with:
+        name: multilingual-bm25-evidence
+        path: |
+          multilingual-ascii.json
+          multilingual-unicode.json
+        if-no-files-found: error
+        retention-days: 30
