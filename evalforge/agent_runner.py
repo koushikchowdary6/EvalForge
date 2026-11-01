@@ -19,6 +19,7 @@ from evalforge.artifacts import atomic_json_dump
 from evalforge.identifiers import valid_benchmark_id
 from evalforge.agent_tools import (
     MAX_TOOL_ARGUMENT_CHARS, TOOL_REGISTRY, has_visible_argument_text,
+    has_valid_unicode_scalars,
 )
 from evalforge.agent import ToolCallingAgent
 from evalforge.agent_graders import (
@@ -184,6 +185,7 @@ def validate_agent_tasks(tasks):
                     or not isinstance(value, str)
                     or len(value) > MAX_TOOL_ARGUMENT_CHARS
                     or not has_visible_argument_text(value)
+                    or not has_valid_unicode_scalars(value)
                     for key, value in required.items()
                 ):
                     raise ValueError(

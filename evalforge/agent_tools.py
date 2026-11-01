@@ -118,6 +118,13 @@ def has_visible_argument_text(value):
     )
 
 
+def has_valid_unicode_scalars(value):
+    """Reject lone UTF-16 surrogate code points in provider/dataset strings."""
+    return isinstance(value, str) and all(
+        not ("\ud800" <= char <= "\udfff") for char in value
+    )
+
+
 def valid_tool_arguments(tool_name, arguments):
     """Check a provider call against this registry's declared tool schema.
 
@@ -140,6 +147,8 @@ def valid_tool_arguments(tool_name, arguments):
             and isinstance(value, str)
             and len(value) <= MAX_TOOL_ARGUMENT_CHARS
             and has_visible_argument_text(value)
+            # JSON accepts escaped surrogates; strict UTF-8 artifacts do not.
+            and has_valid_unicode_scalars(value)
             for key, value in arguments.items()
         )
     )
