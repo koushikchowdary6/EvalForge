@@ -290,23 +290,31 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
     # The baseline intentionally uses an ASCII-only lexical tokenizer. Record
     # where that tokenizer drops an entire query or encounters non-ASCII
     # alphanumeric text, so tie-only retrieval is not mistaken for coverage.
-    query_token_counts = {
-        case["id"]: len(tokenize(case["question"])) for case in questions
+    # Keep the existing two-tokenizations-per-query contract: once during
+    # scoring and once for diagnostics. Reuse the diagnostic tokens for OOV
+    # analysis rather than tokenizing the same question a third time.
+    ascii_query_tokens = {
+        case["id"]: tokenize(case["question"]) for case in questions
     }
-    selected_query_token_counts = (
-        query_token_counts if tokenizer_mode == "ascii" else {
-            case["id"]: len(selected_tokenizer(case["question"]))
+    query_token_counts = {
+        case_id: len(tokens) for case_id, tokens in ascii_query_tokens.items()
+    }
+    selected_query_tokens = (
+        ascii_query_tokens if tokenizer_mode == "ascii" else {
+            case["id"]: selected_tokenizer(case["question"])
             for case in questions
         }
     )
+    selected_query_token_counts = {
+        case_id: len(tokens) for case_id, tokens in selected_query_tokens.items()
+    }
     # BM25 scores a *set* of selected query terms. Report out-of-vocabulary
     # coverage on the same unique-term basis, rather than counting repeated
     # query words as independent evidence. This separates tokenizer failure
     # (zero selected terms) from corpus coverage failure (all terms unseen).
     corpus_terms = set(index[3])
     selected_query_terms = {
-        case["id"]: set(selected_tokenizer(case["question"]))
-        for case in questions
+        case_id: set(tokens) for case_id, tokens in selected_query_tokens.items()
     }
     query_oov_term_counts = {
         case_id: len(terms - corpus_terms)
@@ -565,6 +573,9 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
             "questions_without_selected_tokens": sum(
                 count == 0 for count in selected_query_token_counts.values()
             ),
+            "tokenizer_mode": tokenizer_mode,
+        },
+        "query_vocabulary_diagnostics": {
             "questions_with_all_selected_terms_oov": sum(
                 bool(terms) and query_oov_term_counts[case_id] == len(terms)
                 for case_id, terms in selected_query_terms.items()
@@ -573,7 +584,6 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
                 0 < query_oov_term_counts[case_id] < len(terms)
                 for case_id, terms in selected_query_terms.items()
             ),
-            "tokenizer_mode": tokenizer_mode,
         },
         "tokenizer_diagnostics": {
             "questions_without_ascii_tokens": sum(count == 0 for count in query_token_counts.values()),
