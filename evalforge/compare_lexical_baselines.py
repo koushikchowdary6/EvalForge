@@ -29,6 +29,8 @@ def compare_tokenizers(docs, questions, cutoffs=(1, 3, 5)):
     for k in cutoffs:
         both = ascii_only = unicode_only = neither = 0
         ascii_recall_total = unicode_recall_total = 0.0
+        paired_delta_lower_total = paired_delta_upper_total = 0.0
+        tie_ambiguous_case_count = 0
         answerable_count = unanswerable_count = 0
         ascii_unanswerable_match = unicode_unanswerable_match = 0
         unanswerable_both = unanswerable_ascii_only = 0
@@ -56,10 +58,25 @@ def compare_tokenizers(docs, questions, cutoffs=(1, 3, 5)):
                 u_recall = u_metrics["recall_at_k"]
                 ascii_recall_total += a_recall
                 unicode_recall_total += u_recall
+                # Tied positive BM25 scores have no meaningful ID ordering.
+                # The paired difference can vary even when the reported
+                # deterministic (ID-tiebroken) point estimate is unchanged.
+                delta_lower = (
+                    u["lexical_evidence_recall_lower_bound"]
+                    - a["lexical_evidence_recall_upper_bound"]
+                )
+                delta_upper = (
+                    u["lexical_evidence_recall_upper_bound"]
+                    - a["lexical_evidence_recall_lower_bound"]
+                )
+                paired_delta_lower_total += delta_lower
+                paired_delta_upper_total += delta_upper
+                tie_ambiguous_case_count += int(delta_lower != delta_upper)
                 a_unanswerable = u_unanswerable = None
             else:
                 unanswerable_count += 1
                 a_hit = u_hit = a_recall = u_recall = None
+                delta_lower = delta_upper = None
                 a_unanswerable = bool(a["unanswerable_positive_lexical_match"])
                 u_unanswerable = bool(u["unanswerable_positive_lexical_match"])
                 ascii_unanswerable_match += int(a_unanswerable)
@@ -86,6 +103,8 @@ def compare_tokenizers(docs, questions, cutoffs=(1, 3, 5)):
                 "paired_recall_delta_unicode_minus_ascii": (
                     u_recall - a_recall if question["answerable"] else None
                 ),
+                "paired_recall_delta_lower_bound_unicode_minus_ascii": delta_lower,
+                "paired_recall_delta_upper_bound_unicode_minus_ascii": delta_upper,
                 "ascii_unanswerable_positive_lexical_match": a_unanswerable,
                 "unicode_unanswerable_positive_lexical_match": u_unanswerable,
                 "paired_unanswerable_match_delta_unicode_minus_ascii": (
@@ -114,6 +133,13 @@ def compare_tokenizers(docs, questions, cutoffs=(1, 3, 5)):
             "paired_mean_recall_delta_unicode_minus_ascii": (
                 u_mean_recall - a_mean_recall if answerable_count else None
             ),
+            "paired_mean_recall_delta_lower_bound_unicode_minus_ascii": (
+                paired_delta_lower_total / answerable_count if answerable_count else None
+            ),
+            "paired_mean_recall_delta_upper_bound_unicode_minus_ascii": (
+                paired_delta_upper_total / answerable_count if answerable_count else None
+            ),
+            "paired_recall_delta_tie_ambiguous_cases": tie_ambiguous_case_count,
             "unanswerable_count": unanswerable_count,
             "ascii_unanswerable_positive_lexical_match_count": ascii_unanswerable_match,
             "unicode_unanswerable_positive_lexical_match_count": unicode_unanswerable_match,
@@ -146,7 +172,8 @@ def compare_tokenizers(docs, questions, cutoffs=(1, 3, 5)):
         "question_count": len(questions),
         "scope": (
             "paired_descriptive_lexical_overlap_on_supplied_labels; "
-            "not_semantic_accuracy_or_statistical_significance"
+            "tie_delta_bounds_are_worst_best_cases_over_independent_positive_score_tie_orders; "
+            "not_confidence_intervals_semantic_accuracy_or_statistical_significance"
         ),
         "by_top_k": by_top_k,
         "cases": cases,
