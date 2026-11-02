@@ -252,6 +252,12 @@ class EmbeddingClient:
             )
 
         response = self.client.embeddings.create(model=EMBED_MODEL, input=text)
+        # A provider response identifying a different embedding model must not
+        # poison a cache keyed to EMBED_MODEL, even if its vector dimensions
+        # happen to match. Older test doubles may omit response.model.
+        response_model = getattr(response, "model", None)
+        if response_model is not None and response_model != EMBED_MODEL:
+            raise ValueError("API embedding: unexpected response model")
         # A single input must yield exactly one indexed embedding. Silently
         # taking data[0] from an empty, duplicated, or out-of-order response
         # can poison the cache and change retrieval rankings in later runs.
@@ -262,7 +268,9 @@ class EmbeddingClient:
         if entry is None or not hasattr(entry, "embedding"):
             raise ValueError("API embedding: missing vector")
         index = getattr(entry, "index", 0)
-        if isinstance(index, bool) or index != 0:
+        # A float 0.0 or string "0" compares equal to integer zero in some
+        # callers but is not a valid provider result index.
+        if type(index) is not int or index != 0:
             raise ValueError("API embedding: unexpected result index")
         vector = _validated_embedding(entry.embedding, label="API embedding")
         self.api_calls += 1
