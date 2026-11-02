@@ -432,6 +432,18 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
     # document frequencies and lengths rather than retokenizing all documents
     # for each question; retain the standalone ranking API for callers.
     index = _build_bm25_index(docs, selected_tokenizer)
+    # A document with zero selected tokens cannot earn a positive BM25 score,
+    # even when a benchmark marks it relevant. Surface that unreachable
+    # relevance separately from ordinary query/corpus vocabulary mismatch.
+    unindexable_doc_ids = {
+        doc["doc_id"] for doc, length in zip(docs, index[1]) if length == 0
+    }
+    answerable_cases_with_unindexable_relevance = [
+        case["id"] for case in questions
+        if case["answerable"] and any(
+            doc_id in unindexable_doc_ids for doc_id in case["relevant_doc_ids"]
+        )
+    ]
     lexical_equivalence = _lexical_equivalence_diagnostics(
         docs, questions, index[0], tokenizer_mode
     )
@@ -535,6 +547,14 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
                 "retrieved_ids": ranked,
                 "positive_score_retrieved_ids": evidence_ranked,
                 "relevant_ids": relevant,
+                "relevant_unindexable_document_count": (
+                    sum(doc_id in unindexable_doc_ids for doc_id in relevant)
+                    if case["answerable"] else None
+                ),
+                "relevant_indexable_recall_ceiling": (
+                    sum(doc_id not in unindexable_doc_ids for doc_id in relevant) / len(relevant)
+                    if case["answerable"] else None
+                ),
                 "lexical_positive_document_count": lexical_match_counts[case["id"]],
                 "all_zero_score_ranking": lexical_match_counts[case["id"]] == 0,
                 "positive_score_cutoff_tie": boundary_tie,
@@ -725,6 +745,9 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
                 for row in cutoff_cases
             ),
             "answerable_count": len(rows),
+            "answerable_cases_with_unindexable_relevance": len(
+                answerable_cases_with_unindexable_relevance
+            ),
             "answerable_without_ascii_query_tokens": sum(
                 case["answerable"] and query_token_counts[case["id"]] == 0
                 for case in questions
@@ -802,6 +825,15 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
         "corpus_sha256": _fingerprint(docs),
         "questions_sha256": _fingerprint(questions),
         "corpus_size": len(docs),
+        "corpus_token_coverage": {
+            "tokenizer_mode": tokenizer_mode,
+            "unindexable_document_count": len(unindexable_doc_ids),
+            "unindexable_document_ids": sorted(unindexable_doc_ids),
+            "answerable_cases_with_unindexable_relevance": (
+                answerable_cases_with_unindexable_relevance
+            ),
+            "scope": "zero_selected_tokens_cannot_receive_positive_bm25_scores",
+        },
         "corpus_lexical_equivalence": lexical_equivalence,
         "question_count": len(questions),
         "selected_tokenizer_diagnostics": {
