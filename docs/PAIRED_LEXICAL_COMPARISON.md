@@ -32,8 +32,15 @@ unexpected rank shifts inspectable.
 
 Unanswerable questions are **excluded from retrieval-quality denominators**.
 Their positive lexical-match counts are shown separately; a lexical match
-does not mean the query is answerable. An unanswerable-only benchmark uses
-JSON `null` for undefined hit/recall rates rather than inventing zeroes.
+does not mean the query is answerable. The paired unanswerable matrix reports
+`unanswerable_both_match`, `unanswerable_ascii_only_match`,
+`unanswerable_unicode_only_match`, and `unanswerable_neither_match`. The
+per-case Unicode-minus-ASCII match delta is -1, 0, or +1. Separate match
+rates and the paired rate delta expose **offsetting regressions and gains**
+that equal aggregate counts would conceal. These are lexical-evidence flags,
+**not** hallucination or answer-quality rates. When there are no unanswerable
+questions, these rates are JSON `null`; an unanswerable-only benchmark likewise
+uses `null` for undefined answerable hit/recall rates.
 
 ## Interpretation limits
 
