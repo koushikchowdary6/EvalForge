@@ -133,7 +133,7 @@ def validate_agent_tasks(tasks):
             if (
                 not isinstance(category, str)
                 or len(category) > 128
-                or re.fullmatch(r"[^\\W\\d_][\\w-]*", category) is None
+                or re.fullmatch(r"[^\W\d_][\w-]*", category) is None
                 or not unicodedata.is_normalized("NFKC", category)
                 or (
                     any("LATIN" in unicodedata.name(ch, "") for ch in category)
