@@ -26,7 +26,7 @@ def _task():
 @pytest.mark.parametrize("field", [
     "prompt", "category", "answer_must_contain", "mock_responses",
 ])
-@pytest.mark.parametrize("invalid", ["\\ud800", "\\udfff", "text\\ud800"])
+@pytest.mark.parametrize("invalid", ["\ud800", "\udfff", "text\ud800"])
 def test_lone_surrogates_in_agent_benchmark_evidence_are_rejected(field, invalid):
     task = _task()
     if field == "answer_must_contain":
@@ -43,7 +43,7 @@ def test_escaped_surrogate_in_json_is_rejected_before_agent_initialization(
     tmp_path, monkeypatch,
 ):
     task = _task()
-    task["mock_responses"]["get_weather"] = "Sunny\\ud800"
+    task["mock_responses"]["get_weather"] = "Sunny\ud800"
     dataset = tmp_path / "tasks.json"
     dataset.write_text(json.dumps([task]), encoding="utf-8")
     runner = AgentEvalRunner(dataset, output_dir=tmp_path)
@@ -66,7 +66,7 @@ def test_run_revalidates_mutated_unicode_evidence_before_paid_agent(
     runner.tasks = [task]
     runner.results = [{"stale": True}]
     runner.report = {"stale": True}
-    task["prompt"] += "\\udfff"
+    task["prompt"] += "\udfff"
 
     def never_initialize(*args, **kwargs):
         raise AssertionError("invalid benchmark reached model initialization")
@@ -84,5 +84,5 @@ def test_multilingual_and_astral_unicode_benchmark_evidence_remains_valid():
     task["prompt"] = "Résumé 東京 🌍"
     task["category"] = "évaluation"
     task["answer_must_contain"] = ["café", "東京", "🌍"]
-    task["mock_responses"]["get_weather"] = "Café\\u0301 🌤️"
+    task["mock_responses"]["get_weather"] = "Café\u0301 🌤️"
     validate_agent_tasks([task])
