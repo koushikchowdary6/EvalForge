@@ -81,3 +81,26 @@ the mean query-specific ceiling and the number of answerable cases with a
 relevance gap. An unanswerable-only benchmark reports a `null` mean rather
 than a fabricated zero. These diagnostics do not change rankings or labels
 and are not measures of semantic recall or independently sampled accuracy.
+
+## Diagnosing *why* labeled relevance is lexically unreachable
+
+The report now assigns each **answerable** question exactly one
+`query_relevance_gap_reason` and groups case IDs under
+`query_relevance_coverage.reason_case_ids`. The mutually exclusive reasons
+are:
+
+- `full_positive_relevance`: every labeled-relevant document has a positive
+  BM25 score for this query (a ceiling, not an achieved top-k score).
+- `no_selected_query_tokens`: the selected tokenizer extracted no terms.
+- `all_selected_query_terms_oov`: query terms exist, but none are indexed
+  anywhere in the corpus.
+- `no_positive_relevant_overlap`: some query terms occur in the corpus, but
+  none of the labeled-relevant documents receive a positive score.
+- `partial_positive_relevant_overlap`: some, but not all, labeled-relevant
+  documents receive positive scores.
+
+Unanswerable cases have a `null` reason; they are never assigned a fabricated
+relevance denominator. Reasons are **cutoff-independent** and distinguish
+tokenization, corpus vocabulary, and relevance-label overlap failures without
+claiming semantic retrieval, translation, or independently validated accuracy.
+The per-case ceiling and zero-score evidence metrics remain authoritative.
