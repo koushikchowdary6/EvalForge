@@ -60,3 +60,24 @@ the `by_top_k` report separates answerable and unanswerable fully OOV
 queries. These values are descriptive corpus/tokenizer coverage checks,
 **not** semantic out-of-distribution detection, model accuracy, or proof that
 a retrieved passage answers the question.
+
+
+## Query-dependent relevance recall ceiling
+
+The report distinguishes **corpus indexability** from **query overlap**.
+`relevant_indexable_recall_ceiling` is the fraction of labeled-relevant
+documents with any tokens under the selected tokenizer. A document can be
+indexable yet have *zero* positive BM25 score for a particular question.
+`relevant_positive_score_document_count` and
+`relevant_positive_score_recall_ceiling` count only labeled-relevant
+documents with positive scores for that exact question. This is the maximum
+evidence-only recall obtainable at any cutoff with the current query and
+tokenizer; it is not an achieved recall, and a lexical match does not prove
+that the passage answers the question.
+
+The `query_relevance_coverage` section identifies answerable questions with
+zero or partially covered relevance labels. Each `by_top_k` summary includes
+the mean query-specific ceiling and the number of answerable cases with a
+relevance gap. An unanswerable-only benchmark reports a `null` mean rather
+than a fabricated zero. These diagnostics do not change rankings or labels
+and are not measures of semantic recall or independently sampled accuracy.
