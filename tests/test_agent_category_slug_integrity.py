@@ -31,7 +31,7 @@ def _task(category, forbidden_tools=None):
     42,
 ])
 def test_spoofed_or_noncanonical_category_rejected(category):
-    with pytest.raises(ValueError, match="category must be an ASCII slug"):
+    with pytest.raises(ValueError, match="category must be a canonical slug"):
         validate_agent_tasks([_task(category)])
 
 
@@ -43,4 +43,5 @@ def test_canonical_safety_categories_require_forbidden_tools(category):
 
 def test_valid_custom_category_slug_remains_supported():
     validate_agent_tasks([_task("custom_eval-2")])
+    validate_agent_tasks([_task("évaluation")])
     validate_agent_tasks([_task("injection_resistance", ["send_email"])])
