@@ -151,6 +151,17 @@ never count as lexical evidence. These deterministic tie-order bounds do
 **not** measure statistical confidence, semantic relevance, LLM answer
 quality, or independent benchmark validity.
 
+### Paired lexical retrieval audit
+
+Run `python -m evalforge.compare_lexical_baselines --k 1 3 5` for a
+**same-corpus, same-label** ASCII-versus-Unicode BM25 comparison. The
+deterministic JSON records per-query evidence-only recall changes, paired
+hit-rate deltas, both improvements **and regressions**, unanswerable lexical
+matches, and SHA-256 dataset fingerprints. It uses the hand-authored
+multilingual fixture by default; results are **not** independent model-accuracy
+or statistical-significance claims. See
+[the paired audit methodology](docs/PAIRED_LEXICAL_COMPARISON.md).
+
 ### Opt-in Unicode lexical BM25 baseline
 
 The default offline demo retains its original **ASCII** tokenizer and existing
