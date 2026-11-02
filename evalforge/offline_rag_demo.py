@@ -498,6 +498,17 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
         case_id: sum(score > 0 for _, score in scored)
         for case_id, scored in scored_rankings.items()
     }
+    # Even a tokenized, indexable relevant document may be unreachable for
+    # this specific query if its BM25 score is zero. This ceiling is
+    # query-dependent and distinct from the corpus-only indexability ceiling.
+    positive_score_ids = {
+        case_id: {doc_id for doc_id, score in scored if score > 0}
+        for case_id, scored in scored_rankings.items()
+    }
+    query_relevant_positive_score_counts = {
+        case["id"]: len(set(case["relevant_doc_ids"]) & positive_score_ids[case["id"]])
+        for case in questions if case["answerable"]
+    }
     # A lexical match on an unanswerable question is a useful abstention
     # diagnostic, not evidence that a generated answer was hallucinated.
     unanswerable_count = sum(not case["answerable"] for case in questions)
@@ -553,6 +564,14 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
                 ),
                 "relevant_indexable_recall_ceiling": (
                     sum(doc_id not in unindexable_doc_ids for doc_id in relevant) / len(relevant)
+                    if case["answerable"] else None
+                ),
+                "relevant_positive_score_document_count": (
+                    query_relevant_positive_score_counts[case["id"]]
+                    if case["answerable"] else None
+                ),
+                "relevant_positive_score_recall_ceiling": (
+                    query_relevant_positive_score_counts[case["id"]] / len(relevant)
                     if case["answerable"] else None
                 ),
                 "lexical_positive_document_count": lexical_match_counts[case["id"]],
@@ -748,6 +767,19 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
             "answerable_cases_with_unindexable_relevance": len(
                 answerable_cases_with_unindexable_relevance
             ),
+            "answerable_cases_with_query_relevance_gap": sum(
+                case["answerable"]
+                and query_relevant_positive_score_counts[case["id"]]
+                < len(case["relevant_doc_ids"])
+                for case in questions
+            ),
+            "mean_relevant_positive_score_recall_ceiling": (
+                sum(
+                    query_relevant_positive_score_counts[case["id"]]
+                    / len(case["relevant_doc_ids"])
+                    for case in questions if case["answerable"]
+                ) / len(rows) if rows else None
+            ),
             "answerable_without_ascii_query_tokens": sum(
                 case["answerable"] and query_token_counts[case["id"]] == 0
                 for case in questions
@@ -835,6 +867,18 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
             "scope": "zero_selected_tokens_cannot_receive_positive_bm25_scores",
         },
         "corpus_lexical_equivalence": lexical_equivalence,
+        "query_relevance_coverage": {
+            "answerable_cases_with_zero_positive_relevant_documents": [
+                case["id"] for case in questions if case["answerable"]
+                and query_relevant_positive_score_counts[case["id"]] == 0
+            ],
+            "answerable_cases_with_partial_positive_relevance": [
+                case["id"] for case in questions if case["answerable"]
+                and 0 < query_relevant_positive_score_counts[case["id"]]
+                < len(case["relevant_doc_ids"])
+            ],
+            "scope": "per_query_positive_bm25_overlap_not_semantic_relevance",
+        },
         "question_count": len(questions),
         "selected_tokenizer_diagnostics": {
             "questions_without_selected_tokens": sum(
