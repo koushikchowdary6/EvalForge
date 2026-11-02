@@ -30,6 +30,20 @@ negative delta is a regression, not an error to hide. `cases` includes
 per-question positive-score retrieved IDs and recall deltas, making
 unexpected rank shifts inspectable.
 
+**Cutoff ties can reverse hit-rate conclusions.** The deterministic BM25
+secondary sort by document ID is not retrieval evidence. For each answerable
+question, `paired_hit_delta_lower_bound_unicode_minus_ascii` and
+`paired_hit_delta_upper_bound_unicode_minus_ascii` convert positive-score
+recall tie bounds into possible binary hit differences (-1, 0, +1).
+`by_top_k` averages these worst/best-case deltas over answerable questions
+and reports `paired_hit_delta_tie_ambiguous_cases`. A point-estimate delta
+of zero can coexist with bounds of -1 to +1. Unanswerable questions do not
+enter the denominator, and undefined hit-rate bounds are JSON `null`.
+These are **deterministic tie-order sensitivity bounds**, not confidence
+intervals or statistical tests; they allow the two tokenizers' tied rankings
+to vary independently. The analogous recall bounds describe fractional
+relevance coverage rather than binary hits.
+
 Unanswerable questions are **excluded from retrieval-quality denominators**.
 Their positive lexical-match counts are shown separately; a lexical match
 does not mean the query is answerable. The paired unanswerable matrix reports
