@@ -81,3 +81,54 @@ def test_cli_uses_same_bounded_loader_and_emits_reproducible_provenance():
     assert report["cutoffs"] == [1]
     assert report["question_count"] == 6
     assert report["by_top_k"]["1"]["answerable_count"] == 5
+
+
+def test_unanswerable_paired_discordance_exposes_offsetting_changes():
+    # Neither tokenizer can claim answer accuracy from these lexical matches.
+    # ASCII substring tokenization can match "caf" in a different word,
+    # whereas Unicode tokenization can index a Japanese-only document.
+    docs = [
+        {"doc_id": "accent", "title": "", "text": "café"},
+        {"doc_id": "japanese", "title": "", "text": "日本語"},
+        {"doc_id": "latin", "title": "", "text": "alpha"},
+    ]
+    questions = [
+        {"id": "ascii-only", "question": "caféteria", "answerable": False,
+         "relevant_doc_ids": []},
+        {"id": "unicode-only", "question": "日本語", "answerable": False,
+         "relevant_doc_ids": []},
+        {"id": "both", "question": "alpha", "answerable": False,
+         "relevant_doc_ids": []},
+        {"id": "neither", "question": "unseen", "answerable": False,
+         "relevant_doc_ids": []},
+    ]
+    report = compare_tokenizers(docs, questions, cutoffs=(1,))
+    summary = report["by_top_k"]["1"]
+    assert summary["unanswerable_count"] == 4
+    assert (
+        summary["unanswerable_both_match"],
+        summary["unanswerable_ascii_only_match"],
+        summary["unanswerable_unicode_only_match"],
+        summary["unanswerable_neither_match"],
+    ) == (1, 1, 1, 1)
+    assert summary["ascii_unanswerable_lexical_match_rate"] == 0.5
+    assert summary["unicode_unanswerable_lexical_match_rate"] == 0.5
+    assert summary["paired_unanswerable_match_rate_delta_unicode_minus_ascii"] == 0
+    cases = {row["case_id"]: row for row in report["cases"]}
+    assert cases["ascii-only"]["paired_unanswerable_match_delta_unicode_minus_ascii"] == -1
+    assert cases["unicode-only"]["paired_unanswerable_match_delta_unicode_minus_ascii"] == 1
+    assert cases["both"]["paired_unanswerable_match_delta_unicode_minus_ascii"] == 0
+    assert cases["neither"]["paired_unanswerable_match_delta_unicode_minus_ascii"] == 0
+
+
+def test_paired_unanswerable_rates_are_null_without_unanswerable_questions():
+    report = compare_tokenizers(DOCS, QUESTIONS[:2], cutoffs=(1,))
+    summary = report["by_top_k"]["1"]
+    assert summary["unanswerable_count"] == 0
+    assert summary["ascii_unanswerable_lexical_match_rate"] is None
+    assert summary["unicode_unanswerable_lexical_match_rate"] is None
+    assert summary["paired_unanswerable_match_rate_delta_unicode_minus_ascii"] is None
+    assert all(
+        row["paired_unanswerable_match_delta_unicode_minus_ascii"] is None
+        for row in report["cases"]
+    )
