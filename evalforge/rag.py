@@ -606,6 +606,13 @@ class RAGPipeline:
                 and has_visible_argument_text(doc.get("title"))
                 and has_visible_argument_text(doc.get("text"))
             )
+            # Scores are optional for custom retrieval adapters (some expose
+            # only ranked IDs), and may use non-cosine scales such as BM25.
+            # When supplied, they must still be finite numeric evidence:
+            # NaN/Infinity, booleans, and text scores can corrupt downstream
+            # diagnostics or make persisted evaluation artifacts invalid JSON.
+            if valid and "score" in doc:
+                valid = _finite_number(doc["score"])
             if valid:
                 valid = not any(
                     "\ud800" <= char <= "\udfff"
