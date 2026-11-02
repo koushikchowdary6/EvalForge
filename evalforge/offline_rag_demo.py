@@ -509,6 +509,43 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
         case["id"]: len(set(case["relevant_doc_ids"]) & positive_score_ids[case["id"]])
         for case in questions if case["answerable"]
     }
+    # Attribute missing labeled-relevant lexical evidence to a concrete,
+    # mutually exclusive cause. Tokenizer failure, corpus-vocabulary failure,
+    # and relevance-label mismatch require different remediation; a single
+    # zero-recall ceiling obscures that distinction. These are lexical checks,
+    # not claims about semantic relevance or independently sampled accuracy.
+    query_relevance_gap_reasons = {}
+    for case in questions:
+        if not case["answerable"]:
+            continue
+        case_id = case["id"]
+        matched = query_relevant_positive_score_counts[case_id]
+        terms = selected_query_terms[case_id]
+        if matched == len(case["relevant_doc_ids"]):
+            reason = "full_positive_relevance"
+        elif not terms:
+            reason = "no_selected_query_tokens"
+        elif not (terms & corpus_terms):
+            reason = "all_selected_query_terms_oov"
+        elif matched == 0:
+            reason = "no_positive_relevant_overlap"
+        else:
+            reason = "partial_positive_relevant_overlap"
+        query_relevance_gap_reasons[case_id] = reason
+    relevance_reason_case_ids = {
+        reason: [
+            case["id"] for case in questions
+            if case["answerable"]
+            and query_relevance_gap_reasons[case["id"]] == reason
+        ]
+        for reason in (
+            "full_positive_relevance",
+            "no_selected_query_tokens",
+            "all_selected_query_terms_oov",
+            "no_positive_relevant_overlap",
+            "partial_positive_relevant_overlap",
+        )
+    }
     # A lexical match on an unanswerable question is a useful abstention
     # diagnostic, not evidence that a generated answer was hallucinated.
     unanswerable_count = sum(not case["answerable"] for case in questions)
@@ -572,6 +609,10 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
                 ),
                 "relevant_positive_score_recall_ceiling": (
                     query_relevant_positive_score_counts[case["id"]] / len(relevant)
+                    if case["answerable"] else None
+                ),
+                "query_relevance_gap_reason": (
+                    query_relevance_gap_reasons[case["id"]]
                     if case["answerable"] else None
                 ),
                 "lexical_positive_document_count": lexical_match_counts[case["id"]],
@@ -868,6 +909,7 @@ def evaluate(docs, questions, cutoffs=(1, 3, 5), *, tokenizer_mode="ascii"):
         },
         "corpus_lexical_equivalence": lexical_equivalence,
         "query_relevance_coverage": {
+            "reason_case_ids": relevance_reason_case_ids,
             "answerable_cases_with_zero_positive_relevant_documents": [
                 case["id"] for case in questions if case["answerable"]
                 and query_relevant_positive_score_counts[case["id"]] == 0
