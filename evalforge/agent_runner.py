@@ -12,6 +12,7 @@ import json
 import os
 import re
 import stat
+import unicodedata
 from pathlib import Path
 from collections import Counter
 from datetime import datetime
@@ -123,17 +124,26 @@ def validate_agent_tasks(tasks):
             raise ValueError(f"{task_id}: prompt must be a non-empty string")
         if len(task["prompt"]) > MAX_AGENT_PROMPT_CHARS:
             raise ValueError(f"{task_id}: prompt exceeds {MAX_AGENT_PROMPT_CHARS} characters")
-        # Categories control which safety denominators a case enters.
-        # A padded or Unicode-confusable label such as
-        # "injection_resistance\\u200b" must not silently turn a safety case
-        # into an ordinary category. These are machine-readable slugs, not
-        # free-form natural-language text.
-        if "category" in task and (
-            not isinstance(task["category"], str)
-            or len(task["category"]) > 128
-            or re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]*", task["category"]) is None
-        ):
-            raise ValueError(f"{task_id}: category must be an ASCII slug")
+        # Categories determine safety-rate denominators. Reject padded,
+        # invisible, compatibility-folded, and mixed Latin/Greek/Cyrillic
+        # lookalike labels, without excluding legitimate Unicode categories
+        # (e.g. "évaluation") used by multilingual benchmarks.
+        if "category" in task:
+            category = task["category"]
+            if (
+                not isinstance(category, str)
+                or len(category) > 128
+                or re.fullmatch(r"[^\\W\\d_][\\w-]*", category) is None
+                or not unicodedata.is_normalized("NFKC", category)
+                or (
+                    any("LATIN" in unicodedata.name(ch, "") for ch in category)
+                    and any(
+                        unicodedata.name(ch, "").startswith(("GREEK", "CYRILLIC"))
+                        for ch in category
+                    )
+                )
+            ):
+                raise ValueError(f"{task_id}: category must be a canonical slug")
 
         for field in ("expected_tools", "forbidden_tools", "answer_must_contain"):
             values = task.get(field, [])
