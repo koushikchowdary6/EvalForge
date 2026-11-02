@@ -31,6 +31,8 @@ def compare_tokenizers(docs, questions, cutoffs=(1, 3, 5)):
         ascii_recall_total = unicode_recall_total = 0.0
         answerable_count = unanswerable_count = 0
         ascii_unanswerable_match = unicode_unanswerable_match = 0
+        unanswerable_both = unanswerable_ascii_only = 0
+        unanswerable_unicode_only = unanswerable_neither = 0
         for question in questions:
             key = (question["id"], k)
             a, u = ascii_rows[key], unicode_rows[key]
@@ -62,6 +64,14 @@ def compare_tokenizers(docs, questions, cutoffs=(1, 3, 5)):
                 u_unanswerable = bool(u["unanswerable_positive_lexical_match"])
                 ascii_unanswerable_match += int(a_unanswerable)
                 unicode_unanswerable_match += int(u_unanswerable)
+                if a_unanswerable and u_unanswerable:
+                    unanswerable_both += 1
+                elif a_unanswerable:
+                    unanswerable_ascii_only += 1
+                elif u_unanswerable:
+                    unanswerable_unicode_only += 1
+                else:
+                    unanswerable_neither += 1
 
             cases.append({
                 "case_id": question["id"],
@@ -78,6 +88,10 @@ def compare_tokenizers(docs, questions, cutoffs=(1, 3, 5)):
                 ),
                 "ascii_unanswerable_positive_lexical_match": a_unanswerable,
                 "unicode_unanswerable_positive_lexical_match": u_unanswerable,
+                "paired_unanswerable_match_delta_unicode_minus_ascii": (
+                    int(u_unanswerable) - int(a_unanswerable)
+                    if not question["answerable"] else None
+                ),
             })
 
         a_hit_rate = (both + ascii_only) / answerable_count if answerable_count else None
@@ -103,6 +117,25 @@ def compare_tokenizers(docs, questions, cutoffs=(1, 3, 5)):
             "unanswerable_count": unanswerable_count,
             "ascii_unanswerable_positive_lexical_match_count": ascii_unanswerable_match,
             "unicode_unanswerable_positive_lexical_match_count": unicode_unanswerable_match,
+            # An unanswerable lexical match is *not* a generated hallucination.
+            # Report paired discordance rather than only separate totals:
+            # aggregate rates alone can conceal offsetting regressions.
+            "unanswerable_both_match": unanswerable_both,
+            "unanswerable_ascii_only_match": unanswerable_ascii_only,
+            "unanswerable_unicode_only_match": unanswerable_unicode_only,
+            "unanswerable_neither_match": unanswerable_neither,
+            "ascii_unanswerable_lexical_match_rate": (
+                ascii_unanswerable_match / unanswerable_count
+                if unanswerable_count else None
+            ),
+            "unicode_unanswerable_lexical_match_rate": (
+                unicode_unanswerable_match / unanswerable_count
+                if unanswerable_count else None
+            ),
+            "paired_unanswerable_match_rate_delta_unicode_minus_ascii": (
+                (unanswerable_unicode_only - unanswerable_ascii_only) / unanswerable_count
+                if unanswerable_count else None
+            ),
         }
 
     return {
