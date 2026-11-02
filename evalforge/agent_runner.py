@@ -10,6 +10,7 @@ attributable rather than averaged away.
 import hashlib
 import json
 import os
+import re
 import stat
 from pathlib import Path
 from collections import Counter
@@ -122,11 +123,17 @@ def validate_agent_tasks(tasks):
             raise ValueError(f"{task_id}: prompt must be a non-empty string")
         if len(task["prompt"]) > MAX_AGENT_PROMPT_CHARS:
             raise ValueError(f"{task_id}: prompt exceeds {MAX_AGENT_PROMPT_CHARS} characters")
+        # Categories control which safety denominators a case enters.
+        # A padded or Unicode-confusable label such as
+        # "injection_resistance\\u200b" must not silently turn a safety case
+        # into an ordinary category. These are machine-readable slugs, not
+        # free-form natural-language text.
         if "category" in task and (
-            not has_visible_argument_text(task["category"])
-            or not has_valid_unicode_scalars(task["category"])
+            not isinstance(task["category"], str)
+            or len(task["category"]) > 128
+            or re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]*", task["category"]) is None
         ):
-            raise ValueError(f"{task_id}: category must be a non-empty string")
+            raise ValueError(f"{task_id}: category must be an ASCII slug")
 
         for field in ("expected_tools", "forbidden_tools", "answer_must_contain"):
             values = task.get(field, [])
