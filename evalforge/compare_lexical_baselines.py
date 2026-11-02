@@ -30,7 +30,8 @@ def compare_tokenizers(docs, questions, cutoffs=(1, 3, 5)):
         both = ascii_only = unicode_only = neither = 0
         ascii_recall_total = unicode_recall_total = 0.0
         paired_delta_lower_total = paired_delta_upper_total = 0.0
-        tie_ambiguous_case_count = 0
+        paired_hit_lower_total = paired_hit_upper_total = 0
+        tie_ambiguous_case_count = hit_tie_ambiguous_case_count = 0
         answerable_count = unanswerable_count = 0
         ascii_unanswerable_match = unicode_unanswerable_match = 0
         unanswerable_both = unanswerable_ascii_only = 0
@@ -72,11 +73,27 @@ def compare_tokenizers(docs, questions, cutoffs=(1, 3, 5)):
                 paired_delta_lower_total += delta_lower
                 paired_delta_upper_total += delta_upper
                 tie_ambiguous_case_count += int(delta_lower != delta_upper)
+                # A positive-score cutoff tie can also reverse hit@k,
+                # even when the deterministic ID tie-break reports no change.
+                # Recall bounds are fractions of labeled relevant documents;
+                # any positive recall is a hit, including at the upper bound.
+                hit_delta_lower = (
+                    int(u["lexical_evidence_recall_lower_bound"] > 0)
+                    - int(a["lexical_evidence_recall_upper_bound"] > 0)
+                )
+                hit_delta_upper = (
+                    int(u["lexical_evidence_recall_upper_bound"] > 0)
+                    - int(a["lexical_evidence_recall_lower_bound"] > 0)
+                )
+                paired_hit_lower_total += hit_delta_lower
+                paired_hit_upper_total += hit_delta_upper
+                hit_tie_ambiguous_case_count += int(hit_delta_lower != hit_delta_upper)
                 a_unanswerable = u_unanswerable = None
             else:
                 unanswerable_count += 1
                 a_hit = u_hit = a_recall = u_recall = None
                 delta_lower = delta_upper = None
+                hit_delta_lower = hit_delta_upper = None
                 a_unanswerable = bool(a["unanswerable_positive_lexical_match"])
                 u_unanswerable = bool(u["unanswerable_positive_lexical_match"])
                 ascii_unanswerable_match += int(a_unanswerable)
@@ -105,6 +122,8 @@ def compare_tokenizers(docs, questions, cutoffs=(1, 3, 5)):
                 ),
                 "paired_recall_delta_lower_bound_unicode_minus_ascii": delta_lower,
                 "paired_recall_delta_upper_bound_unicode_minus_ascii": delta_upper,
+                "paired_hit_delta_lower_bound_unicode_minus_ascii": hit_delta_lower,
+                "paired_hit_delta_upper_bound_unicode_minus_ascii": hit_delta_upper,
                 "ascii_unanswerable_positive_lexical_match": a_unanswerable,
                 "unicode_unanswerable_positive_lexical_match": u_unanswerable,
                 "paired_unanswerable_match_delta_unicode_minus_ascii": (
@@ -128,6 +147,13 @@ def compare_tokenizers(docs, questions, cutoffs=(1, 3, 5)):
             "paired_hit_rate_delta_unicode_minus_ascii": (
                 u_hit_rate - a_hit_rate if answerable_count else None
             ),
+            "paired_hit_rate_delta_lower_bound_unicode_minus_ascii": (
+                paired_hit_lower_total / answerable_count if answerable_count else None
+            ),
+            "paired_hit_rate_delta_upper_bound_unicode_minus_ascii": (
+                paired_hit_upper_total / answerable_count if answerable_count else None
+            ),
+            "paired_hit_delta_tie_ambiguous_cases": hit_tie_ambiguous_case_count,
             "ascii_mean_evidence_recall": a_mean_recall,
             "unicode_mean_evidence_recall": u_mean_recall,
             "paired_mean_recall_delta_unicode_minus_ascii": (
@@ -172,7 +198,7 @@ def compare_tokenizers(docs, questions, cutoffs=(1, 3, 5)):
         "question_count": len(questions),
         "scope": (
             "paired_descriptive_lexical_overlap_on_supplied_labels; "
-            "tie_delta_bounds_are_worst_best_cases_over_independent_positive_score_tie_orders; "
+            "hit_and_recall_delta_bounds_are_worst_best_cases_over_independent_positive_score_tie_orders; "
             "not_confidence_intervals_semantic_accuracy_or_statistical_significance"
         ),
         "by_top_k": by_top_k,
