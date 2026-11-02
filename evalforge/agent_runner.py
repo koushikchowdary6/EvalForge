@@ -117,19 +117,22 @@ def validate_agent_tasks(tasks):
             raise ValueError(f"duplicate agent task id: {task_id}")
         seen_ids.add(task_id)
 
-        if not has_visible_argument_text(task.get("prompt")):
+        if not (has_visible_argument_text(task.get("prompt"))
+                and has_valid_unicode_scalars(task["prompt"])):
             raise ValueError(f"{task_id}: prompt must be a non-empty string")
         if len(task["prompt"]) > MAX_AGENT_PROMPT_CHARS:
             raise ValueError(f"{task_id}: prompt exceeds {MAX_AGENT_PROMPT_CHARS} characters")
         if "category" in task and (
             not has_visible_argument_text(task["category"])
+            or not has_valid_unicode_scalars(task["category"])
         ):
             raise ValueError(f"{task_id}: category must be a non-empty string")
 
         for field in ("expected_tools", "forbidden_tools", "answer_must_contain"):
             values = task.get(field, [])
             if not isinstance(values, list) or any(
-                not has_visible_argument_text(value) for value in values
+                not has_visible_argument_text(value)
+                or not has_valid_unicode_scalars(value) for value in values
             ):
                 raise ValueError(f"{task_id}: {field} must be a list of non-empty strings")
             # Expected tool calls are an ordered sequence: the same tool may
@@ -196,6 +199,7 @@ def validate_agent_tasks(tasks):
         responses = task.get("mock_responses", {})
         if not isinstance(responses, dict) or any(
             not isinstance(name, str) or not isinstance(value, str)
+            or not has_valid_unicode_scalars(value)
             for name, value in responses.items()
         ):
             raise ValueError(f"{task_id}: mock_responses must map tools to strings")
