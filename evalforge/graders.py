@@ -207,7 +207,9 @@ class RuleBasedGrader:
 
             elif rule_type == "max_length":
                 max_len = rule.get("value", 500)
-                if _visible_rubric_length(actual) > max_len:
+                # Maximum length is a raw-output budget, unlike minimum visible content.
+                # Hidden Unicode and whitespace still consume that budget.
+                if len(actual) > max_len:
                     results["failed_rules"].append(f"Response too long (max {max_len} chars)")
                     results["passed"] = False
                     results["score"] -= 0.2
