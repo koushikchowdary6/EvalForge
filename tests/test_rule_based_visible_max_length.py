@@ -5,7 +5,7 @@ from evalforge.graders import RuleBasedGrader
 
 def test_max_length_ignores_nonvisible_padding():
     grader = RuleBasedGrader()
-    result = grader.grade("", "ok" + "\\u200b" * 100, [{"type": "max_length", "value": 2}])
+    result = grader.grade("", "ok" + "\u200b" * 100, [{"type": "max_length", "value": 2}])
     assert result["passed"] is True
     assert result["score"] == 1.0
 
