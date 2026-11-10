@@ -207,7 +207,7 @@ class RuleBasedGrader:
 
             elif rule_type == "max_length":
                 max_len = rule.get("value", 500)
-                if len(actual) > max_len:
+                if _visible_rubric_length(actual) > max_len:
                     results["failed_rules"].append(f"Response too long (max {max_len} chars)")
                     results["passed"] = False
                     results["score"] -= 0.2
