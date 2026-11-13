@@ -12,6 +12,7 @@ dependencies = ["python-dotenv>=1.0,<2"]
 
 [project.scripts]
 evalforge-bm25 = "evalforge.offline_rag_demo:main"
+evalforge-compare-lexical = "evalforge.compare_lexical_baselines:main"
 
 [project.optional-dependencies]
 test = ["pytest>=8,<9"]
