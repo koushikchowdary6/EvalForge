@@ -109,3 +109,30 @@ def test_bundled_dataset_cli_runs_without_api_keys(monkeypatch):
     assert report["question_count"] == 14
     assert set(report["by_top_k"]) == {"1", "3"}
     assert report["by_top_k"]["1"]["answerable_count"] == 12
+
+
+def test_cli_output_file_is_valid_and_never_overwrites(tmp_path):
+    target = tmp_path / "benchmark.json"
+    command = [sys.executable, "-m", "evalforge.offline_rag_demo",
+               "--k", "1", "--summary-only", "--output", str(target)]
+    first = subprocess.run(command, capture_output=True, text=True, timeout=20)
+    assert first.returncode == 0, first.stderr
+    assert first.stdout == ""
+    report = json.loads(target.read_text(encoding="utf-8"))
+    assert "cases" not in report
+    assert len(report["corpus_sha256"]) == 64
+    original = target.read_bytes()
+    second = subprocess.run(command, capture_output=True, text=True, timeout=20)
+    assert second.returncode != 0
+    assert "cannot write report" in second.stderr
+    assert target.read_bytes() == original
+
+
+def test_cli_output_parent_directory_must_exist(tmp_path):
+    target = tmp_path / "missing" / "benchmark.json"
+    result = subprocess.run(
+        [sys.executable, "-m", "evalforge.offline_rag_demo", "--output", str(target)],
+        capture_output=True, text=True, timeout=20,
+    )
+    assert result.returncode != 0
+    assert not target.exists()
