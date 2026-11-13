@@ -68,6 +68,17 @@ jobs:
         assert report["question_count"] == 14
         assert set(report["by_top_k"]) == {"1", "3", "5"}
         PY
+        "$RUNNER_TEMP/evalforge-wheel-venv/bin/evalforge-compare-lexical" --k 1 3 5 > paired-lexical.json
+        "$RUNNER_TEMP/evalforge-wheel-venv/bin/python" - <<'PY'
+        import json
+        from pathlib import Path
+        report = json.loads(Path("paired-lexical.json").read_text(encoding="utf-8"))
+        assert report["method"] == "paired_ascii_unicode_bm25_lexical_retrieval_only"
+        assert report["question_count"] == 6
+        assert set(report["by_top_k"]) == {"1", "3", "5"}
+        assert len(report["corpus_sha256"]) == 64
+        assert len(report["questions_sha256"]) == 64
+        PY
 
     - name: Verify installed dependency consistency
       run: python -m pip check
