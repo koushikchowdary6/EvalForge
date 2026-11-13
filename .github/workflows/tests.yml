@@ -47,6 +47,24 @@ jobs:
         assert set(report["by_top_k"]) == {"1", "3", "5"}
         PY
 
+    - name: Verify wheel installation outside the source checkout
+      if: matrix.python-version == '3.12'
+      run: |
+        python -m pip wheel --no-deps --wheel-dir dist .
+        python -m venv "$RUNNER_TEMP/evalforge-wheel-venv"
+        "$RUNNER_TEMP/evalforge-wheel-venv/bin/python" -m pip install --no-deps dist/evalforge_ai-*.whl
+        cd "$RUNNER_TEMP"
+        "$RUNNER_TEMP/evalforge-wheel-venv/bin/evalforge-bm25" --k 1 3 5 --summary-only > wheel-summary.json
+        "$RUNNER_TEMP/evalforge-wheel-venv/bin/python" - <<'PY'
+        import json
+        from pathlib import Path
+        report = json.loads(Path("wheel-summary.json").read_text(encoding="utf-8"))
+        assert report["method"] == "lexical_bm25_retrieval_only"
+        assert report["corpus_size"] == 15
+        assert report["question_count"] == 14
+        assert set(report["by_top_k"]) == {"1", "3", "5"}
+        PY
+
     - name: Verify installed dependency consistency
       run: python -m pip check
 
