@@ -21,7 +21,7 @@ from evalforge.rag_graders import (
     recall_at_k, reciprocal_rank,
 )
 
-DATA_DIR = Path(__file__).resolve().parents[1] / "datasets"
+DATA_DIR = Path(__file__).resolve().parent / "data"  # Bundled for wheel/CLI installs
 _TOKEN = re.compile(r"[a-z0-9]+", re.IGNORECASE)
 
 
