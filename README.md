@@ -10,6 +10,7 @@ From a checkout, install the local package (the BM25 baseline needs no model API
 python -m pip install .
 evalforge-bm25 --k 1 3 5 --summary-only
 evalforge-bm25 --k 1 3 5 --summary-only --output benchmark-summary.json
+evalforge-compare-lexical --k 1 3 5 > paired-lexical.json
 ```
 
 The installed CLI bundles the small, hand-authored 15-document / 14-question security retrieval fixture; `--corpus` and `--questions` accept your own compatible JSON fixtures. This is a **lexical BM25 retrieval baseline**, not a claim about LLM quality. The full development/test dependencies remain available in `requirements.txt`. No PyPI release has been published.
