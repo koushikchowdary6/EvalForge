@@ -77,6 +77,29 @@ jobs:
         assert set(compact["by_top_k"]) == {"1", "3", "5"}
         PY
 
+    - name: Verify CLI file export matches stdout and protects existing reports
+      if: matrix.python-version == '3.12'
+      run: |
+        python -m evalforge.offline_rag_demo --k 1 3 5 --summary-only --output exported-summary.json
+        python - <<'PY'
+        import json
+        from pathlib import Path
+        expected = json.loads(Path("benchmark-summary.json").read_text(encoding="utf-8"))
+        actual = json.loads(Path("exported-summary.json").read_text(encoding="utf-8"))
+        assert actual == expected, "File export changed benchmark metrics or provenance"
+        PY
+        if python -m evalforge.offline_rag_demo --k 1 3 5 --summary-only --output exported-summary.json; then
+          echo "ERROR: CLI overwrote an existing benchmark artifact" >&2
+          exit 1
+        fi
+        python - <<'PY'
+        import json
+        from pathlib import Path
+        expected = json.loads(Path("benchmark-summary.json").read_text(encoding="utf-8"))
+        actual = json.loads(Path("exported-summary.json").read_text(encoding="utf-8"))
+        assert actual == expected, "Failed overwrite attempt changed existing evidence"
+        PY
+
     - name: Upload compact benchmark evidence
       if: matrix.python-version == '3.12'
       uses: actions/upload-artifact@v4
