@@ -1,5 +1,21 @@
 # EvalForge
 
+**Evaluate RAG retrieval and AI-agent safety with reproducible, inspectable benchmarks.** Start with an API-free BM25 retrieval baseline, then explore provider-backed LLM and agent evaluation. The offline demo makes **no model calls**, needs **no API keys**, and does **not** measure answer correctness or hallucination resistance.
+
+### Try the offline benchmark first
+
+```bash
+git clone https://github.com/koushikchowdary6/EvalForge.git
+cd EvalForge
+python -m pip install -r requirements.txt
+python -m evalforge.offline_rag_demo --k 1 3 5
+```
+
+**What you get:** ranked document IDs, precision/recall@k, nDCG, average precision, MRR, hit rate, lexical-evidence diagnostics, and dataset SHA-256 fingerprints on the bundled 15-document / 14-question security benchmark. These are **lexical retrieval measurements**, not LLM accuracy claims. To verify the offline path, run `python -m pytest tests/test_offline_rag_demo.py tests/test_offline_rag_evidence_metrics.py -q`.
+
+**Explore next:** [retrieval methodology](docs/PAIRED_LEXICAL_COMPARISON.md) · [multilingual fixture limitations](docs/MULTILINGUAL_LEXICAL_BASELINE.md) · [full project status and provider-backed setup](#project-status).
+
+
 **Reproducible multilingual lexical sanity check:** A small, hand-authored
 [English/Hindi/Japanese/Arabic/accented-French BM25 fixture](docs/MULTILINGUAL_LEXICAL_BASELINE.md)
 compares ASCII and Unicode tokenization using evidence-only retrieval metrics,
