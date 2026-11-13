@@ -962,6 +962,10 @@ def main(argv=None):
         "--summary-only", action="store_true",
         help="Emit aggregate metrics and benchmark provenance without per-case records",
     )
+    parser.add_argument(
+        "--output", type=Path,
+        help="Write the JSON report to a file instead of standard output",
+    )
     args = parser.parse_args(argv)
     try:
         docs = load_benchmark_json(args.corpus)
@@ -971,7 +975,16 @@ def main(argv=None):
         parser.error(str(exc))
     if args.summary_only:
         report = {key: value for key, value in report.items() if key != "cases"}
-    print(json.dumps(report, indent=2, allow_nan=False))
+    rendered = json.dumps(report, indent=2, allow_nan=False) + "\n"
+    if args.output is None:
+        print(rendered, end="")
+    else:
+        try:
+            # Never silently create directories or overwrite an existing report.
+            with args.output.open("x", encoding="utf-8") as stream:
+                stream.write(rendered)
+        except OSError as exc:
+            parser.error(f"cannot write report to {args.output}: {exc}")
 
 
 if __name__ == "__main__":
