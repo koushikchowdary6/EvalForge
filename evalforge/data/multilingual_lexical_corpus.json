@@ -1,0 +1,27 @@
+[
+  {
+    "doc_id": "d-en",
+    "title": "Battery voltage",
+    "text": "voltage monitoring metrics"
+  },
+  {
+    "doc_id": "d-hi",
+    "title": "बैटरी वोल्टेज",
+    "text": "निगरानी"
+  },
+  {
+    "doc_id": "d-jp",
+    "title": "温度 センサー",
+    "text": "測定"
+  },
+  {
+    "doc_id": "d-ar",
+    "title": "درجة حرارة",
+    "text": "المستشعر"
+  },
+  {
+    "doc_id": "d-fr",
+    "title": "Café",
+    "text": "crème et pâtisseries"
+  }
+]
