@@ -958,6 +958,10 @@ def main(argv=None):
         "--tokenizer", choices=("ascii", "unicode"), default="ascii",
         help="ASCII legacy baseline or Unicode-aware lexical tokenization",
     )
+    parser.add_argument(
+        "--summary-only", action="store_true",
+        help="Emit aggregate metrics and benchmark provenance without per-case records",
+    )
     args = parser.parse_args(argv)
     try:
         docs = load_benchmark_json(args.corpus)
@@ -965,6 +969,8 @@ def main(argv=None):
         report = evaluate(docs, questions, args.k, tokenizer_mode=args.tokenizer)
     except (ValueError, json.JSONDecodeError, OSError) as exc:
         parser.error(str(exc))
+    if args.summary_only:
+        report = {key: value for key, value in report.items() if key != "cases"}
     print(json.dumps(report, indent=2, allow_nan=False))
 
 
