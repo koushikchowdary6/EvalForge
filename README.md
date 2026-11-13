@@ -2,6 +2,18 @@
 
 **Evaluate RAG retrieval and AI-agent safety with reproducible, inspectable benchmarks.** Start with an API-free BM25 retrieval baseline, then explore provider-backed LLM and agent evaluation. The offline demo makes **no model calls**, needs **no API keys**, and does **not** measure answer correctness or hallucination resistance.
 
+### Install the offline benchmark CLI
+
+From a checkout, install the local package (the BM25 baseline needs no model API keys or provider dependencies):
+
+```bash
+python -m pip install .
+evalforge-bm25 --k 1 3 5 --summary-only
+evalforge-bm25 --k 1 3 5 --summary-only --output benchmark-summary.json
+```
+
+The installed CLI bundles the small, hand-authored 15-document / 14-question security retrieval fixture; `--corpus` and `--questions` accept your own compatible JSON fixtures. This is a **lexical BM25 retrieval baseline**, not a claim about LLM quality. The full development/test dependencies remain available in `requirements.txt`. No PyPI release has been published.
+
 ### Try the offline benchmark first
 
 ```bash
