@@ -47,8 +47,10 @@ jobs:
         assert set(report["by_top_k"]) == {"1", "3", "5"}
         PY
 
+    # Packaging compatibility is part of the supported Python 3.10–3.12 contract,
+    # not just a Python 3.12 smoke test. Exercise the wheel in an isolated venv
+    # on every matrix version; publish the artifact only from Python 3.12.
     - name: Verify wheel installation outside the source checkout
-      if: matrix.python-version == '3.12'
       run: |
         python -m pip wheel --no-deps --wheel-dir dist .
         python -m venv "$RUNNER_TEMP/evalforge-wheel-venv"
