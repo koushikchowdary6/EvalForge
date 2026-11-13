@@ -11,6 +11,16 @@ python -m pip install -r requirements.txt
 python -m evalforge.offline_rag_demo --k 1 3 5
 ```
 
+**For CI or a compact benchmark artifact**, omit the per-question records while retaining aggregate metrics, dataset fingerprints, tokenizer diagnostics, and coverage warnings:
+
+```bash
+python -m evalforge.offline_rag_demo --k 1 3 5 --summary-only > benchmark-summary.json
+python -m evalforge.offline_rag_demo --k 1 3 5 --tokenizer unicode --summary-only > benchmark-unicode-summary.json
+python -m pytest tests/test_offline_rag_demo.py tests/test_offline_rag_evidence_metrics.py -q
+```
+
+The `--summary-only` flag removes the top-level `cases` array; it **does not** remove aggregate warnings or turn lexical retrieval scores into claims about LLM answer correctness. Compare reports only with matching corpus/question fingerprints, tokenizer settings, and top-k values. The bundled small, security-themed dataset is a demonstration fixture, not an external generalization benchmark.
+
 **What you get:** ranked document IDs, precision/recall@k, nDCG, average precision, MRR, hit rate, lexical-evidence diagnostics, and dataset SHA-256 fingerprints on the bundled 15-document / 14-question security benchmark. These are **lexical retrieval measurements**, not LLM accuracy claims. To verify the offline path, run `python -m pytest tests/test_offline_rag_demo.py tests/test_offline_rag_evidence_metrics.py -q`.
 
 **Explore next:** [retrieval methodology](docs/PAIRED_LEXICAL_COMPARISON.md) · [multilingual fixture limitations](docs/MULTILINGUAL_LEXICAL_BASELINE.md) · [full project status and provider-backed setup](#project-status).
