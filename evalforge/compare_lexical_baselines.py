@@ -226,6 +226,10 @@ def main(argv=None):
         "--summary-only", action="store_true",
         help="Omit per-question cases while retaining paired metrics and dataset fingerprints",
     )
+    parser.add_argument(
+        "--output", type=Path,
+        help="Write JSON to a new file instead of stdout (never overwrite existing reports)",
+    )
     args = parser.parse_args(argv)
     try:
         docs = load_benchmark_json(args.corpus)
@@ -235,7 +239,15 @@ def main(argv=None):
         parser.error(str(exc))
     if args.summary_only:
         report = {key: value for key, value in report.items() if key != "cases"}
-    print(json.dumps(report, indent=2, allow_nan=False))
+    rendered = json.dumps(report, indent=2, allow_nan=False) + "\n"
+    if args.output is None:
+        print(rendered, end="")
+    else:
+        try:
+            with args.output.open("x", encoding="utf-8") as stream:
+                stream.write(rendered)
+        except OSError as exc:
+            parser.error(f"cannot write report to {args.output}: {exc}")
 
 
 if __name__ == "__main__":
