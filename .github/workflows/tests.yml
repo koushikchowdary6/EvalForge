@@ -69,6 +69,23 @@ jobs:
         assert set(report["by_top_k"]) == {"1", "3", "5"}
         PY
         "$RUNNER_TEMP/evalforge-wheel-venv/bin/evalforge-compare-lexical" --k 1 3 5 > paired-lexical.json
+        # Test the installed entry point with caller-supplied datasets, not just
+        # the package's bundled fixtures. Run outside the source checkout.
+        "$RUNNER_TEMP/evalforge-wheel-venv/bin/evalforge-bm25" \
+          --corpus "$GITHUB_WORKSPACE/datasets/multilingual_lexical_corpus.json" \
+          --questions "$GITHUB_WORKSPACE/datasets/multilingual_lexical_questions.json" \
+          --tokenizer unicode --k 1 --summary-only > custom-fixture-summary.json
+        "$RUNNER_TEMP/evalforge-wheel-venv/bin/python" - <<'PY'
+        import json
+        from pathlib import Path
+        report = json.loads(Path("custom-fixture-summary.json").read_text(encoding="utf-8"))
+        assert report["method"] == "lexical_bm25_retrieval_only"
+        assert report["question_count"] == 6
+        assert report["parameters"]["tokenizer"] == "unicode_alphanumeric"
+        assert set(report["by_top_k"]) == {"1"}
+        assert len(report["corpus_sha256"]) == 64
+        assert len(report["questions_sha256"]) == 64
+        PY
         "$RUNNER_TEMP/evalforge-wheel-venv/bin/python" - <<'PY'
         import json
         from pathlib import Path
