@@ -8,6 +8,7 @@ Python 3.10+ is required. Install directly from GitHub (no clone or provider cre
 
 ```bash
 python -m pip install "git+https://github.com/koushikchowdary6/EvalForge.git"
+evalforge-demo  # run both offline benchmarks, no checkout or API keys
 evalforge-bm25 --k 1 3 5 --summary-only --output benchmark-summary.json
 evalforge-compare-lexical --k 1 3 5 --summary-only --output paired-summary.json
 ```
