@@ -179,10 +179,15 @@ jobs:
                 "paired_mean_recall_delta_upper_bound_unicode_minus_ascii",
             "--fail-on-certain-hit-regression":
                 "paired_hit_rate_delta_upper_bound_unicode_minus_ascii",
+            "--fail-on-unanswerable-match-regression":
+                "paired_unanswerable_match_rate_delta_unicode_minus_ascii",
         }
         for flag, metric in gates.items():
             expected_failure = any(
-                row[metric] is not None and row[metric] < -1e-12
+                row[metric] is not None and (
+                    row[metric] > 1e-12 if flag == "--fail-on-unanswerable-match-regression"
+                    else row[metric] < -1e-12
+                )
                 for row in report["by_top_k"].values()
             )
             destination = Path("gate-" + flag.removeprefix("--") + ".json")
