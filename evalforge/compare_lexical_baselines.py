@@ -259,11 +259,16 @@ def main(argv=None):
         if metrics["paired_mean_recall_delta_upper_bound_unicode_minus_ascii"] is not None
         and metrics["paired_mean_recall_delta_upper_bound_unicode_minus_ascii"] < -1e-12
     ]
-    certain_hit_regressions = [
-        k for k, metrics in report["by_top_k"].items()
-        if metrics["paired_hit_rate_delta_upper_bound_unicode_minus_ascii"] is not None
-        and metrics["paired_hit_rate_delta_upper_bound_unicode_minus_ascii"] < -1e-12
-    ]
+    # Only evaluate an opt-in gate when requested. Older/custom reports and
+    # recall-only test doubles need not expose the independent hit-rate bound.
+    certain_hit_regressions = (
+        [
+            k for k, metrics in report["by_top_k"].items()
+            if metrics["paired_hit_rate_delta_upper_bound_unicode_minus_ascii"] is not None
+            and metrics["paired_hit_rate_delta_upper_bound_unicode_minus_ascii"] < -1e-12
+        ]
+        if args.fail_on_certain_hit_regression else []
+    )
     rendered = json.dumps(report, indent=2, allow_nan=False) + "\n"
     if args.output is None:
         print(rendered, end="")
