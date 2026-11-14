@@ -15,6 +15,13 @@ from evalforge.offline_rag_demo import DATA_DIR, evaluate, load_benchmark_json
 
 def compare_tokenizers(docs, questions, cutoffs=(1, 3, 5)):
     """Report both gains and regressions without cherry-picking a tokenizer."""
+    # Duplicate or nonpositive cutoffs can silently collapse by_top_k keys or
+    # produce misleading benchmark comparisons. Reject them before evaluation.
+    cutoffs = tuple(cutoffs)
+    if not cutoffs or any(type(k) is not int or k <= 0 for k in cutoffs):
+        raise ValueError("top-k cutoffs must be nonempty positive integers")
+    if len(set(cutoffs)) != len(cutoffs):
+        raise ValueError("top-k cutoffs must be unique")
     ascii_report = evaluate(docs, questions, cutoffs, tokenizer_mode="ascii")
     unicode_report = evaluate(docs, questions, cutoffs, tokenizer_mode="unicode")
     assert ascii_report["corpus_sha256"] == unicode_report["corpus_sha256"]
