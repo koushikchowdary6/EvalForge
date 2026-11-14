@@ -21,6 +21,19 @@ To work from source instead, clone this repository and run `python -m pip instal
 
 Use `--corpus` and `--questions` with the BM25 CLI for compatible user-supplied JSON fixtures. Both CLIs accept `--output` and `--summary-only`; the compact report retains aggregate metrics and dataset fingerprints. For development and provider-backed evaluations, see [project status](#project-status) and `requirements.txt`. Provider-backed evaluations require configured API credentials and are **not** exercised by these offline commands.
 
+### Run the verified two-benchmark quickstart
+
+For a single, API-free smoke test of the **installed package**, clone the repository and run the same public example exercised by the Python 3.10–3.12 GitHub Actions matrix:
+
+```bash
+git clone https://github.com/koushikchowdary6/EvalForge.git
+cd EvalForge
+python -m pip install .
+python examples/quickstart_demo.py
+```
+
+The script invokes both the BM25 retrieval CLI and the paired ASCII/Unicode comparison, validates the compact JSON reports and SHA-256 dataset fingerprints, and prints a short summary. Reports live only in a temporary directory. It requires no API keys or paid model calls. [Read the demo source](examples/quickstart_demo.py) or [inspect the CI workflow](.github/workflows/ci.yml). A passing demo validates packaging and deterministic lexical evaluation on small hand-authored fixtures; it does **not** establish production retrieval quality, LLM correctness, or hallucination resistance.
+
 ### Try the offline benchmark first
 
 ```bash
