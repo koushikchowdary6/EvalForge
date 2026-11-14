@@ -11,10 +11,10 @@ python -m pip install .
 evalforge-bm25 --k 1 3 5 --summary-only
 evalforge-bm25 --k 1 3 5 --summary-only --output benchmark-summary.json
 evalforge-compare-lexical --k 1 3 5 > paired-lexical.json
-evalforge-compare-lexical --k 1 3 5 --summary-only > paired-summary.json
+evalforge-compare-lexical --k 1 3 5 --summary-only --output paired-summary.json
 ```
 
-The paired `--summary-only` report omits per-question cases while retaining aggregate paired deltas, tie-uncertainty bounds, and dataset fingerprints for reproducible comparisons.
+The paired `--summary-only` report omits per-question cases while retaining aggregate paired deltas, tie-uncertainty bounds, and dataset fingerprints for reproducible comparisons. Both CLIs accept `--output` to create a JSON report without shell redirection; the command fails rather than overwriting an existing file.
 
 The installed CLI bundles the small, hand-authored 15-document / 14-question security retrieval fixture; `--corpus` and `--questions` accept your own compatible JSON fixtures. This is a **lexical BM25 retrieval baseline**, not a claim about LLM quality. The full development/test dependencies remain available in `requirements.txt`. No PyPI release has been published.
 
