@@ -123,6 +123,26 @@ jobs:
         assert all(len(compact[key]) == 64 for key in ("corpus_sha256", "questions_sha256"))
         PY
 
+    - name: Verify paired CLI export and overwrite protection
+      if: matrix.python-version == '3.12'
+      run: |
+        python -m evalforge.compare_lexical_baselines --k 1 3 5 --summary-only > paired-stdout.json
+        python -m evalforge.compare_lexical_baselines --k 1 3 5 --summary-only --output paired-export.json
+        python - <<'PY'
+        import json
+        from pathlib import Path
+        expected = json.loads(Path("paired-stdout.json").read_text(encoding="utf-8"))
+        actual = json.loads(Path("paired-export.json").read_text(encoding="utf-8"))
+        assert expected == actual
+        assert actual["question_count"] == 6
+        assert len(actual["corpus_sha256"]) == 64
+        PY
+        if python -m evalforge.compare_lexical_baselines --summary-only --output paired-export.json; then
+          echo "ERROR: paired CLI overwrote existing evidence" >&2
+          exit 1
+        fi
+        cmp paired-stdout.json paired-export.json
+
     - name: Verify installed dependency consistency
       run: python -m pip check
 
