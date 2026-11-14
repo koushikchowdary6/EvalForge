@@ -226,6 +226,9 @@ jobs:
       run: |
         python -m pytest tests/ -v -m "not api"
 
+    - name: Run public API-free quickstart demo
+      run: python examples/quickstart_demo.py
+
     - name: Generate and validate multilingual BM25 comparison evidence
       if: matrix.python-version == '3.12'
       run: |
