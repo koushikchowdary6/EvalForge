@@ -109,5 +109,5 @@ def test_demo_reports_subprocess_and_artifact_failures(monkeypatch, tmp_path, ou
         return subprocess.CompletedProcess(command, 0, "", "")
 
     monkeypatch.setattr(demo.subprocess, "run", fake_run)
-    with pytest.raises(RuntimeError, match=expected.replace("(", r"\\(").replace(")", r"\\)")):
+    with pytest.raises(RuntimeError, match=re.escape(expected)):
         demo.run_report("evalforge.offline_rag_demo", tmp_path / "report.json")
