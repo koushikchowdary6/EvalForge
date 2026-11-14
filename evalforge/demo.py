@@ -43,7 +43,6 @@ def main() -> int:
             raise RuntimeError("Unexpected offline benchmark method")
         if paired["method"] != "paired_ascii_unicode_bm25_lexical_retrieval_only":
             raise RuntimeError("Unexpected paired benchmark method")
-        print("EvalForge offline quickstart: PASS")
         for name, report in (("BM25", bm25), ("Paired ASCII/Unicode", paired)):
             print(
                 f"{name}: {report['question_count']} questions; "
@@ -68,8 +67,9 @@ def main() -> int:
                 f"k={cutoff}: BM25 lexical evidence hit rate={hit_text}; "
                 f"Unicode-minus-ASCII paired recall delta={delta_text}"
             )
+        print("EvalForge offline quickstart: PASS")
         print(
-            "These are deterministic lexical retrieval diagnostics, "
+            "These are deterministic lexical retrieval diagnostics, 
             "not LLM correctness or hallucination benchmarks."
         )
     return 0
