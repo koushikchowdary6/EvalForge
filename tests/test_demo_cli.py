@@ -80,3 +80,33 @@ def test_demo_rejects_invalid_paired_delta(monkeypatch, bad_value):
     monkeypatch.setattr(demo, "run_report", fake_report)
     with pytest.raises(RuntimeError, match="Invalid paired recall delta"):
         demo.main()
+
+
+@pytest.mark.parametrize(
+    "outcome, expected",
+    [
+        ("timeout", "timed out after 90 seconds"),
+        ("failure", "failed (exit 7): invalid fixture"),
+        ("missing", "did not produce its JSON report"),
+        ("malformed", "produced an unreadable JSON report"),
+        ("array", "produced a non-object JSON report"),
+    ],
+)
+def test_demo_reports_subprocess_and_artifact_failures(monkeypatch, tmp_path, outcome, expected):
+    """A broken installed benchmark must fail clearly, never silently pass."""
+    def fake_run(command, **kwargs):
+        assert kwargs["timeout"] == 90
+        destination = tmp_path / "report.json"
+        if outcome == "timeout":
+            raise subprocess.TimeoutExpired(command, 90)
+        if outcome == "failure":
+            return subprocess.CompletedProcess(command, 7, "", "invalid fixture")
+        if outcome == "malformed":
+            destination.write_text("{broken", encoding="utf-8")
+        if outcome == "array":
+            destination.write_text("[]", encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(demo.subprocess, "run", fake_run)
+    with pytest.raises(RuntimeError, match=expected.replace("(", r"\\(").replace(")", r"\\)")):
+        demo.run_report("evalforge.offline_rag_demo", tmp_path / "report.json")
