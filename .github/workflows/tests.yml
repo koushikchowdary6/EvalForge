@@ -140,6 +140,15 @@ jobs:
                    for key in ("corpus_sha256", "questions_sha256"))
         PY
 
+    # Validate distribution metadata as a package index would before release.
+    # This catches malformed README rendering and wheel/sdist metadata that
+    # successful installation alone would not detect.
+    - name: Validate release distribution metadata
+      if: matrix.python-version == '3.12'
+      run: |
+        python -m pip install 'twine>=6,<7'
+        python -m twine check --strict dist/evalforge_ai-*.whl sdist/evalforge_ai-*.tar.gz
+
     - name: Verify compact paired comparison retains all aggregate evidence
       if: matrix.python-version == '3.12'
       run: |
