@@ -222,6 +222,10 @@ def main(argv=None):
         "--questions", type=Path, default=DATA_DIR / "multilingual_lexical_questions.json"
     )
     parser.add_argument("--k", type=int, nargs="+", default=[1, 3, 5])
+    parser.add_argument(
+        "--summary-only", action="store_true",
+        help="Omit per-question cases while retaining paired metrics and dataset fingerprints",
+    )
     args = parser.parse_args(argv)
     try:
         docs = load_benchmark_json(args.corpus)
@@ -229,6 +233,8 @@ def main(argv=None):
         report = compare_tokenizers(docs, questions, args.k)
     except (ValueError, json.JSONDecodeError, OSError) as exc:
         parser.error(str(exc))
+    if args.summary_only:
+        report = {key: value for key, value in report.items() if key != "cases"}
     print(json.dumps(report, indent=2, allow_nan=False))
 
 
