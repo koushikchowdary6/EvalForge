@@ -19,8 +19,26 @@ def run_report(module: str, destination: Path, *options: str) -> dict:
         sys.executable, "-m", module, "--k", "1", "3", "5",
         "--summary-only", "--output", str(destination), *options,
     ]
-    subprocess.run(command, check=True, capture_output=True, text=True)
-    report = json.loads(destination.read_text(encoding="utf-8"))
+    # Bound execution so the public quickstart cannot hang indefinitely.
+    try:
+        completed = subprocess.run(
+            command, check=False, capture_output=True, text=True, timeout=90
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"{module} timed out after 90 seconds") from exc
+    if completed.returncode != 0:
+        detail = (completed.stderr or completed.stdout).strip()
+        raise RuntimeError(
+            f"{module} failed (exit {completed.returncode}): {detail[-2000:]}"
+        )
+    if not destination.is_file():
+        raise RuntimeError(f"{module} did not produce its JSON report")
+    try:
+        report = json.loads(destination.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"{module} produced an unreadable JSON report") from exc
+    if not isinstance(report, dict):
+        raise RuntimeError(f"{module} produced a non-object JSON report")
     if "cases" in report:
         raise RuntimeError("Compact report unexpectedly includes individual cases")
     if set(report["by_top_k"]) != {"1", "3", "5"}:
