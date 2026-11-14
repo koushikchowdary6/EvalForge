@@ -32,7 +32,7 @@ python -m pip install .
 python examples/quickstart_demo.py
 ```
 
-The script invokes both the BM25 retrieval CLI and the paired ASCII/Unicode comparison, validates the compact JSON reports and SHA-256 dataset fingerprints, and prints a short summary. Reports live only in a temporary directory. It requires no API keys or paid model calls. [Read the demo source](examples/quickstart_demo.py) or [inspect the CI workflow](.github/workflows/ci.yml). A passing demo validates packaging and deterministic lexical evaluation on small hand-authored fixtures; it does **not** establish production retrieval quality, LLM correctness, or hallucination resistance.
+The script invokes both the BM25 retrieval CLI and the paired ASCII/Unicode comparison, validates the compact JSON reports and SHA-256 dataset fingerprints, and prints a short summary. Reports live only in a temporary directory. It requires no API keys or paid model calls. [Read the demo source](examples/quickstart_demo.py) or [inspect the passing CI run](https://github.com/koushikchowdary6/EvalForge/actions/runs/43613086707). A passing demo validates packaging and deterministic lexical evaluation on small hand-authored fixtures; it does **not** establish production retrieval quality, LLM correctness, or hallucination resistance.
 
 ### Try the offline benchmark first
 
