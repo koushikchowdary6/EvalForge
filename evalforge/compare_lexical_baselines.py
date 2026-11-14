@@ -236,6 +236,12 @@ def main(argv=None):
               "paired mean lexical recall delta at any requested k; "
               "ties with uncertain outcomes do not fail"),
     )
+    parser.add_argument(
+        "--fail-on-certain-hit-regression", action="store_true",
+        help=("Exit 1 if Unicode has a strictly negative upper bound on "
+              "paired lexical evidence hit-rate delta at any requested k; "
+              "uncertain positive-score ties do not fail"),
+    )
     args = parser.parse_args(argv)
     try:
         docs = load_benchmark_json(args.corpus)
@@ -253,6 +259,11 @@ def main(argv=None):
         if metrics["paired_mean_recall_delta_upper_bound_unicode_minus_ascii"] is not None
         and metrics["paired_mean_recall_delta_upper_bound_unicode_minus_ascii"] < -1e-12
     ]
+    certain_hit_regressions = [
+        k for k, metrics in report["by_top_k"].items()
+        if metrics["paired_hit_rate_delta_upper_bound_unicode_minus_ascii"] is not None
+        and metrics["paired_hit_rate_delta_upper_bound_unicode_minus_ascii"] < -1e-12
+    ]
     rendered = json.dumps(report, indent=2, allow_nan=False) + "\n"
     if args.output is None:
         print(rendered, end="")
@@ -262,6 +273,9 @@ def main(argv=None):
                 stream.write(rendered)
         except OSError as exc:
             parser.error(f"cannot write report to {args.output}: {exc}")
+    if args.fail_on_certain_hit_regression and certain_hit_regressions:
+        parser.exit(1, "Certain Unicode lexical evidence hit-rate regression at k=" +
+                    ",".join(certain_hit_regressions) + "\n")
     if args.fail_on_certain_regression and certain_regressions:
         parser.exit(1, "Certain Unicode lexical recall regression at k=" +
                     ",".join(certain_regressions) + "\n")
