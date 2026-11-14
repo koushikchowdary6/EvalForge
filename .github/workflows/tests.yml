@@ -57,7 +57,10 @@ jobs:
         "$RUNNER_TEMP/evalforge-wheel-venv/bin/python" -m pip install dist/evalforge_ai-*.whl
         # Check the isolated installation, not just the runner's development environment.
         "$RUNNER_TEMP/evalforge-wheel-venv/bin/python" -m pip check
+        # The installed demo must run outside the checkout without credentials.
         cd "$RUNNER_TEMP"
+        "$RUNNER_TEMP/evalforge-wheel-venv/bin/evalforge-demo" > installed-demo.txt
+        grep -q "EvalForge offline quickstart: PASS" installed-demo.txt
         "$RUNNER_TEMP/evalforge-wheel-venv/bin/evalforge-bm25" --k 1 3 5 --summary-only > wheel-summary.json
         "$RUNNER_TEMP/evalforge-wheel-venv/bin/python" - <<'PY'
         import json
