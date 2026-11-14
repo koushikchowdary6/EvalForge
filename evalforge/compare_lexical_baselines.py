@@ -242,6 +242,12 @@ def main(argv=None):
               "paired lexical evidence hit-rate delta at any requested k; "
               "uncertain positive-score ties do not fail"),
     )
+    parser.add_argument(
+        "--fail-on-unanswerable-match-regression", action="store_true",
+        help=("Exit 1 when Unicode produces more positive-score lexical matches "
+              "than ASCII on unanswerable questions at any requested k; "
+              "this is a lexical proxy, not a hallucination metric"),
+    )
     args = parser.parse_args(argv)
     try:
         docs = load_benchmark_json(args.corpus)
@@ -269,6 +275,17 @@ def main(argv=None):
         ]
         if args.fail_on_certain_hit_regression else []
     )
+    # A paired positive-score match on an unanswerable question is a lexical
+    # retrieval warning, not proof of a generated hallucination. Unlike the
+    # recall/hit gates this uses observed deterministic matches, not tie bounds.
+    unanswerable_match_regressions = (
+        [
+            k for k, metrics in report["by_top_k"].items()
+            if metrics["paired_unanswerable_match_rate_delta_unicode_minus_ascii"] is not None
+            and metrics["paired_unanswerable_match_rate_delta_unicode_minus_ascii"] > 1e-12
+        ]
+        if args.fail_on_unanswerable_match_regression else []
+    )
     rendered = json.dumps(report, indent=2, allow_nan=False) + "\n"
     if args.output is None:
         print(rendered, end="")
@@ -281,6 +298,9 @@ def main(argv=None):
     if args.fail_on_certain_hit_regression and certain_hit_regressions:
         parser.exit(1, "Certain Unicode lexical evidence hit-rate regression at k=" +
                     ",".join(certain_hit_regressions) + "\n")
+    if args.fail_on_unanswerable_match_regression and unanswerable_match_regressions:
+        parser.exit(1, "Unicode unanswerable lexical match-rate regression at k=" +
+                    ",".join(unanswerable_match_regressions) + "\n")
     if args.fail_on_certain_regression and certain_regressions:
         parser.exit(1, "Certain Unicode lexical recall regression at k=" +
                     ",".join(certain_regressions) + "\n")
