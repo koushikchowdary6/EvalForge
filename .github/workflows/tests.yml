@@ -205,3 +205,15 @@ jobs:
         path: dist/evalforge_ai-*.whl
         if-no-files-found: error
         retention-days: 30
+
+    # The source archive has already been rebuilt and installed in a clean
+    # environment above. Publish it alongside the wheel so downstream users
+    # can reproduce installation without relying on the Git checkout.
+    - name: Upload verified offline CLI source distribution
+      if: success() && matrix.python-version == '3.12'
+      uses: actions/upload-artifact@v4
+      with:
+        name: evalforge-offline-cli-sdist
+        path: sdist/evalforge_ai-*.tar.gz
+        if-no-files-found: error
+        retention-days: 30
