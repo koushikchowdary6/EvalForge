@@ -50,6 +50,23 @@ def main() -> int:
                 f"corpus SHA-256 {report['corpus_sha256'][:12]}…; "
                 f"questions SHA-256 {report['questions_sha256'][:12]}…"
             )
+        # Display actual measurements, not only successful execution and hashes.
+        # Values come from the bundled fixtures; no accuracy claims about LLMs.
+        for cutoff in ("1", "3", "5"):
+            bm25_row = bm25["by_top_k"][cutoff]
+            paired_row = paired["by_top_k"][cutoff]
+            hit = bm25_row["lexical_evidence_hit_rate"]
+            delta = paired_row["paired_mean_recall_delta_unicode_minus_ascii"]
+            if hit is not None and not 0 <= hit <= 1:
+                raise RuntimeError(f"Invalid lexical evidence hit rate at k={cutoff}")
+            if delta is not None and not -1 <= delta <= 1:
+                raise RuntimeError(f"Invalid paired recall delta at k={cutoff}")
+            hit_text = "undefined" if hit is None else f"{hit:.3f}"
+            delta_text = "undefined" if delta is None else f"{delta:+.3f}"
+            print(
+                f"k={cutoff}: BM25 lexical evidence hit rate={hit_text}; "
+                f"Unicode-minus-ASCII paired recall delta={delta_text}"
+            )
         print(
             "These are deterministic lexical retrieval diagnostics, "
             "not LLM correctness or hallucination benchmarks."
