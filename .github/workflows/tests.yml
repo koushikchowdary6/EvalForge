@@ -106,6 +106,23 @@ jobs:
                    for key in ("corpus_sha256", "questions_sha256"))
         PY
 
+    - name: Verify compact paired comparison retains all aggregate evidence
+      if: matrix.python-version == '3.12'
+      run: |
+        python -m evalforge.compare_lexical_baselines --k 1 3 5 > paired-full.json
+        python -m evalforge.compare_lexical_baselines --k 1 3 5 --summary-only > paired-summary.json
+        python - <<'PY'
+        import json
+        from pathlib import Path
+        full = json.loads(Path("paired-full.json").read_text(encoding="utf-8"))
+        compact = json.loads(Path("paired-summary.json").read_text(encoding="utf-8"))
+        assert "cases" in full and "cases" not in compact
+        assert {k: v for k, v in full.items() if k != "cases"} == compact
+        assert compact["question_count"] == 6
+        assert set(compact["by_top_k"]) == {"1", "3", "5"}
+        assert all(len(compact[key]) == 64 for key in ("corpus_sha256", "questions_sha256"))
+        PY
+
     - name: Verify installed dependency consistency
       run: python -m pip check
 
