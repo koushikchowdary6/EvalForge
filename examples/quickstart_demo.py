@@ -7,6 +7,7 @@ Reports are written to a temporary directory, never to tracked files.
 from __future__ import annotations
 
 import json
+import math
 import subprocess
 import sys
 import tempfile
@@ -57,9 +58,9 @@ def main() -> int:
             paired_row = paired["by_top_k"][cutoff]
             hit = bm25_row["lexical_evidence_hit_rate"]
             delta = paired_row["paired_mean_recall_delta_unicode_minus_ascii"]
-            if hit is not None and not 0 <= hit <= 1:
+            if hit is not None and (not isinstance(hit, (int, float)) or not math.isfinite(hit) or not 0 <= hit <= 1):
                 raise RuntimeError(f"Invalid lexical evidence hit rate at k={cutoff}")
-            if delta is not None and not -1 <= delta <= 1:
+            if delta is not None and (not isinstance(delta, (int, float)) or not math.isfinite(delta) or not -1 <= delta <= 1):
                 raise RuntimeError(f"Invalid paired recall delta at k={cutoff}")
             hit_text = "undefined" if hit is None else f"{hit:.3f}"
             delta_text = "undefined" if delta is None else f"{delta:+.3f}"
