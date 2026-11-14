@@ -2,21 +2,24 @@
 
 **Evaluate RAG retrieval and AI-agent safety with reproducible, inspectable benchmarks.** Start with an API-free BM25 retrieval baseline, then explore provider-backed LLM and agent evaluation. The offline demo makes **no model calls**, needs **no API keys**, and does **not** measure answer correctness or hallucination resistance.
 
-### Install the offline benchmark CLI
+### Install and run without API keys
 
-From a checkout, install the local package (the BM25 baseline needs no model API keys or provider dependencies):
+Python 3.10+ is required. Install directly from GitHub (no clone or provider credentials needed):
 
 ```bash
-python -m pip install .
-evalforge-bm25 --k 1 3 5 --summary-only
+python -m pip install "git+https://github.com/koushikchowdary6/EvalForge.git"
 evalforge-bm25 --k 1 3 5 --summary-only --output benchmark-summary.json
-evalforge-compare-lexical --k 1 3 5 > paired-lexical.json
 evalforge-compare-lexical --k 1 3 5 --summary-only --output paired-summary.json
 ```
 
-The paired `--summary-only` report omits per-question cases while retaining aggregate paired deltas, tie-uncertainty bounds, and dataset fingerprints for reproducible comparisons. Both CLIs accept `--output` to create a JSON report without shell redirection; the command fails rather than overwriting an existing file.
+To work from source instead, clone this repository and run `python -m pip install .` from its root. There is **no published PyPI release**; do not use `pip install evalforge-ai` expecting this repository's code. Both commands run offline using bundled, hand-authored security retrieval fixtures. They create JSON reports at the specified paths and refuse to overwrite existing files. Use a different filename for each run.
 
-The installed CLI bundles the small, hand-authored 15-document / 14-question security retrieval fixture; `--corpus` and `--questions` accept your own compatible JSON fixtures. This is a **lexical BM25 retrieval baseline**, not a claim about LLM quality. The full development/test dependencies remain available in `requirements.txt`. No PyPI release has been published.
+| Command | What it actually measures | What it does not measure |
+| --- | --- | --- |
+| `evalforge-bm25` | Deterministic BM25 retrieval metrics and lexical-evidence diagnostics on 15 documents / 14 questions | Generated-answer accuracy, semantic retrieval, or hallucination resistance |
+| `evalforge-compare-lexical` | Paired ASCII-vs-Unicode BM25 evidence metrics on a small multilingual fixture | Translation quality, LLM safety, or independent model performance |
+
+Use `--corpus` and `--questions` with the BM25 CLI for compatible user-supplied JSON fixtures. Both CLIs accept `--output` and `--summary-only`; the compact report retains aggregate metrics and dataset fingerprints. For development and provider-backed evaluations, see [project status](#project-status) and `requirements.txt`. Provider-backed evaluations require configured API credentials and are **not** exercised by these offline commands.
 
 ### Try the offline benchmark first
 
