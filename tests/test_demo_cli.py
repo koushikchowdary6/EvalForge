@@ -53,7 +53,7 @@ def test_demo_rejects_invalid_hit_rate(monkeypatch, bad_value):
 
     monkeypatch.setattr(demo, "run_report", fake_report)
     with pytest.raises(RuntimeError, match="Invalid lexical evidence hit rate"):
-        demo.main()
+        demo.main([])
 
 
 @pytest.mark.parametrize("bad_value", [float("nan"), float("inf"), -float("inf"), 1.01, -1.01, True, False])
@@ -81,7 +81,7 @@ def test_demo_rejects_invalid_paired_delta(monkeypatch, bad_value):
 
     monkeypatch.setattr(demo, "run_report", fake_report)
     with pytest.raises(RuntimeError, match="Invalid paired recall delta"):
-        demo.main()
+        demo.main([])
 
 
 @pytest.mark.parametrize(
@@ -183,7 +183,7 @@ def test_demo_does_not_print_partial_metrics_on_late_failure(monkeypatch, capsys
 
     monkeypatch.setattr(demo, "run_report", fake_report)
     with pytest.raises(RuntimeError, match="Invalid paired recall delta at k=5"):
-        demo.main()
+        demo.main([])
     assert capsys.readouterr().out == ""
 
 
