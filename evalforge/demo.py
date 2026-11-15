@@ -47,9 +47,11 @@ def run_report(module: str, destination: Path, *options: str) -> dict:
     for cutoff, row in cutoffs.items():
         if not isinstance(row, dict):
             raise RuntimeError(f"{module} returned a non-object metric row at k={cutoff}")
-        for metric in ("lexical_evidence_hit_rate", "paired_mean_recall_delta_unicode_minus_ascii"):
-            if metric not in row:
-                raise RuntimeError(f"{module} missing metric {metric} at k={cutoff}")
+        metric = ("paired_mean_recall_delta_unicode_minus_ascii"
+                  if module.endswith("compare_lexical_baselines")
+                  else "lexical_evidence_hit_rate")
+        if metric not in row:
+            raise RuntimeError(f"{module} missing metric {metric} at k={cutoff}")
     for key in ("corpus_sha256", "questions_sha256"):
         digest = report.get(key)
         if not isinstance(digest, str) or len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
