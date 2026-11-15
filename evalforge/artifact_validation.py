@@ -63,6 +63,19 @@ def validate(report: dict, threshold: float, expected_version: str | None = None
         raise ValueError(f"Lexical evidence hit rate at k=3 ({hit}) below {threshold}")
 
 
+# Saved reports are small; reject unexpectedly large inputs before JSON decoding.
+# This bounds memory used by a CI gate on untrusted or accidental artifacts.
+MAX_REPORT_BYTES = 10 * 1024 * 1024
+
+
+def _read_report(path: Path) -> str:
+    with path.open("rb") as handle:
+        raw = handle.read(MAX_REPORT_BYTES + 1)
+    if len(raw) > MAX_REPORT_BYTES:
+        raise ValueError("Evaluation artifact exceeds 10 MiB limit")
+    return raw.decode("utf-8")
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("report", type=Path)
@@ -73,7 +86,7 @@ def main(argv=None) -> int:
         parser.error("--min-hit-rate must be finite and between 0 and 1")
     try:
         expected = version("evalforge-ai") if args.check_installed_version else None
-        report = json.loads(args.report.read_text(encoding="utf-8"),
+        report = json.loads(_read_report(args.report),
                             object_pairs_hook=_unique_keys,
                             parse_constant=lambda x: (_ for _ in ()).throw(ValueError(f"Invalid JSON constant: {x}")))
         validate(report, args.min_hit_rate, expected)
