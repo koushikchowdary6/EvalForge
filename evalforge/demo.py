@@ -73,7 +73,11 @@ def main(argv: list[str] | None = None) -> int:
         "--min-hit-rate", type=float, default=None, metavar="RATE",
         help="Fail if BM25 lexical evidence hit rate at k=3 is below RATE (0..1)",
     )
+    parser.add_argument("--output", type=Path, default=None, metavar="PATH",
+                        help="Write --json report to a new file without overwriting")
     args = parser.parse_args(argv)
+    if args.output is not None and not args.json:
+        parser.error("--output requires --json")
     if args.min_hit_rate is not None and (
         not math.isfinite(args.min_hit_rate) or not 0 <= args.min_hit_rate <= 1
     ):
@@ -133,7 +137,14 @@ def main(argv: list[str] | None = None) -> int:
                 },
                 "limitations": "Lexical retrieval diagnostics; not LLM correctness or hallucination resistance",
             }
-            print(json.dumps(payload, sort_keys=True, allow_nan=False))
+            serialized = json.dumps(payload, sort_keys=True, allow_nan=False)
+            if args.output is None:
+                print(serialized)
+            else:
+                # Exclusive creation prevents overwriting existing benchmark evidence.
+                with args.output.open("x", encoding="utf-8") as output:
+                    output.write(serialized + "\
+")
         else:
             for name, report in (("BM25", bm25), ("Paired ASCII/Unicode", paired)):
                 print(
