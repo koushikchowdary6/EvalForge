@@ -232,3 +232,35 @@ def test_demo_json_never_prints_partial_output_on_invalid_metric(monkeypatch, ca
     with pytest.raises(RuntimeError, match="Invalid paired recall delta at k=5"):
         demo.main(["--json"])
     assert capsys.readouterr().out == ""
+
+
+@pytest.mark.parametrize("bad", ["nan", "inf", "-inf", "-0.1", "1.1", "nope"])
+def test_demo_rejects_invalid_quality_gate(bad):
+    with pytest.raises(SystemExit) as error:
+        demo.main(["--min-hit-rate", bad])
+    assert error.value.code == 2
+
+
+def test_demo_quality_gate_pass_and_fail(monkeypatch, capsys):
+    def fake_report(module, destination, *options):
+        paired = module.endswith("compare_lexical_baselines")
+        return {
+            "method": ("paired_ascii_unicode_bm25_lexical_retrieval_only"
+                       if paired else "lexical_bm25_retrieval_only"),
+            "question_count": 3,
+            "corpus_sha256": "a" * 64,
+            "questions_sha256": "b" * 64,
+            "by_top_k": {
+                str(k): {
+                    "lexical_evidence_hit_rate": 0.5,
+                    "paired_mean_recall_delta_unicode_minus_ascii": 0.0,
+                } for k in (1, 3, 5)
+            },
+        }
+
+    monkeypatch.setattr(demo, "run_report", fake_report)
+    assert demo.main(["--json", "--min-hit-rate", "0.5"]) == 0
+    assert json.loads(capsys.readouterr().out)["schema_version"] == 1
+    with pytest.raises(RuntimeError, match="below required 0.6"):
+        demo.main(["--json", "--min-hit-rate", "0.6"])
+    assert capsys.readouterr().out == ""
