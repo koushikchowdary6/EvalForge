@@ -73,6 +73,18 @@ def main() -> int:
             raise RuntimeError("Unexpected offline benchmark method")
         if paired["method"] != "paired_ascii_unicode_bm25_lexical_retrieval_only":
             raise RuntimeError("Unexpected paired benchmark method")
+        # Validate every cutoff before emitting any success-looking metrics.
+        for cutoff in ("1", "3", "5"):
+            bm25_row = bm25["by_top_k"][cutoff]
+            paired_row = paired["by_top_k"][cutoff]
+            hit = bm25_row["lexical_evidence_hit_rate"]
+            delta = paired_row["paired_mean_recall_delta_unicode_minus_ascii"]
+            if hit is not None and (type(hit) not in (int, float) or not math.isfinite(hit) or not 0 <= hit <= 1):
+                raise RuntimeError(f"Invalid lexical evidence hit rate at k={cutoff}")
+            if delta is not None and (type(delta) not in (int, float) or not math.isfinite(delta) or not -1 <= delta <= 1):
+                raise RuntimeError(f"Invalid paired recall delta at k={cutoff}")
+            hit_text = "undefined" if hit is None else f"{hit:.3f}"
+            delta_text = "undefined" if delta is None else f"{delta:+.3f}"
         for name, report in (("BM25", bm25), ("Paired ASCII/Unicode", paired)):
             print(
                 f"{name}: {report['question_count']} questions; "
@@ -87,10 +99,6 @@ def main() -> int:
             paired_row = paired["by_top_k"][cutoff]
             hit = bm25_row["lexical_evidence_hit_rate"]
             delta = paired_row["paired_mean_recall_delta_unicode_minus_ascii"]
-            if hit is not None and (not isinstance(hit, (int, float)) or not math.isfinite(hit) or not 0 <= hit <= 1):
-                raise RuntimeError(f"Invalid lexical evidence hit rate at k={cutoff}")
-            if delta is not None and (not isinstance(delta, (int, float)) or not math.isfinite(delta) or not -1 <= delta <= 1):
-                raise RuntimeError(f"Invalid paired recall delta at k={cutoff}")
             hit_text = "undefined" if hit is None else f"{hit:.3f}"
             delta_text = "undefined" if delta is None else f"{delta:+.3f}"
             print(
