@@ -6,6 +6,7 @@ Reports are written to a temporary directory, never to tracked files.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import math
 import subprocess
@@ -62,7 +63,13 @@ def run_report(module: str, destination: Path, *options: str) -> dict:
     return report
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Run two API-free retrieval benchmarks")
+    parser.add_argument(
+        "--json", action="store_true",
+        help="Emit one machine-readable JSON summary instead of human-readable output",
+    )
+    args = parser.parse_args(argv)
     with tempfile.TemporaryDirectory(prefix="evalforge-demo-") as directory:
         root = Path(directory)
         bm25 = run_report("evalforge.offline_rag_demo", root / "bm25.json")
@@ -85,31 +92,57 @@ def main() -> int:
                 raise RuntimeError(f"Invalid paired recall delta at k={cutoff}")
             hit_text = "undefined" if hit is None else f"{hit:.3f}"
             delta_text = "undefined" if delta is None else f"{delta:+.3f}"
-        for name, report in (("BM25", bm25), ("Paired ASCII/Unicode", paired)):
+        if args.json:
+            # Only validated values reach stdout. This output is suitable for
+            # CI quality gates and can be parsed without scraping human text.
+            payload = {
+                "schema_version": 1,
+                "benchmark_type": "offline_lexical_retrieval_only",
+                "bm25": {
+                    "question_count": bm25["question_count"],
+                    "corpus_sha256": bm25["corpus_sha256"],
+                    "questions_sha256": bm25["questions_sha256"],
+                    "lexical_evidence_hit_rate_by_k": {
+                        k: bm25["by_top_k"][k]["lexical_evidence_hit_rate"]
+                        for k in ("1", "3", "5")
+                    },
+                },
+                "paired_tokenizer": {
+                    "question_count": paired["question_count"],
+                    "corpus_sha256": paired["corpus_sha256"],
+                    "questions_sha256": paired["questions_sha256"],
+                    "recall_delta_unicode_minus_ascii_by_k": {
+                        k: paired["by_top_k"][k]["paired_mean_recall_delta_unicode_minus_ascii"]
+                        for k in ("1", "3", "5")
+                    },
+                },
+                "limitations": "Lexical retrieval diagnostics; not LLM correctness or hallucination resistance",
+            }
+            print(json.dumps(payload, sort_keys=True, allow_nan=False))
+        else:
+            for name, report in (("BM25", bm25), ("Paired ASCII/Unicode", paired)):
+                print(
+                    f"{name}: {report['question_count']} questions; "
+                    f"cutoffs {', '.join(report['by_top_k'])}; "
+                    f"corpus SHA-256 {report['corpus_sha256'][:12]}…; "
+                    f"questions SHA-256 {report['questions_sha256'][:12]}…"
+                )
+            for cutoff in ("1", "3", "5"):
+                bm25_row = bm25["by_top_k"][cutoff]
+                paired_row = paired["by_top_k"][cutoff]
+                hit = bm25_row["lexical_evidence_hit_rate"]
+                delta = paired_row["paired_mean_recall_delta_unicode_minus_ascii"]
+                hit_text = "undefined" if hit is None else f"{hit:.3f}"
+                delta_text = "undefined" if delta is None else f"{delta:+.3f}"
+                print(
+                    f"k={cutoff}: BM25 lexical evidence hit rate={hit_text}; "
+                    f"Unicode-minus-ASCII paired recall delta={delta_text}"
+                )
+            print("EvalForge offline quickstart: PASS")
             print(
-                f"{name}: {report['question_count']} questions; "
-                f"cutoffs {', '.join(report['by_top_k'])}; "
-                f"corpus SHA-256 {report['corpus_sha256'][:12]}…; "
-                f"questions SHA-256 {report['questions_sha256'][:12]}…"
+                "These are deterministic lexical retrieval diagnostics, "
+                "not LLM correctness or hallucination benchmarks."
             )
-        # Display actual measurements, not only successful execution and hashes.
-        # Values come from the bundled fixtures; no accuracy claims about LLMs.
-        for cutoff in ("1", "3", "5"):
-            bm25_row = bm25["by_top_k"][cutoff]
-            paired_row = paired["by_top_k"][cutoff]
-            hit = bm25_row["lexical_evidence_hit_rate"]
-            delta = paired_row["paired_mean_recall_delta_unicode_minus_ascii"]
-            hit_text = "undefined" if hit is None else f"{hit:.3f}"
-            delta_text = "undefined" if delta is None else f"{delta:+.3f}"
-            print(
-                f"k={cutoff}: BM25 lexical evidence hit rate={hit_text}; "
-                f"Unicode-minus-ASCII paired recall delta={delta_text}"
-            )
-        print("EvalForge offline quickstart: PASS")
-        print(
-            "These are deterministic lexical retrieval diagnostics, "
-            "not LLM correctness or hallucination benchmarks."
-        )
     return 0
 
 
