@@ -8,12 +8,13 @@ Python 3.10+ is required. Install directly from GitHub (no clone or provider cre
 
 ```bash
 python -m pip install "git+https://github.com/koushikchowdary6/EvalForge.git"
-evalforge-demo  # run both offline benchmarks, no checkout or API keys
+evalforge-demo  # human-readable offline benchmark summary
+evalforge-demo --json > evaluation.json  # structured CI-friendly metrics
 evalforge-bm25 --k 1 3 5 --summary-only --output benchmark-summary.json
 evalforge-compare-lexical --k 1 3 5 --summary-only --output paired-summary.json
 ```
 
-To work from source instead, clone this repository and run `python -m pip install .` from its root. There is **no published PyPI release**; do not use `pip install evalforge-ai` expecting this repository's code. Both commands run offline using bundled, hand-authored security retrieval fixtures. They create JSON reports at the specified paths and refuse to overwrite existing files. Use a different filename for each run.
+To work from source instead, clone this repository and run `python -m pip install .` from its root. There is **no published PyPI release**; do not use `pip install evalforge-ai` expecting this repository's code. All three commands run offline using bundled, hand-authored security retrieval fixtures. `evalforge-demo --json` emits a versioned, machine-readable object containing both benchmarks' metric-by-k values, dataset SHA-256 fingerprints, and explicit limitations; it does not enforce a production-quality threshold. They create JSON reports at the specified paths and refuse to overwrite existing files. Use a different filename for each run.
 
 | Command | What it actually measures | What it does not measure |
 | --- | --- | --- |
