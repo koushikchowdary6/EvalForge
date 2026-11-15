@@ -87,7 +87,7 @@ def main() -> int:
             )
         print("EvalForge offline quickstart: PASS")
         print(
-            "These are deterministic lexical retrieval diagnostics, 
+            "These are deterministic lexical retrieval diagnostics, "
             "not LLM correctness or hallucination benchmarks."
         )
     return 0
