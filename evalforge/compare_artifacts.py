@@ -22,11 +22,13 @@ def compare(baseline: dict, candidate: dict, tolerance: float = 0.0) -> dict:
             if baseline[section][field] != candidate[section][field]:
                 raise ValueError(f"Incomparable {section} {field}: fixtures differ")
     metrics = {}
+    absolute_scores = {}
     for section, field in (
         ("bm25", "lexical_evidence_hit_rate_by_k"),
         ("paired_tokenizer", "recall_delta_unicode_minus_ascii_by_k"),
     ):
         metrics[section] = {}
+        absolute_scores[section] = {"baseline": {}, "candidate": {}}
         for cutoff in ("1", "3", "5"):
             old = baseline[section][field][cutoff]
             new = candidate[section][field][cutoff]
@@ -37,6 +39,8 @@ def compare(baseline: dict, candidate: dict, tolerance: float = 0.0) -> dict:
             else:
                 delta = new - old
             metrics[section][cutoff] = delta
+            absolute_scores[section]["baseline"][cutoff] = old
+            absolute_scores[section]["candidate"][cutoff] = new
     # Paired Unicode-minus-ASCII delta is diagnostic, not a quality score:
     # its sign cannot be interpreted as an improvement or regression.
     regressions = [
@@ -56,6 +60,7 @@ def compare(baseline: dict, candidate: dict, tolerance: float = 0.0) -> dict:
         },
     }
     return {"bm25_regression_cutoffs": regressions, "metric_deltas": metrics,
+            "absolute_scores": absolute_scores, "tolerance": tolerance,
             "provenance": provenance}
 
 
