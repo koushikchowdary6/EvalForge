@@ -15,6 +15,7 @@ evalforge-bm25 = "evalforge.offline_rag_demo:main"
 evalforge-compare-lexical = "evalforge.compare_lexical_baselines:main"
 evalforge-demo = "evalforge.demo:main"
 evalforge-validate = "evalforge.artifact_validation:main"
+evalforge-compare-artifacts = "evalforge.compare_artifacts:main"
 
 [project.optional-dependencies]
 test = ["pytest>=8,<9"]
