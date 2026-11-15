@@ -33,6 +33,16 @@ To work from source instead, clone this repository and run `python -m pip instal
 
 Use `--corpus` and `--questions` with the BM25 CLI for compatible user-supplied JSON fixtures. Both CLIs accept `--output` and `--summary-only`; the compact report retains aggregate metrics and dataset fingerprints. For development and provider-backed evaluations, see [project status](#project-status) and `requirements.txt`. Provider-backed evaluations require configured API credentials and are **not** exercised by these offline commands.
 
+### Compare two offline evaluation runs
+
+Use the installed `evalforge-compare-artifacts` command to detect lexical retrieval regressions across two reports from **identical datasets**:
+
+```bash
+evalforge-compare-artifacts baseline.json candidate.json --tolerance 0.01
+```
+
+Exit code 0 means no BM25 lexical evidence hit-rate regression greater than the tolerance at k=1, 3, or 5; exit code 1 means a regression; exit code 2 means invalid or incomparable input. The command prints machine-readable JSON deltas and refuses comparisons when dataset fingerprints or question counts differ. The paired Unicode-minus-ASCII recall delta is reported as a diagnostic only, **not** treated as a quality score. These are small offline lexical fixtures, not production RAG or LLM safety measurements.
+
 ### Run the verified two-benchmark quickstart
 
 For a single, API-free smoke test of the **installed package**, clone the repository and run the same public example exercised by the Python 3.10–3.12 GitHub Actions matrix:
