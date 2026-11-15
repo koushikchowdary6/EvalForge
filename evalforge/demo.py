@@ -69,7 +69,15 @@ def main(argv: list[str] | None = None) -> int:
         "--json", action="store_true",
         help="Emit one machine-readable JSON summary instead of human-readable output",
     )
+    parser.add_argument(
+        "--min-hit-rate", type=float, default=None, metavar="RATE",
+        help="Fail if BM25 lexical evidence hit rate at k=3 is below RATE (0..1)",
+    )
     args = parser.parse_args(argv)
+    if args.min_hit_rate is not None and (
+        not math.isfinite(args.min_hit_rate) or not 0 <= args.min_hit_rate <= 1
+    ):
+        parser.error("--min-hit-rate must be a finite number between 0 and 1")
     with tempfile.TemporaryDirectory(prefix="evalforge-demo-") as directory:
         root = Path(directory)
         bm25 = run_report("evalforge.offline_rag_demo", root / "bm25.json")
@@ -92,6 +100,13 @@ def main(argv: list[str] | None = None) -> int:
                 raise RuntimeError(f"Invalid paired recall delta at k={cutoff}")
             hit_text = "undefined" if hit is None else f"{hit:.3f}"
             delta_text = "undefined" if delta is None else f"{delta:+.3f}"
+        if args.min_hit_rate is not None:
+            observed = bm25["by_top_k"]["3"]["lexical_evidence_hit_rate"]
+            if observed is None or observed < args.min_hit_rate:
+                raise RuntimeError(
+                    f"BM25 lexical evidence hit rate at k=3 "
+                    f"({observed}) is below required {args.min_hit_rate}"
+                )
         if args.json:
             # Only validated values reach stdout. This output is suitable for
             # CI quality gates and can be parsed without scraping human text.
