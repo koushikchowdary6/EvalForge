@@ -15,7 +15,9 @@ evalforge-bm25 --k 1 3 5 --summary-only --output benchmark-summary.json
 evalforge-compare-lexical --k 1 3 5 --summary-only --output paired-summary.json
 ```
 
-The optional `--min-hit-rate RATE` flag requires a finite threshold between 0 and 1 and fails before emitting JSON or a success summary when the bundled BM25 **lexical evidence hit rate at k=3** falls below it (or is undefined). It is a deterministic regression gate for this small fixture, **not** a model-quality, safety, or production RAG acceptance threshold. Choose and justify thresholds against your own labeled datasets before using them in CI.\n\nTo work from source instead, clone this repository and run `python -m pip install .` from its root. There is **no published PyPI release**; do not use `pip install evalforge-ai` expecting this repository's code. All three commands run offline using bundled, hand-authored security retrieval fixtures. `evalforge-demo --json` emits a versioned, machine-readable object containing both benchmarks' metric-by-k values, dataset SHA-256 fingerprints, and explicit limitations; it does not enforce a production-quality threshold. The CLIs create JSON reports at specified paths and refuse to overwrite existing files. The demo also supports `--json --output PATH` for a validated artifact without redirecting stdout; it refuses to overwrite an existing path. Use a different filename for each run.
+The optional `--min-hit-rate RATE` flag requires a finite threshold between 0 and 1 and fails before emitting JSON or a success summary when the bundled BM25 **lexical evidence hit rate at k=3** falls below it (or is undefined). It is a deterministic regression gate for this small fixture, **not** a model-quality, safety, or production RAG acceptance threshold. Choose and justify thresholds against your own labeled datasets before using them in CI.
+
+To work from source instead, clone this repository and run `python -m pip install .` from its root. There is **no published PyPI release**; do not use `pip install evalforge-ai` expecting this repository's code. All three commands run offline using bundled, hand-authored security retrieval fixtures. `evalforge-demo --json` emits a versioned, machine-readable object containing both benchmarks' metric-by-k values, dataset SHA-256 fingerprints, and explicit limitations; it does not enforce a production-quality threshold. The CLIs create JSON reports at specified paths and refuse to overwrite existing files. The demo also supports `--json --output PATH` for a validated artifact without redirecting stdout; it refuses to overwrite an existing path. Use a different filename for each run.
 
 | Command | What it actually measures | What it does not measure |
 | --- | --- | --- |
@@ -68,7 +70,7 @@ with regression tests and dataset fingerprints. It is not independent sampling,
 translation, embedding evaluation, or a claim of deployment accuracy.
 
 
-An LLM and AI Agent evaluation platform. Run tests against AI models and agents, grade responses, identify failures, compare performance, and generate insightful reports.
+EvalForge also contains provider-backed LLM and agent evaluation experiments. Those paths require configured credentials and are separate from the deterministic, API-free lexical benchmark shown above.
 
 ## What is EvalForge?
 
