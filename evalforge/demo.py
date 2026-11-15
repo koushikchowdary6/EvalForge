@@ -143,8 +143,7 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 # Exclusive creation prevents overwriting existing benchmark evidence.
                 with args.output.open("x", encoding="utf-8") as output:
-                    output.write(serialized + "\
-")
+                    output.write(serialized + "\n")
         else:
             for name, report in (("BM25", bm25), ("Paired ASCII/Unicode", paired)):
                 print(
