@@ -264,3 +264,23 @@ def test_demo_quality_gate_pass_and_fail(monkeypatch, capsys):
     with pytest.raises(RuntimeError, match="below required 0.6"):
         demo.main(["--json", "--min-hit-rate", "0.6"])
     assert capsys.readouterr().out == ""
+
+
+def test_demo_version_matches_installed_distribution(tmp_path):
+    """CLI version and JSON provenance must agree with installed wheel metadata."""
+    from importlib.metadata import version
+
+    expected = version("evalforge-ai")
+    result = subprocess.run(
+        [sys.executable, "-m", "evalforge.demo", "--version"],
+        cwd=tmp_path, capture_output=True, text=True, timeout=30, check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == f"demo.py {expected}"
+
+    result = subprocess.run(
+        [sys.executable, "-m", "evalforge.demo", "--json"],
+        cwd=tmp_path, capture_output=True, text=True, timeout=60, check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["evalforge_version"] == expected
