@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import subprocess
 import sys
 import tempfile
@@ -141,9 +142,27 @@ def main(argv: list[str] | None = None) -> int:
             if args.output is None:
                 print(serialized)
             else:
-                # Exclusive creation prevents overwriting existing benchmark evidence.
-                with args.output.open("x", encoding="utf-8") as output:
-                    output.write(serialized + "\n")
+                # Stage a complete artifact on the destination filesystem first.
+                # Hard-link creation is atomic and fails if the destination exists,
+                # so neither a partial write nor an overwrite can be published.
+                destination = args.output
+                with tempfile.NamedTemporaryFile(
+                    mode="w", encoding="utf-8", newline="\n",
+                    prefix=".evalforge-", suffix=".tmp",
+                    dir=destination.parent, delete=False,
+                ) as staged:
+                    staged_path = Path(staged.name)
+                    try:
+                        staged.write(serialized + "\n")
+                        staged.flush()
+                        os.fsync(staged.fileno())
+                    except BaseException:
+                        staged_path.unlink(missing_ok=True)
+                        raise
+                try:
+                    os.link(staged_path, destination)
+                finally:
+                    staged_path.unlink(missing_ok=True)
         else:
             for name, report in (("BM25", bm25), ("Paired ASCII/Unicode", paired)):
                 print(
