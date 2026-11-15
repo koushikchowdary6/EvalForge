@@ -26,6 +26,10 @@ def _unique_keys(pairs):
 
 
 def validate(report: dict, threshold: float, expected_version: str | None = None) -> None:
+    # Library callers must receive the same gate validation as CLI callers.
+    # NaN comparisons are always false and could otherwise bypass the gate.
+    if type(threshold) not in (int, float) or not math.isfinite(threshold) or not 0 <= threshold <= 1:
+        raise ValueError("Minimum hit rate must be finite and between 0 and 1")
     if type(report) is not dict or report.get("schema_version") != 1 or type(report["schema_version"]) is not int:
         raise ValueError("Unsupported report schema version")
     if report.get("benchmark_type") != "offline_lexical_retrieval_only":
