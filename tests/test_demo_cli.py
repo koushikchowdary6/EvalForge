@@ -1,6 +1,7 @@
 """Regression tests for the public, API-free installed demo entry point."""
 from __future__ import annotations
 
+import json
 import math
 import re
 import subprocess
@@ -183,4 +184,51 @@ def test_demo_does_not_print_partial_metrics_on_late_failure(monkeypatch, capsys
     monkeypatch.setattr(demo, "run_report", fake_report)
     with pytest.raises(RuntimeError, match="Invalid paired recall delta at k=5"):
         demo.main()
+    assert capsys.readouterr().out == ""
+
+
+def test_demo_json_output_from_installed_module(tmp_path):
+    """Machine-readable CLI output has stable keys and no human text."""
+    result = subprocess.run(
+        [sys.executable, "-m", "evalforge.demo", "--json"],
+        cwd=tmp_path, capture_output=True, text=True, timeout=60, check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    report = json.loads(result.stdout)
+    assert report["schema_version"] == 1
+    assert report["benchmark_type"] == "offline_lexical_retrieval_only"
+    assert report["bm25"]["question_count"] == 14
+    assert report["paired_tokenizer"]["question_count"] == 6
+    assert set(report["bm25"]["lexical_evidence_hit_rate_by_k"]) == {"1", "3", "5"}
+    assert set(report["paired_tokenizer"]["recall_delta_unicode_minus_ascii_by_k"]) == {"1", "3", "5"}
+    for group in ("bm25", "paired_tokenizer"):
+        for key in ("corpus_sha256", "questions_sha256"):
+            assert len(report[group][key]) == 64
+    assert "PASS" not in result.stdout
+    assert "not LLM correctness" in report["limitations"]
+
+
+def test_demo_json_never_prints_partial_output_on_invalid_metric(monkeypatch, capsys):
+    """JSON consumers must never receive a misleading success document."""
+    def fake_report(module, destination, *options):
+        paired = module.endswith("compare_lexical_baselines")
+        return {
+            "method": ("paired_ascii_unicode_bm25_lexical_retrieval_only"
+                       if paired else "lexical_bm25_retrieval_only"),
+            "question_count": 1,
+            "by_top_k": {
+                str(k): {
+                    "lexical_evidence_hit_rate": 0.5,
+                    "paired_mean_recall_delta_unicode_minus_ascii": (
+                        float("nan") if paired and k == 5 else 0.0
+                    ),
+                }
+                for k in (1, 3, 5)
+            },
+            "corpus_sha256": "a" * 64,
+            "questions_sha256": "b" * 64,
+        }
+    monkeypatch.setattr(demo, "run_report", fake_report)
+    with pytest.raises(RuntimeError, match="Invalid paired recall delta at k=5"):
+        demo.main(["--json"])
     assert capsys.readouterr().out == ""
