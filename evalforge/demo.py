@@ -52,6 +52,9 @@ def run_report(module: str, destination: Path, *options: str) -> dict:
                   else "lexical_evidence_hit_rate")
         if metric not in row:
             raise RuntimeError(f"{module} missing metric {metric} at k={cutoff}")
+    count = report.get("question_count")
+    if type(count) is not int or count <= 0:
+        raise RuntimeError(f"{module} returned invalid question_count")
     for key in ("corpus_sha256", "questions_sha256"):
         digest = report.get(key)
         if not isinstance(digest, str) or len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
