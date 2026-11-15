@@ -259,6 +259,28 @@ jobs:
             assert ("regression" in result.stderr.lower()) == expected_failure
         PY
 
+    # Exercise the packaged validator from an isolated wheel, not the source tree.
+    # Rejecting tampered evidence must yield a nonzero exit code in downstream CI.
+    - name: Verify installed artifact validator and tamper rejection
+      run: |
+        cd "$RUNNER_TEMP"
+        VENV="$RUNNER_TEMP/evalforge-wheel-venv/bin"
+        "$VENV/evalforge-demo" --json --output validator-evidence.json
+        "$VENV/evalforge-validate" validator-evidence.json --check-installed-version
+        "$VENV/python" - <<'PY'
+        from pathlib import Path
+        source = Path("validator-evidence.json").read_text(encoding="utf-8")
+        assert '"schema_version"' in source
+        Path("validator-duplicate-key.json").write_text(
+            source.replace('"schema_version"', '"schema_version": 1, "schema_version"', 1),
+            encoding="utf-8",
+        )
+        PY
+        if "$VENV/evalforge-validate" validator-duplicate-key.json; then
+          echo "ERROR: installed validator accepted duplicate JSON keys" >&2
+          exit 1
+        fi
+
     - name: Verify installed dependency consistency
       run: python -m pip check
 
