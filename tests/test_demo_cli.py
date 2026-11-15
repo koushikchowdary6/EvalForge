@@ -111,3 +111,25 @@ def test_demo_reports_subprocess_and_artifact_failures(monkeypatch, tmp_path, ou
     monkeypatch.setattr(demo.subprocess, "run", fake_run)
     with pytest.raises(RuntimeError, match=re.escape(expected)):
         demo.run_report("evalforge.offline_rag_demo", tmp_path / "report.json")
+
+
+@pytest.mark.parametrize(
+    "module, payload, expected",
+    [
+        ("evalforge.offline_rag_demo", {}, "invalid benchmark cutoffs"),
+        ("evalforge.offline_rag_demo", {"by_top_k": {"1": {}, "3": {}, "5": {}}}, "missing metric lexical_evidence_hit_rate"),
+        ("evalforge.compare_lexical_baselines", {"by_top_k": {"1": {}, "3": {}, "5": {}}}, "missing metric paired_mean_recall_delta_unicode_minus_ascii"),
+        ("evalforge.offline_rag_demo", {"by_top_k": {"1": [], "3": {}, "5": {}}}, "non-object metric row"),
+    ],
+)
+def test_demo_rejects_invalid_report_schema(monkeypatch, tmp_path, module, payload, expected):
+    """Malformed benchmark reports fail with actionable errors, not KeyError."""
+    import json
+
+    def fake_run(command, **kwargs):
+        (tmp_path / "report.json").write_text(json.dumps(payload), encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(demo.subprocess, "run", fake_run)
+    with pytest.raises(RuntimeError, match=re.escape(expected)):
+        demo.run_report(module, tmp_path / "report.json")
