@@ -133,3 +133,26 @@ def test_demo_rejects_invalid_report_schema(monkeypatch, tmp_path, module, paylo
     monkeypatch.setattr(demo.subprocess, "run", fake_run)
     with pytest.raises(RuntimeError, match=re.escape(expected)):
         demo.run_report(module, tmp_path / "report.json")
+
+
+@pytest.mark.parametrize("bad_count", [None, 0, -1, True, 1.5, "3"])
+def test_demo_rejects_invalid_question_counts(monkeypatch, tmp_path, bad_count):
+    """A successful benchmark must report a positive integer question count."""
+    import json
+
+    payload = {
+        "question_count": bad_count,
+        "by_top_k": {
+            str(k): {"lexical_evidence_hit_rate": 0.5} for k in (1, 3, 5)
+        },
+        "corpus_sha256": "a" * 64,
+        "questions_sha256": "b" * 64,
+    }
+
+    def fake_run(command, **kwargs):
+        (tmp_path / "report.json").write_text(json.dumps(payload), encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(demo.subprocess, "run", fake_run)
+    with pytest.raises(RuntimeError, match="invalid question_count"):
+        demo.run_report("evalforge.offline_rag_demo", tmp_path / "report.json")
