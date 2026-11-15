@@ -16,6 +16,16 @@ import tempfile
 from pathlib import Path
 
 
+def _reject_duplicate_keys(pairs: list[tuple[str, object]]) -> dict:
+    """Reject ambiguous benchmark JSON instead of silently accepting the last value."""
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"Duplicate JSON field: {key}")
+        result[key] = value
+    return result
+
+
 def run_report(module: str, destination: Path, *options: str) -> dict:
     command = [
         sys.executable, "-m", module, "--k", "1", "3", "5",
@@ -36,8 +46,11 @@ def run_report(module: str, destination: Path, *options: str) -> dict:
     if not destination.is_file():
         raise RuntimeError(f"{module} did not produce its JSON report")
     try:
-        report = json.loads(destination.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        report = json.loads(
+            destination.read_text(encoding="utf-8"),
+            object_pairs_hook=_reject_duplicate_keys,
+        )
+    except (OSError, UnicodeError, ValueError) as exc:
         raise RuntimeError(f"{module} produced an unreadable JSON report") from exc
     if not isinstance(report, dict):
         raise RuntimeError(f"{module} produced a non-object JSON report")
