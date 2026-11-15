@@ -281,6 +281,44 @@ jobs:
           exit 1
         fi
 
+    # The public comparison entry point must work from the isolated wheel,
+    # including a nonzero CI exit code for a genuine lexical regression.
+    - name: Verify installed artifact comparison regression gate
+      run: |
+        cd "$RUNNER_TEMP"
+        VENV="$RUNNER_TEMP/evalforge-wheel-venv/bin"
+        "$VENV/evalforge-demo" --json --output compare-baseline.json
+        "$VENV/python" - <<'PY'
+        import json
+        from pathlib import Path
+        baseline = json.loads(Path("compare-baseline.json").read_text(encoding="utf-8"))
+        scores = baseline["bm25"]["lexical_evidence_hit_rate_by_k"]
+        # A zero baseline cannot regress; explicitly fail the test rather than
+        # silently skipping coverage if the bundled fixture changes.
+        assert scores["3"] is not None and scores["3"] > 0
+        scores["3"] = 0.0
+        Path("compare-regressed.json").write_text(
+            json.dumps(baseline), encoding="utf-8"
+        )
+        PY
+        "$VENV/evalforge-compare-artifacts" compare-baseline.json compare-baseline.json > compare-same.json
+        if "$VENV/evalforge-compare-artifacts" compare-baseline.json compare-regressed.json > compare-regression.json; then
+          echo "ERROR: installed comparison CLI failed to reject a regression" >&2
+          exit 1
+        else
+          status=$?
+          test "$status" -eq 1 || { echo "ERROR: expected regression exit code 1, got $status" >&2; exit 1; }
+        fi
+        "$VENV/python" - <<'PY'
+        import json
+        from pathlib import Path
+        same = json.loads(Path("compare-same.json").read_text(encoding="utf-8"))
+        regression = json.loads(Path("compare-regression.json").read_text(encoding="utf-8"))
+        assert same["bm25_regression_cutoffs"] == []
+        assert "3" in regression["bm25_regression_cutoffs"]
+        assert regression["metric_deltas"]["bm25"]["3"] < 0
+        PY
+
     - name: Verify installed dependency consistency
       run: python -m pip check
 
