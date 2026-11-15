@@ -41,11 +41,18 @@ def run_report(module: str, destination: Path, *options: str) -> dict:
         raise RuntimeError(f"{module} produced a non-object JSON report")
     if "cases" in report:
         raise RuntimeError("Compact report unexpectedly includes individual cases")
-    if set(report["by_top_k"]) != {"1", "3", "5"}:
-        raise RuntimeError("Benchmark cutoffs differ from requested values")
+    cutoffs = report.get("by_top_k")
+    if not isinstance(cutoffs, dict) or set(cutoffs) != {"1", "3", "5"}:
+        raise RuntimeError(f"{module} returned invalid benchmark cutoffs")
+    for cutoff, row in cutoffs.items():
+        if not isinstance(row, dict):
+            raise RuntimeError(f"{module} returned a non-object metric row at k={cutoff}")
+        for metric in ("lexical_evidence_hit_rate", "paired_mean_recall_delta_unicode_minus_ascii"):
+            if metric not in row:
+                raise RuntimeError(f"{module} missing metric {metric} at k={cutoff}")
     for key in ("corpus_sha256", "questions_sha256"):
-        digest = report[key]
-        if len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
+        digest = report.get(key)
+        if not isinstance(digest, str) or len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
             raise RuntimeError(f"Invalid dataset fingerprint: {key}")
     return report
 
