@@ -9,13 +9,13 @@ Python 3.10+ is required. Install directly from GitHub (no clone or provider cre
 ```bash
 python -m pip install "git+https://github.com/koushikchowdary6/EvalForge.git"
 evalforge-demo  # human-readable offline benchmark summary
-evalforge-demo --json > evaluation.json  # structured CI-friendly metrics
+evalforge-demo --json --output evaluation.json  # structured artifact, refuses overwrite
 evalforge-demo --json --min-hit-rate 0.50 > gated-evaluation.json  # optional k=3 lexical gate
 evalforge-bm25 --k 1 3 5 --summary-only --output benchmark-summary.json
 evalforge-compare-lexical --k 1 3 5 --summary-only --output paired-summary.json
 ```
 
-The optional `--min-hit-rate RATE` flag requires a finite threshold between 0 and 1 and fails before emitting JSON or a success summary when the bundled BM25 **lexical evidence hit rate at k=3** falls below it (or is undefined). It is a deterministic regression gate for this small fixture, **not** a model-quality, safety, or production RAG acceptance threshold. Choose and justify thresholds against your own labeled datasets before using them in CI.\n\nTo work from source instead, clone this repository and run `python -m pip install .` from its root. There is **no published PyPI release**; do not use `pip install evalforge-ai` expecting this repository's code. All three commands run offline using bundled, hand-authored security retrieval fixtures. `evalforge-demo --json` emits a versioned, machine-readable object containing both benchmarks' metric-by-k values, dataset SHA-256 fingerprints, and explicit limitations; it does not enforce a production-quality threshold. They create JSON reports at the specified paths and refuse to overwrite existing files. Use a different filename for each run.
+The optional `--min-hit-rate RATE` flag requires a finite threshold between 0 and 1 and fails before emitting JSON or a success summary when the bundled BM25 **lexical evidence hit rate at k=3** falls below it (or is undefined). It is a deterministic regression gate for this small fixture, **not** a model-quality, safety, or production RAG acceptance threshold. Choose and justify thresholds against your own labeled datasets before using them in CI.\n\nTo work from source instead, clone this repository and run `python -m pip install .` from its root. There is **no published PyPI release**; do not use `pip install evalforge-ai` expecting this repository's code. All three commands run offline using bundled, hand-authored security retrieval fixtures. `evalforge-demo --json` emits a versioned, machine-readable object containing both benchmarks' metric-by-k values, dataset SHA-256 fingerprints, and explicit limitations; it does not enforce a production-quality threshold. The CLIs create JSON reports at specified paths and refuse to overwrite existing files. The demo also supports `--json --output PATH` for a validated artifact without redirecting stdout; it refuses to overwrite an existing path. Use a different filename for each run.
 
 | Command | What it actually measures | What it does not measure |
 | --- | --- | --- |
