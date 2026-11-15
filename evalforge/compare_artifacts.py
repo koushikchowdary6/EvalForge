@@ -43,7 +43,20 @@ def compare(baseline: dict, candidate: dict, tolerance: float = 0.0) -> dict:
         k for k, delta in metrics["bm25"].items()
         if delta is not None and delta < -tolerance
     ]
-    return {"bm25_regression_cutoffs": regressions, "metric_deltas": metrics}
+    # Include validated provenance so a CI decision is auditable after renaming files.
+    provenance = {
+        "baseline_version": baseline.get("evalforge_version"),
+        "candidate_version": candidate.get("evalforge_version"),
+        "datasets": {
+            section: {
+                field: baseline[section][field]
+                for field in ("question_count", "corpus_sha256", "questions_sha256")
+            }
+            for section in ("bm25", "paired_tokenizer")
+        },
+    }
+    return {"bm25_regression_cutoffs": regressions, "metric_deltas": metrics,
+            "provenance": provenance}
 
 
 def main(argv=None) -> int:
