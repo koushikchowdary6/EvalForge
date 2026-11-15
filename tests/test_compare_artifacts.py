@@ -104,3 +104,17 @@ def test_cli_rejects_incomparable_dataset(tmp_path, capsys):
         main([str(baseline), str(candidate)])
     assert exc.value.code == 2
     assert "fixtures differ" in capsys.readouterr().err
+
+
+def test_comparison_exposes_absolute_scores_and_gate_tolerance():
+    """A downstream CI report must explain the gate using actual scores."""
+    candidate = copy.deepcopy(fixture())
+    candidate["bm25"]["lexical_evidence_hit_rate_by_k"]["3"] = 0.5
+    report = compare(fixture(), candidate, tolerance=0.1)
+    assert report["tolerance"] == pytest.approx(0.1)
+    assert report["absolute_scores"]["bm25"]["baseline"]["3"] == pytest.approx(0.75)
+    assert report["absolute_scores"]["bm25"]["candidate"]["3"] == pytest.approx(0.5)
+    assert report["metric_deltas"]["bm25"]["3"] == pytest.approx(-0.25)
+    assert report["bm25_regression_cutoffs"] == ["3"]
+    assert report["absolute_scores"]["paired_tokenizer"]["baseline"]["3"] == pytest.approx(-0.1)
+    assert report["absolute_scores"]["paired_tokenizer"]["candidate"]["3"] == pytest.approx(-0.1)
