@@ -7,6 +7,7 @@ Reports are written to a temporary directory, never to tracked files.
 from __future__ import annotations
 
 import argparse
+from importlib.metadata import PackageNotFoundError, version
 import json
 import math
 import os
@@ -79,6 +80,11 @@ def run_report(module: str, destination: Path, *options: str) -> dict:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run two API-free retrieval benchmarks")
+    try:
+        installed_version = version("evalforge-ai")
+    except PackageNotFoundError:
+        installed_version = "uninstalled"
+    parser.add_argument("--version", action="version", version=f"%(prog)s {installed_version}")
     parser.add_argument(
         "--json", action="store_true",
         help="Emit one machine-readable JSON summary instead of human-readable output",
@@ -130,6 +136,7 @@ def main(argv: list[str] | None = None) -> int:
             # CI quality gates and can be parsed without scraping human text.
             payload = {
                 "schema_version": 1,
+                "evalforge_version": installed_version,
                 "benchmark_type": "offline_lexical_retrieval_only",
                 "bm25": {
                     "question_count": bm25["question_count"],
