@@ -67,6 +67,18 @@ not generated answers. This synthetic fixture demonstrates custom dataset
 loading and validation; it is **not** a real-world generalization benchmark.
 Choose thresholds using separately collected, representative labeled data.
 
+### Gate a custom labeled retrieval dataset in CI
+
+The installed `evalforge-custom-gate` command combines dataset preflight and a BM25 lexical-evidence hit-rate threshold in one reproducible JSON report. It exits **0** for a passing gate, **1** for a failed quality/coverage gate (while still writing evidence), and **2** for invalid input or output errors. Reports refuse overwrite. It does not evaluate generated answers, hallucinations, or agent safety.
+
+```bash
+evalforge-custom-gate --corpus examples/customer_support_corpus.json \
+  --questions examples/customer_support_questions.json \
+  --k 3 --min-hit-rate 0.50 --output custom-gate.json
+```
+
+Set thresholds using your own representative labeled data, not this synthetic example. A zero-overlap relevant label fails the gate even if unrelated documents match the question. The JSON contains corpus/question fingerprints, preflight warnings, and aggregate lexical retrieval metrics.
+
 ### Export a human-readable benchmark summary
 
 Generate a Markdown table from a validated offline JSON artifact for a pull request, release notes, or a recruiter-facing demo. The reporter includes dataset SHA-256 provenance and explicitly labels lexical metrics; it does not claim to evaluate generated answers or model safety.
