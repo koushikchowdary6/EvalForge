@@ -16,6 +16,7 @@ evalforge-compare-lexical = "evalforge.compare_lexical_baselines:main"
 evalforge-demo = "evalforge.demo:main"
 evalforge-validate = "evalforge.artifact_validation:main"
 evalforge-compare-artifacts = "evalforge.compare_artifacts:main"
+evalforge-report-md = "evalforge.report_markdown:main"
 
 [project.optional-dependencies]
 test = ["pytest>=8,<9"]
