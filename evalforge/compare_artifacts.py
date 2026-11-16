@@ -154,6 +154,12 @@ def main(argv=None) -> int:
             print(f"::error title=EvalForge BM25 regression at k={cutoff}::"
                   f"Lexical evidence hit rate fell from {old:.6f} to {new:.6f} "
                   f"(tolerance {args.tolerance:.6f})", file=sys.stderr)
+        if result["minimum_hit_rate_failed"]:
+            actual = result["absolute_scores"]["bm25"]["candidate"]["3"]
+            actual_label = "undefined" if actual is None else f"{actual:.6f}"
+            print(f"::error title=EvalForge BM25 minimum hit rate at k=3::"
+                  f"Candidate lexical evidence hit rate {actual_label} is below "
+                  f"minimum {args.min_hit_rate:.6f}", file=sys.stderr)
     return 1 if result["bm25_regression_cutoffs"] or result["minimum_hit_rate_failed"] else 0
 
 
