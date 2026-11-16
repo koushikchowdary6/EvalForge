@@ -236,3 +236,22 @@ def test_github_annotations_omit_absolute_floor_on_pass(tmp_path, capsys):
     path.write_text(json.dumps(fixture()), encoding="utf-8")
     assert main([str(path), str(path), "--min-hit-rate", "0.5", "--github-annotations"]) == 0
     assert "::error" not in capsys.readouterr().err
+
+
+def test_missing_github_summary_does_not_publish_artifact(tmp_path, monkeypatch, capsys):
+    """Invalid Actions configuration must not publish misleading CI evidence."""
+    import json
+    from evalforge.compare_artifacts import main
+
+    report = tmp_path / "report.json"
+    output = tmp_path / "comparison.json"
+    report.write_text(json.dumps(fixture()), encoding="utf-8")
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+
+    with pytest.raises(SystemExit) as exc:
+        main([str(report), str(report), "--github-step-summary",
+              "--output", str(output)])
+    assert exc.value.code == 2
+    assert not output.exists()
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["report.json"]
+    assert "GITHUB_STEP_SUMMARY is not set" in capsys.readouterr().err
