@@ -62,6 +62,22 @@ def main() -> None:
                 "Regression report omitted degraded k=3 metric")
         require(failed_evidence["metric_deltas"]["bm25"]["3"] < 0,
                 "Degraded k=3 metric did not show a negative delta")
+        # A candidate can be consistently poor without regressing relative to its
+        # baseline. Verify that the absolute quality floor independently fails.
+        floor_report = root / "quality-floor.json"
+        floor = subprocess.run(
+            ["evalforge-compare-artifacts", str(degraded), str(degraded),
+             "--min-hit-rate", str(hit_rates["3"]),
+             "--output", str(floor_report)],
+            capture_output=True, text=True, check=False,
+        )
+        require(floor.returncode == 1,
+                f"Expected absolute quality-floor exit code 1, got {floor.returncode}: {floor.stderr}")
+        floor_evidence = json.loads(floor_report.read_text(encoding="utf-8"))
+        require(floor_evidence["bm25_regression_cutoffs"] == [],
+                "Identical degraded runs unexpectedly triggered relative regression")
+        print("PASS: absolute quality floor rejects unchanged poor retrieval "
+              "and preserves JSON failure evidence")
         print("PASS: installed regression gate rejects degraded k=3 evidence "
               "and preserves a JSON report")
         print("PASS: reproducible offline benchmark, validated evidence, no regression")
