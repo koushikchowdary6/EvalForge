@@ -173,3 +173,37 @@ def test_cli_failed_publish_leaves_no_partial_report_or_tempfile(tmp_path, monke
     assert not output.exists()
     assert sorted(path.name for path in tmp_path.iterdir()) == ["baseline.json"]
     assert "output rejected" in capsys.readouterr().err.lower()
+
+
+def test_absolute_floor_fails_without_relative_regression():
+    """An unchanged weak model must not pass solely because baseline is weak."""
+    weak = fixture()
+    weak["bm25"]["lexical_evidence_hit_rate_by_k"]["3"] = 0.25
+    report = compare(weak, copy.deepcopy(weak), min_hit_rate=0.5)
+    assert report["bm25_regression_cutoffs"] == []
+    assert report["minimum_hit_rate_failed"] is True
+    assert report["min_hit_rate"] == 0.5
+    assert compare(weak, weak, min_hit_rate=0.25)["minimum_hit_rate_failed"] is False
+
+
+@pytest.mark.parametrize("invalid", [float("nan"), float("inf"), -0.1, 1.1])
+def test_absolute_floor_rejects_invalid_values(invalid):
+    with pytest.raises(ValueError, match="Minimum hit rate"):
+        compare(fixture(), fixture(), min_hit_rate=invalid)
+
+
+def test_absolute_floor_cli_exit_and_report(tmp_path, capsys):
+    """Quality floor is a gate failure (exit 1), not an invalid report (exit 2)."""
+    import json
+    from evalforge.compare_artifacts import main
+
+    weak = fixture()
+    weak["bm25"]["lexical_evidence_hit_rate_by_k"]["3"] = 0.25
+    path = tmp_path / "weak.json"
+    path.write_text(json.dumps(weak), encoding="utf-8")
+    assert main([str(path), str(path), "--min-hit-rate", "0.5"]) == 1
+    report = json.loads(capsys.readouterr().out)
+    assert report["minimum_hit_rate_failed"] is True
+    assert report["bm25_regression_cutoffs"] == []
+    assert main([str(path), str(path), "--min-hit-rate", "0.25"]) == 0
+    assert json.loads(capsys.readouterr().out)["minimum_hit_rate_failed"] is False
