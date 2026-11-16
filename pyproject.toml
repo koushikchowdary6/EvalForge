@@ -17,6 +17,7 @@ evalforge-demo = "evalforge.demo:main"
 evalforge-validate = "evalforge.artifact_validation:main"
 evalforge-compare-artifacts = "evalforge.compare_artifacts:main"
 evalforge-report-md = "evalforge.report_markdown:main"
+evalforge-dataset-audit = "evalforge.dataset_audit:main"
 
 [project.optional-dependencies]
 test = ["pytest>=8,<9"]
