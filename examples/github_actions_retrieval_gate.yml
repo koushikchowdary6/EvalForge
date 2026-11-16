@@ -1,0 +1,39 @@
+# Copy this file to .github/workflows/evalforge-retrieval.yml in a consumer repo.
+# Example only: uses EvalForge's small synthetic lexical fixture, not a production RAG quality gate.
+name: EvalForge offline retrieval smoke test
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  offline-retrieval:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install EvalForge from source
+        run: python -m pip install "git+https://github.com/koushikchowdary6/EvalForge.git"
+      - name: Generate and validate offline evaluation artifact
+        run: |
+          evalforge-demo --json --output evaluation.json
+          evalforge-validate evaluation.json --min-hit-rate 0.50 --check-installed-version
+      - name: Render Markdown summary
+        if: always()
+        run: |
+          if [ -f evaluation.json ]; then
+            evalforge-report-md evaluation.json --output evaluation-summary.md
+            cat evaluation-summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload reproducibility evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evalforge-offline-retrieval
+          path: |
+            evaluation.json
+            evaluation-summary.md
+          if-no-files-found: warn
