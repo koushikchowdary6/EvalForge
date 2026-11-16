@@ -1,0 +1,40 @@
+[
+  {
+    "id": "refund",
+    "question": "How do I request a refund with a receipt?",
+    "answerable": true,
+    "relevant_doc_ids": [
+      "refund-policy"
+    ]
+  },
+  {
+    "id": "recover",
+    "question": "How do I reset my password with a recovery email?",
+    "answerable": true,
+    "relevant_doc_ids": [
+      "account-recovery"
+    ]
+  },
+  {
+    "id": "tracking",
+    "question": "Where can I track shipping with a parcel number?",
+    "answerable": true,
+    "relevant_doc_ids": [
+      "shipping-tracking"
+    ]
+  },
+  {
+    "id": "invoice",
+    "question": "Where do I download my billing invoice?",
+    "answerable": true,
+    "relevant_doc_ids": [
+      "billing-invoice"
+    ]
+  },
+  {
+    "id": "unsupported",
+    "question": "What is the weather forecast for tomorrow?",
+    "answerable": false,
+    "relevant_doc_ids": []
+  }
+]
