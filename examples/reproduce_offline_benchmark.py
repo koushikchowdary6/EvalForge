@@ -37,9 +37,20 @@ def main() -> None:
         result = json.loads(comparison.read_text(encoding="utf-8"))
         require(first == second, "Offline benchmark was not deterministic")
         require(result["bm25_regression_cutoffs"] == [], "Identical inputs regressed")
+        # Reproducibility requires identical provenance, not merely well-sized
+        # hashes. Validate the digest encoding and compare both runs and both
+        # benchmark arms so a silently changed input cannot pass this smoke test.
         for section in ("bm25", "paired_tokenizer"):
             for key in ("corpus_sha256", "questions_sha256"):
-                require(len(first[section][key]) == 64, f"Invalid fingerprint: {section}.{key}")
+                digest = first[section][key]
+                require(isinstance(digest, str) and len(digest) == 64
+                        and all(char in "0123456789abcdef" for char in digest),
+                        f"Invalid SHA-256 fingerprint: {section}.{key}")
+                require(digest == second[section][key],
+                        f"Non-reproducible fingerprint: {section}.{key}")
+        for key in ("corpus_sha256", "questions_sha256"):
+            require(first["bm25"][key] == first["paired_tokenizer"][key],
+                    f"Benchmark arms used different input provenance: {key}")
         # Also prove the installed gate rejects a degraded candidate and retains
         # machine-readable failure evidence for a downstream CI artifact upload.
         degraded = root / "degraded.json"
