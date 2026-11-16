@@ -22,13 +22,16 @@ def audit(docs: list, questions: list, tokenizer: str = "ascii") -> dict:
     split = tokenize if tokenizer == "ascii" else tokenize_unicode
     vocabulary = set()
     unindexable = set()
+    document_terms = {}
     for doc in docs:
         terms = set(split(doc["title"] + " " + doc["text"]))
         vocabulary.update(terms)
+        document_terms[doc["doc_id"]] = terms
         if not terms:
             unindexable.add(doc["doc_id"])
     no_overlap = []
     unindexable_labels = []
+    no_relevant_overlap = []
     answerable = 0
     for case in questions:
         if not case["answerable"]:
@@ -36,6 +39,9 @@ def audit(docs: list, questions: list, tokenizer: str = "ascii") -> dict:
         answerable += 1
         if not set(split(case["question"])).intersection(vocabulary):
             no_overlap.append(case["id"])
+        relevant_vocabulary = set().union(*(document_terms[doc_id] for doc_id in case["relevant_doc_ids"]))
+        if not set(split(case["question"])).intersection(relevant_vocabulary):
+            no_relevant_overlap.append(case["id"])
         if set(case["relevant_doc_ids"]).intersection(unindexable):
             unindexable_labels.append(case["id"])
     return {
@@ -50,6 +56,7 @@ def audit(docs: list, questions: list, tokenizer: str = "ascii") -> dict:
         "unindexable_document_ids": sorted(unindexable),
         "answerable_question_ids_without_corpus_token_overlap": sorted(no_overlap),
         "question_ids_with_unindexable_relevance_labels": sorted(unindexable_labels),
+        "answerable_question_ids_without_relevant_doc_token_overlap": sorted(no_relevant_overlap),
         "corpus_sha256": _fingerprint(docs),
         "questions_sha256": _fingerprint(questions),
     }
@@ -72,7 +79,8 @@ def main(argv: list[str] | None = None) -> int:
     print(json.dumps(report, sort_keys=True, allow_nan=False))
     if args.strict and (report["unindexable_document_ids"]
                         or report["answerable_question_ids_without_corpus_token_overlap"]
-                        or report["question_ids_with_unindexable_relevance_labels"]):
+                        or report["question_ids_with_unindexable_relevance_labels"]
+                        or report["answerable_question_ids_without_relevant_doc_token_overlap"]):
         return 1
     return 0
 
