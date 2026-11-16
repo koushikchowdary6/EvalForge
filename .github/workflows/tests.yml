@@ -329,6 +329,9 @@ jobs:
     - name: Run public API-free quickstart demo
       run: python examples/quickstart_demo.py
 
+    - name: Reproduce installed offline benchmark and compare artifacts
+      run: python examples/reproduce_offline_benchmark.py
+
     - name: Generate and validate multilingual BM25 comparison evidence
       if: matrix.python-version == '3.12'
       run: |
