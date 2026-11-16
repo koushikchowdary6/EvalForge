@@ -38,10 +38,10 @@ Use `--corpus` and `--questions` with the BM25 CLI for compatible user-supplied 
 Use the installed `evalforge-compare-artifacts` command to detect lexical retrieval regressions across two reports from **identical datasets**:
 
 ```bash
-evalforge-compare-artifacts baseline.json candidate.json --tolerance 0.01
+evalforge-compare-artifacts baseline.json candidate.json --tolerance 0.01 --output comparison.json
 ```
 
-Exit code 0 means no BM25 lexical evidence hit-rate regression greater than the tolerance at k=1, 3, or 5; exit code 1 means a regression; exit code 2 means invalid or incomparable input. The command prints machine-readable JSON deltas and refuses comparisons when dataset fingerprints or question counts differ. The paired Unicode-minus-ASCII recall delta is reported as a diagnostic only, **not** treated as a quality score. The JSON output includes `absolute_scores` (baseline and candidate values for each metric and cutoff), `metric_deltas`, the applied `tolerance`, and dataset provenance so CI reviewers can audit the decision without reconstructing values from separate artifacts. These are small offline lexical fixtures, not production RAG or LLM safety measurements.
+Exit code 0 means no BM25 lexical evidence hit-rate regression greater than the tolerance at k=1, 3, or 5; exit code 1 means a regression; exit code 2 means invalid or incomparable input. The command prints machine-readable JSON deltas by default, or writes them to a new file with `--output` (refusing overwrite). It saves the report even when the quality gate detects a regression (exit code 1), so CI can upload the failure evidence. It refuses comparisons when dataset fingerprints or question counts differ. The paired Unicode-minus-ASCII recall delta is reported as a diagnostic only, **not** treated as a quality score. The JSON output includes `absolute_scores` (baseline and candidate values for each metric and cutoff), `metric_deltas`, the applied `tolerance`, and dataset provenance so CI reviewers can audit the decision without reconstructing values from separate artifacts. These are small offline lexical fixtures, not production RAG or LLM safety measurements.
 
 ### Run the verified two-benchmark quickstart
 
