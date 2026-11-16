@@ -14,9 +14,11 @@ from pathlib import Path
 from .artifact_validation import _read_report, _unique_keys, validate
 
 
-def compare(baseline: dict, candidate: dict, tolerance: float = 0.0) -> dict:
+def compare(baseline: dict, candidate: dict, tolerance: float = 0.0, min_hit_rate: float = 0.0) -> dict:
     if type(tolerance) not in (int, float) or not math.isfinite(tolerance) or tolerance < 0 or tolerance > 1:
         raise ValueError("Tolerance must be finite and between 0 and 1")
+    if type(min_hit_rate) not in (int, float) or not math.isfinite(min_hit_rate) or not 0 <= min_hit_rate <= 1:
+        raise ValueError("Minimum hit rate must be finite and between 0 and 1")
     validate(baseline, 0.0)
     validate(candidate, 0.0)
     for section in ("bm25", "paired_tokenizer"):
@@ -43,6 +45,10 @@ def compare(baseline: dict, candidate: dict, tolerance: float = 0.0) -> dict:
             metrics[section][cutoff] = delta
             absolute_scores[section]["baseline"][cutoff] = old
             absolute_scores[section]["candidate"][cutoff] = new
+    # An absolute floor catches a persistently poor candidate even if it has
+    # not regressed relative to an equally poor baseline.
+    candidate_hit_at_3 = candidate["bm25"]["lexical_evidence_hit_rate_by_k"]["3"]
+    minimum_hit_rate_failed = candidate_hit_at_3 is None or candidate_hit_at_3 < min_hit_rate
     # Paired Unicode-minus-ASCII delta is diagnostic, not a quality score:
     # its sign cannot be interpreted as an improvement or regression.
     regressions = [
@@ -63,7 +69,8 @@ def compare(baseline: dict, candidate: dict, tolerance: float = 0.0) -> dict:
     }
     return {"bm25_regression_cutoffs": regressions, "metric_deltas": metrics,
             "absolute_scores": absolute_scores, "tolerance": tolerance,
-            "provenance": provenance}
+            "provenance": provenance, "min_hit_rate": min_hit_rate,
+            "minimum_hit_rate_failed": minimum_hit_rate_failed}
 
 
 def main(argv=None) -> int:
@@ -71,6 +78,8 @@ def main(argv=None) -> int:
     parser.add_argument("baseline", type=Path)
     parser.add_argument("candidate", type=Path)
     parser.add_argument("--tolerance", type=float, default=0.0)
+    parser.add_argument("--min-hit-rate", type=float, default=0.0,
+                        help="Require candidate BM25 evidence hit rate at k=3 to meet this floor")
     parser.add_argument("--output", type=Path, help="Write JSON report to a new file (never overwrite)")
     parser.add_argument("--github-annotations", action="store_true",
                         help="Emit GitHub Actions error annotations for regressed BM25 cutoffs")
@@ -85,7 +94,7 @@ def main(argv=None) -> int:
                     ValueError(f"Invalid JSON constant: {value}")
                 ),
             )
-        result = compare(load(args.baseline), load(args.candidate), args.tolerance)
+        result = compare(load(args.baseline), load(args.candidate), args.tolerance, args.min_hit_rate)
     except (ValueError, OSError, UnicodeError) as exc:
         parser.exit(2, f"EvalForge comparison rejected: {exc}\n")
     payload = json.dumps(result, sort_keys=True, allow_nan=False) + "\n"
@@ -128,7 +137,9 @@ def main(argv=None) -> int:
             fmt = lambda x: "N/A" if x is None else f"{x:.6f}"
             rows.append(f"| k={cutoff} | {fmt(old)} | {fmt(new)} | {fmt(delta)} |")
         rows.extend(["", f"**Gate:** {'FAIL' if result['bm25_regression_cutoffs'] else 'PASS'} "
-                     f"(tolerance {args.tolerance:.6f})", ""])
+                     f"(tolerance {args.tolerance:.6f})", "",
+                     f"**Candidate k=3 minimum:** {'FAIL' if result['minimum_hit_rate_failed'] else 'PASS'} "
+                     f"(minimum {args.min_hit_rate:.6f})", ""])
         try:
             with open(summary_path, "a", encoding="utf-8") as summary:
                 summary.write("\n".join(rows) + "\n")
@@ -143,7 +154,7 @@ def main(argv=None) -> int:
             print(f"::error title=EvalForge BM25 regression at k={cutoff}::"
                   f"Lexical evidence hit rate fell from {old:.6f} to {new:.6f} "
                   f"(tolerance {args.tolerance:.6f})", file=sys.stderr)
-    return 1 if result["bm25_regression_cutoffs"] else 0
+    return 1 if result["bm25_regression_cutoffs"] or result["minimum_hit_rate_failed"] else 0
 
 
 if __name__ == "__main__":
