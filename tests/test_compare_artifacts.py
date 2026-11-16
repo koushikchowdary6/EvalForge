@@ -151,3 +151,25 @@ def test_cli_never_overwrites_existing_comparison_artifact(tmp_path, capsys):
     assert exc.value.code == 2
     assert output.read_text(encoding="utf-8") == "previous evidence"
     assert "output rejected" in capsys.readouterr().err.lower()
+
+
+def test_cli_failed_publish_leaves_no_partial_report_or_tempfile(tmp_path, monkeypatch, capsys):
+    """An interrupted publish must leave no incomplete report for CI to consume."""
+    import json
+    import os
+    from evalforge.compare_artifacts import main
+
+    baseline = tmp_path / "baseline.json"
+    output = tmp_path / "comparison.json"
+    baseline.write_text(json.dumps(fixture()), encoding="utf-8")
+
+    def fail_publish(source, destination):
+        raise OSError("simulated publish failure")
+
+    monkeypatch.setattr(os, "link", fail_publish)
+    with pytest.raises(SystemExit) as exc:
+        main([str(baseline), str(baseline), "--output", str(output)])
+    assert exc.value.code == 2
+    assert not output.exists()
+    assert sorted(path.name for path in tmp_path.iterdir()) == ["baseline.json"]
+    assert "output rejected" in capsys.readouterr().err.lower()
