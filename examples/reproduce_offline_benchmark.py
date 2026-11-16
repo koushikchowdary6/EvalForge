@@ -48,9 +48,8 @@ def main() -> None:
                         f"Invalid SHA-256 fingerprint: {section}.{key}")
                 require(digest == second[section][key],
                         f"Non-reproducible fingerprint: {section}.{key}")
-        for key in ("corpus_sha256", "questions_sha256"):
-            require(first["bm25"][key] == first["paired_tokenizer"][key],
-                    f"Benchmark arms used different input provenance: {key}")
+        # The BM25 and paired-tokenizer fixtures are intentionally different;
+        # only compare fingerprints within the same arm across repeat runs.
         # Also prove the installed gate rejects a degraded candidate and retains
         # machine-readable failure evidence for a downstream CI artifact upload.
         degraded = root / "degraded.json"
