@@ -7,6 +7,8 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
+import tempfile
 from pathlib import Path
 
 from .artifact_validation import _read_report, _unique_keys, validate
@@ -85,9 +87,25 @@ def main(argv=None) -> int:
     payload = json.dumps(result, sort_keys=True, allow_nan=False) + "\n"
     if args.output is not None:
         try:
-            # Exclusive creation prevents accidental destruction of prior CI evidence.
-            with args.output.open("x", encoding="utf-8") as handle:
-                handle.write(payload)
+            # Stage and fsync the full report before publishing it. An exclusive
+            # hard link prevents overwrites and avoids exposing partial CI evidence.
+            with tempfile.NamedTemporaryFile(
+                mode="w", encoding="utf-8", newline="\n",
+                prefix=".evalforge-compare-", suffix=".tmp",
+                dir=args.output.parent, delete=False,
+            ) as staged:
+                staged_path = Path(staged.name)
+                try:
+                    staged.write(payload)
+                    staged.flush()
+                    os.fsync(staged.fileno())
+                except BaseException:
+                    staged_path.unlink(missing_ok=True)
+                    raise
+            try:
+                os.link(staged_path, args.output)
+            finally:
+                staged_path.unlink(missing_ok=True)
         except OSError as exc:
             parser.exit(2, f"EvalForge comparison output rejected: {exc}\n")
     else:
