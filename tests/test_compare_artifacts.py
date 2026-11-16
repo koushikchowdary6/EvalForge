@@ -118,3 +118,36 @@ def test_comparison_exposes_absolute_scores_and_gate_tolerance():
     assert report["bm25_regression_cutoffs"] == ["3"]
     assert report["absolute_scores"]["paired_tokenizer"]["baseline"]["3"] == pytest.approx(-0.1)
     assert report["absolute_scores"]["paired_tokenizer"]["candidate"]["3"] == pytest.approx(-0.1)
+
+
+def test_cli_writes_comparison_artifact_even_when_gate_fails(tmp_path, capsys):
+    """CI should retain a machine-readable failed gate for later inspection."""
+    import json
+    from evalforge.compare_artifacts import main
+
+    baseline = tmp_path / "baseline.json"
+    candidate = tmp_path / "candidate.json"
+    output = tmp_path / "comparison.json"
+    baseline.write_text(json.dumps(fixture()), encoding="utf-8")
+    changed = copy.deepcopy(fixture())
+    changed["bm25"]["lexical_evidence_hit_rate_by_k"]["3"] = 0.5
+    candidate.write_text(json.dumps(changed), encoding="utf-8")
+    assert main([str(baseline), str(candidate), "--output", str(output)]) == 1
+    assert json.loads(output.read_text(encoding="utf-8"))["bm25_regression_cutoffs"] == ["3"]
+    assert capsys.readouterr().out == ""
+
+
+def test_cli_never_overwrites_existing_comparison_artifact(tmp_path, capsys):
+    """Existing CI evidence must not be silently replaced."""
+    import json
+    from evalforge.compare_artifacts import main
+
+    baseline = tmp_path / "baseline.json"
+    output = tmp_path / "comparison.json"
+    baseline.write_text(json.dumps(fixture()), encoding="utf-8")
+    output.write_text("previous evidence", encoding="utf-8")
+    with pytest.raises(SystemExit) as exc:
+        main([str(baseline), str(baseline), "--output", str(output)])
+    assert exc.value.code == 2
+    assert output.read_text(encoding="utf-8") == "previous evidence"
+    assert "output rejected" in capsys.readouterr().err.lower()
