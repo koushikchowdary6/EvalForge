@@ -97,6 +97,10 @@ def main(argv=None) -> int:
         result = compare(load(args.baseline), load(args.candidate), args.tolerance, args.min_hit_rate)
     except (ValueError, OSError, UnicodeError) as exc:
         parser.exit(2, f"EvalForge comparison rejected: {exc}\n")
+    # Validate Actions configuration before publishing a report: a missing
+    # summary destination must not leave behind an apparently successful artifact.
+    if args.github_step_summary and not os.environ.get("GITHUB_STEP_SUMMARY"):
+        parser.exit(2, "EvalForge comparison summary rejected: GITHUB_STEP_SUMMARY is not set\n")
     payload = json.dumps(result, sort_keys=True, allow_nan=False) + "\n"
     if args.output is not None:
         try:
