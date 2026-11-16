@@ -69,6 +69,7 @@ def main(argv=None) -> int:
     parser.add_argument("baseline", type=Path)
     parser.add_argument("candidate", type=Path)
     parser.add_argument("--tolerance", type=float, default=0.0)
+    parser.add_argument("--output", type=Path, help="Write JSON report to a new file (never overwrite)")
     args = parser.parse_args(argv)
     try:
         def load(path):
@@ -81,7 +82,16 @@ def main(argv=None) -> int:
         result = compare(load(args.baseline), load(args.candidate), args.tolerance)
     except (ValueError, OSError, UnicodeError) as exc:
         parser.exit(2, f"EvalForge comparison rejected: {exc}\n")
-    print(json.dumps(result, sort_keys=True, allow_nan=False))
+    payload = json.dumps(result, sort_keys=True, allow_nan=False) + "\n"
+    if args.output is not None:
+        try:
+            # Exclusive creation prevents accidental destruction of prior CI evidence.
+            with args.output.open("x", encoding="utf-8") as handle:
+                handle.write(payload)
+        except OSError as exc:
+            parser.exit(2, f"EvalForge comparison output rejected: {exc}\n")
+    else:
+        print(payload, end="")
     return 1 if result["bm25_regression_cutoffs"] else 0
 
 
