@@ -72,6 +72,8 @@ def main(argv=None) -> int:
     parser.add_argument("candidate", type=Path)
     parser.add_argument("--tolerance", type=float, default=0.0)
     parser.add_argument("--output", type=Path, help="Write JSON report to a new file (never overwrite)")
+    parser.add_argument("--github-annotations", action="store_true",
+                        help="Emit GitHub Actions error annotations for regressed BM25 cutoffs")
     args = parser.parse_args(argv)
     try:
         def load(path):
@@ -110,6 +112,15 @@ def main(argv=None) -> int:
             parser.exit(2, f"EvalForge comparison output rejected: {exc}\n")
     else:
         print(payload, end="")
+    if args.github_annotations:
+        import sys
+        for cutoff in result["bm25_regression_cutoffs"]:
+            old = result["absolute_scores"]["bm25"]["baseline"][cutoff]
+            new = result["absolute_scores"]["bm25"]["candidate"][cutoff]
+            # All annotation fields are validated numbers or fixed cutoff labels.
+            print(f"::error title=EvalForge BM25 regression at k={cutoff}::"
+                  f"Lexical evidence hit rate fell from {old:.6f} to {new:.6f} "
+                  f"(tolerance {args.tolerance:.6f})", file=sys.stderr)
     return 1 if result["bm25_regression_cutoffs"] else 0
 
 
