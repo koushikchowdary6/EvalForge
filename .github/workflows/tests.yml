@@ -330,7 +330,10 @@ jobs:
       run: python examples/quickstart_demo.py
 
     - name: Reproduce installed offline benchmark and compare artifacts
-      run: python examples/reproduce_offline_benchmark.py
+      run: |
+        python examples/reproduce_offline_benchmark.py
+        # The benchmark's runtime checks must remain active under -O.
+        python -O examples/reproduce_offline_benchmark.py
 
     - name: Generate and validate multilingual BM25 comparison evidence
       if: matrix.python-version == '3.12'
