@@ -1,0 +1,22 @@
+[
+  {
+    "doc_id": "refund-policy",
+    "title": "Refund policy",
+    "text": "Refund requests within thirty days require the original receipt and order number."
+  },
+  {
+    "doc_id": "account-recovery",
+    "title": "Account recovery",
+    "text": "Reset an account password using the verified recovery email and a one-time code."
+  },
+  {
+    "doc_id": "shipping-tracking",
+    "title": "Shipping tracking",
+    "text": "Track shipping delivery status using the parcel tracking number in the order confirmation."
+  },
+  {
+    "doc_id": "billing-invoice",
+    "title": "Billing invoice",
+    "text": "Download an invoice from billing history after signing in to the account."
+  }
+]
