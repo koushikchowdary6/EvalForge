@@ -67,7 +67,7 @@ def main() -> None:
         floor_report = root / "quality-floor.json"
         floor = subprocess.run(
             ["evalforge-compare-artifacts", str(degraded), str(degraded),
-             "--min-hit-rate", str(hit_rates["3"]),
+             "--min-hit-rate", str(first["bm25"]["lexical_evidence_hit_rate_by_k"]["3"]),
              "--output", str(floor_report)],
             capture_output=True, text=True, check=False,
         )
