@@ -207,3 +207,32 @@ def test_absolute_floor_cli_exit_and_report(tmp_path, capsys):
     assert report["bm25_regression_cutoffs"] == []
     assert main([str(path), str(path), "--min-hit-rate", "0.25"]) == 0
     assert json.loads(capsys.readouterr().out)["minimum_hit_rate_failed"] is False
+
+
+def test_github_annotations_report_absolute_floor_failure(tmp_path, capsys):
+    """A failing absolute quality floor must appear in Actions, even without a regression."""
+    import json
+    from evalforge.compare_artifacts import main
+
+    weak = fixture()
+    weak["bm25"]["lexical_evidence_hit_rate_by_k"]["3"] = 0.25
+    path = tmp_path / "weak.json"
+    path.write_text(json.dumps(weak), encoding="utf-8")
+    assert main([str(path), str(path), "--min-hit-rate", "0.5", "--github-annotations"]) == 1
+    output = capsys.readouterr()
+    assert "BM25 minimum hit rate at k=3" in output.err
+    assert "0.250000" in output.err
+    assert "0.500000" in output.err
+    assert "regression at" not in output.err
+    assert json.loads(output.out)["minimum_hit_rate_failed"] is True
+
+
+def test_github_annotations_omit_absolute_floor_on_pass(tmp_path, capsys):
+    """Passing quality floors must not emit misleading error annotations."""
+    import json
+    from evalforge.compare_artifacts import main
+
+    path = tmp_path / "baseline.json"
+    path.write_text(json.dumps(fixture()), encoding="utf-8")
+    assert main([str(path), str(path), "--min-hit-rate", "0.5", "--github-annotations"]) == 0
+    assert "::error" not in capsys.readouterr().err
