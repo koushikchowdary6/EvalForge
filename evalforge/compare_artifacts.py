@@ -74,6 +74,8 @@ def main(argv=None) -> int:
     parser.add_argument("--output", type=Path, help="Write JSON report to a new file (never overwrite)")
     parser.add_argument("--github-annotations", action="store_true",
                         help="Emit GitHub Actions error annotations for regressed BM25 cutoffs")
+    parser.add_argument("--github-step-summary", action="store_true",
+                        help="Append a concise Markdown table to GITHUB_STEP_SUMMARY")
     args = parser.parse_args(argv)
     try:
         def load(path):
@@ -112,6 +114,26 @@ def main(argv=None) -> int:
             parser.exit(2, f"EvalForge comparison output rejected: {exc}\n")
     else:
         print(payload, end="")
+    if args.github_step_summary:
+        summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+        if not summary_path:
+            parser.exit(2, "EvalForge comparison summary rejected: GITHUB_STEP_SUMMARY is not set\n")
+        rows = ["### EvalForge lexical retrieval comparison",
+                "", "| BM25 cutoff | Baseline | Candidate | Delta |",
+                "| --- | ---: | ---: | ---: |"]
+        for cutoff in ("1", "3", "5"):
+            old = result["absolute_scores"]["bm25"]["baseline"][cutoff]
+            new = result["absolute_scores"]["bm25"]["candidate"][cutoff]
+            delta = result["metric_deltas"]["bm25"][cutoff]
+            fmt = lambda x: "N/A" if x is None else f"{x:.6f}"
+            rows.append(f"| k={cutoff} | {fmt(old)} | {fmt(new)} | {fmt(delta)} |")
+        rows.extend(["", f"**Gate:** {'FAIL' if result['bm25_regression_cutoffs'] else 'PASS'} "
+                     f"(tolerance {args.tolerance:.6f})", ""])
+        try:
+            with open(summary_path, "a", encoding="utf-8") as summary:
+                summary.write("\n".join(rows) + "\n")
+        except OSError as exc:
+            parser.exit(2, f"EvalForge comparison summary rejected: {exc}\n")
     if args.github_annotations:
         import sys
         for cutoff in result["bm25_regression_cutoffs"]:
