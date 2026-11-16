@@ -56,6 +56,17 @@ not generated answers. This synthetic fixture demonstrates custom dataset
 loading and validation; it is **not** a real-world generalization benchmark.
 Choose thresholds using separately collected, representative labeled data.
 
+### Export a human-readable benchmark summary
+
+Generate a Markdown table from a validated offline JSON artifact for a pull request, release notes, or a recruiter-facing demo. The reporter includes dataset SHA-256 provenance and explicitly labels lexical metrics; it does not claim to evaluate generated answers or model safety.
+
+```bash
+evalforge-demo --json --output evaluation.json
+evalforge-report-md evaluation.json --output evaluation-summary.md
+```
+
+The installed `evalforge-report-md` command rejects invalid artifacts and refuses to overwrite an existing summary. Omit `--output` to print Markdown to stdout. It requires no provider API keys.
+
 ### Compare two offline evaluation runs
 
 Use the installed `evalforge-compare-artifacts` command to detect lexical retrieval regressions across two reports from **identical datasets**:
