@@ -33,6 +33,29 @@ To work from source instead, clone this repository and run `python -m pip instal
 
 Use `--corpus` and `--questions` with the BM25 CLI for compatible user-supplied JSON fixtures. Both CLIs accept `--output` and `--summary-only`; the compact report retains aggregate metrics and dataset fingerprints. For development and provider-backed evaluations, see [project status](#project-status) and `requirements.txt`. Provider-backed evaluations require configured API credentials and are **not** exercised by these offline commands.
 
+### Evaluate your own labeled retrieval dataset
+
+The [customer-support corpus](examples/customer_support_corpus.json) and
+[labeled questions](examples/customer_support_questions.json) provide a second,
+small hand-authored fixture independent of the bundled security example. It
+includes four answerable queries and one deliberately unanswerable query.
+
+```bash
+evalforge-bm25 --corpus examples/customer_support_corpus.json \
+  --questions examples/customer_support_questions.json \
+  --k 1 3 --summary-only --output customer-support-report.json
+python -m pytest tests/test_customer_support_example.py -q
+```
+
+Each corpus entry needs `doc_id`, `title`, and `text`; each question
+needs `id`, `question`, `answerable` (boolean), and `relevant_doc_ids`
+(list of corpus IDs). Answerable questions need at least one relevant ID;
+unanswerable questions must have none. Run from the repository root after
+installation. Reports include dataset fingerprints and retrieval metrics,
+not generated answers. This synthetic fixture demonstrates custom dataset
+loading and validation; it is **not** a real-world generalization benchmark.
+Choose thresholds using separately collected, representative labeled data.
+
 ### Compare two offline evaluation runs
 
 Use the installed `evalforge-compare-artifacts` command to detect lexical retrieval regressions across two reports from **identical datasets**:
