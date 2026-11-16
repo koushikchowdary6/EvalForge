@@ -33,6 +33,17 @@ To work from source instead, clone this repository and run `python -m pip instal
 
 Use `--corpus` and `--questions` with the BM25 CLI for compatible user-supplied JSON fixtures. Both CLIs accept `--output` and `--summary-only`; the compact report retains aggregate metrics and dataset fingerprints. For development and provider-backed evaluations, see [project status](#project-status) and `requirements.txt`. Provider-backed evaluations require configured API credentials and are **not** exercised by these offline commands.
 
+### Preflight your labeled dataset before benchmarking
+
+The installed `evalforge-dataset-audit` command validates custom corpus/question JSON and reports deterministic SHA-256 fingerprints, label counts, unindexable documents, and answerable queries without lexical overlap. It uses **no model API calls** and does not score retrieval accuracy or generated answers.
+
+```bash
+evalforge-dataset-audit --corpus examples/customer_support_corpus.json \
+  --questions examples/customer_support_questions.json --strict
+```
+
+The command prints machine-readable JSON. Exit code **0** means the dataset is structurally valid and (with `--strict`) no flagged lexical coverage problems were found; **1** means strict coverage checks failed; **2** means invalid input. A clean preflight is **not** evidence of model quality, absence of data leakage, or semantic relevance. The `--tokenizer unicode` option uses a Unicode lexical baseline rather than the default ASCII tokenizer.
+
 ### Evaluate your own labeled retrieval dataset
 
 The [customer-support corpus](examples/customer_support_corpus.json) and
