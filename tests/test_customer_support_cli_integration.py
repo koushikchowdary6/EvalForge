@@ -70,3 +70,37 @@ def test_custom_dataset_cli_rejects_broken_relevance_labels_without_artifact(tmp
                   "--k", "1", "3", "--summary-only", "--output", target)
     assert result.returncode != 0
     assert not target.exists()
+
+
+def test_custom_dataset_cli_rejects_ambiguous_json_without_artifact(tmp_path):
+    """Fail closed on ambiguous labels and JSON before writing evaluation evidence."""
+    corpus = EXAMPLES / "customer_support_corpus.json"
+    original = (EXAMPLES / "customer_support_questions.json").read_text(encoding="utf-8")
+    cases = {
+        "duplicate-key": original.replace('"answerable":', '"answerable": true, "answerable":', 1),
+        "nonfinite": original.replace('"answerable":', '"unexpected": NaN, "answerable":', 1),
+    }
+    for name, payload in cases.items():
+        bad = tmp_path / (name + ".json")
+        bad.write_text(payload, encoding="utf-8")
+        target = tmp_path / (name + "-report.json")
+        result = _run("--corpus", corpus, "--questions", bad,
+                      "--k", "1", "3", "--summary-only", "--output", target)
+        assert result.returncode != 0, (name, result.stdout, result.stderr)
+        assert not target.exists(), name
+
+
+def test_custom_dataset_cli_rejects_duplicate_question_ids_without_artifact(tmp_path):
+    """Duplicate question IDs must never overwrite one another in metric reports."""
+    corpus = EXAMPLES / "customer_support_corpus.json"
+    questions = json.loads(
+        (EXAMPLES / "customer_support_questions.json").read_text(encoding="utf-8")
+    )
+    questions[1]["id"] = questions[0]["id"]
+    bad = tmp_path / "duplicate-ids.json"
+    bad.write_text(json.dumps(questions), encoding="utf-8")
+    target = tmp_path / "duplicate-ids-report.json"
+    result = _run("--corpus", corpus, "--questions", bad,
+                  "--k", "1", "3", "--summary-only", "--output", target)
+    assert result.returncode != 0, (result.stdout, result.stderr)
+    assert not target.exists()
