@@ -71,7 +71,7 @@ def test_overlap_with_irrelevant_documents_does_not_mask_unreachable_label():
         {"doc_id": "distractor", "title": "Refund", "text": "Request a refund"},
     ]
     questions = [
-        {"id": "q1", "question": "How can I request a refund?",
+        {"id": "q1", "question": "Refund request",
          "answerable": True, "relevant_doc_ids": ["relevant"]},
     ]
     result = audit(docs, questions)
