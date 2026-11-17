@@ -6,12 +6,14 @@ on:
     paths:
       - "evalforge/**"
       - "examples/customer_support_*.json"
+      - "examples/reproduce_custom_gate.py"
       - "pyproject.toml"
       - ".github/workflows/custom-gate-demo.yml"
   pull_request:
     paths:
       - "evalforge/**"
       - "examples/customer_support_*.json"
+      - "examples/reproduce_custom_gate.py"
       - "pyproject.toml"
       - ".github/workflows/custom-gate-demo.yml"
   workflow_dispatch:
@@ -40,9 +42,12 @@ jobs:
             --k 3 \
             --min-hit-rate 0.50 \
             --min-answerable-questions 4 \
+            --min-unanswerable-questions 1 \
             --min-distinct-relevant-docs 4 \
             --github-annotations \
             --output custom-gate-evidence.json
+      - name: Verify reproducible evidence and deliberate failing control
+        run: python examples/reproduce_custom_gate.py
       - name: Preserve evaluation evidence (including failed gates)
         if: always()
         uses: actions/upload-artifact@v4
