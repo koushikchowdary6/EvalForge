@@ -45,8 +45,8 @@ this report to the GitHub Actions job summary and retains the JSON and Markdown
 as artifacts.
 
 ```bash
-evalforge-custom-gate --corpus examples/customer_support_corpus.json \\
-  --questions examples/customer_support_questions.json \\
+evalforge-custom-gate --corpus examples/customer_support_corpus.json \
+  --questions examples/customer_support_questions.json \
   --k 3 --min-hit-rate 0.50 --output gate-evidence.json
 evalforge-custom-summary gate-evidence.json --output gate-summary.md
 ```
