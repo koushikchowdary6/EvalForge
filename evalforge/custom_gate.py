@@ -16,7 +16,7 @@ from .offline_rag_demo import evaluate, load_benchmark_json
 
 def gate(docs: list, questions: list, *, k: int = 3,
          min_hit_rate: float = 0.5, tokenizer: str = "ascii",
-         include_cases: bool = False) -> dict:
+         include_cases: bool = False, fail_on_ambiguous_ties: bool = False) -> dict:
     """Return evidence and pass/fail; reject invalid or unreachable labels."""
     if type(k) is not int or k < 1:
         raise ValueError("k must be a positive integer")
@@ -24,6 +24,8 @@ def gate(docs: list, questions: list, *, k: int = 3,
         raise ValueError("min_hit_rate must be finite and between 0 and 1")
     if type(include_cases) is not bool:
         raise ValueError("include_cases must be a boolean")
+    if type(fail_on_ambiguous_ties) is not bool:
+        raise ValueError("fail_on_ambiguous_ties must be a boolean")
     preflight = audit(docs, questions, tokenizer)
     warnings = {name: preflight[name] for name in (
         "unindexable_document_ids",
@@ -33,7 +35,9 @@ def gate(docs: list, questions: list, *, k: int = 3,
     ) if preflight[name]}
     result = evaluate(docs, questions, [k], tokenizer_mode=tokenizer)
     metric = result["by_top_k"][str(k)]["lexical_evidence_hit_rate"]
-    passed = not warnings and metric is not None and metric >= min_hit_rate
+    ambiguous_ties = result["by_top_k"][str(k)]["answerable_mixed_relevance_cutoff_tie_count"]
+    passed = (not warnings and metric is not None and metric >= min_hit_rate
+              and (not fail_on_ambiguous_ties or ambiguous_ties == 0))
     report = {
         "schema": "evalforge.custom_retrieval_gate.v1",
         "scope": "offline_lexical_retrieval_only_not_llm_quality_or_safety",
@@ -42,6 +46,8 @@ def gate(docs: list, questions: list, *, k: int = 3,
         "minimum_lexical_evidence_hit_rate": min_hit_rate,
         "observed_lexical_evidence_hit_rate": metric,
         "preflight_warnings": warnings,
+        "ambiguous_relevance_cutoff_tie_count": ambiguous_ties,
+        "fail_on_ambiguous_ties": fail_on_ambiguous_ties,
         "dataset_audit": preflight,
         "benchmark": {key: value for key, value in result.items() if key != "cases"},
     }
@@ -64,6 +70,8 @@ def github_annotations(report: dict) -> list[str]:
     minimum = report["minimum_lexical_evidence_hit_rate"]
     if observed is None or observed < minimum:
         messages.append(f"::error title=EvalForge lexical retrieval gate::hit rate {safe(observed)} below minimum {safe(minimum)}")
+    if report.get("fail_on_ambiguous_ties") and report.get("ambiguous_relevance_cutoff_tie_count", 0):
+        messages.append("::error title=EvalForge ambiguous BM25 cutoff::mixed-relevance positive-score ties make the selected top-k dependent on tie breaking")
     return messages
 
 
@@ -78,12 +86,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--include-cases", action="store_true",
                         help="Include per-question retrieval diagnostics in the JSON evidence")
     parser.add_argument("--github-annotations", action="store_true", help="Emit actionable GitHub Actions errors to stderr on failed gates")
+    parser.add_argument("--fail-on-ambiguous-ties", action="store_true",
+                        help="Fail when a positive-score tie at k contains both relevant and irrelevant documents")
     args = parser.parse_args(argv)
     try:
         result = gate(load_benchmark_json(args.corpus),
                       load_benchmark_json(args.questions), k=args.k,
                       min_hit_rate=args.min_hit_rate, tokenizer=args.tokenizer,
-                      include_cases=args.include_cases)
+                      include_cases=args.include_cases,
+                      fail_on_ambiguous_ties=args.fail_on_ambiguous_ties)
         rendered = json.dumps(result, indent=2, sort_keys=True, allow_nan=False) + "\n"
         if args.output:
             with args.output.open("x", encoding="utf-8") as stream:
