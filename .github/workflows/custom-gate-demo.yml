@@ -1,0 +1,53 @@
+name: Custom retrieval gate demo
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "evalforge/**"
+      - "examples/customer_support_*.json"
+      - "pyproject.toml"
+      - ".github/workflows/custom-gate-demo.yml"
+  pull_request:
+    paths:
+      - "evalforge/**"
+      - "examples/customer_support_*.json"
+      - "pyproject.toml"
+      - ".github/workflows/custom-gate-demo.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  custom-retrieval-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install packaged CLI
+        run: python -m pip install .
+      - name: Evaluate labeled customer-support retrieval fixture
+        run: |
+          evalforge-custom-gate \
+            --corpus examples/customer_support_corpus.json \
+            --questions examples/customer_support_questions.json \
+            --k 3 \
+            --min-hit-rate 0.50 \
+            --min-answerable-questions 4 \
+            --min-distinct-relevant-docs 4 \
+            --github-annotations \
+            --output custom-gate-evidence.json
+      - name: Preserve evaluation evidence (including failed gates)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: custom-gate-evidence
+          path: custom-gate-evidence.json
+          if-no-files-found: warn
+          retention-days: 14
