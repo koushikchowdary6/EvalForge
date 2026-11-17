@@ -107,3 +107,43 @@ def test_opt_in_case_evidence_preserves_aggregate_contract(tmp_path):
     assert plain.returncode == detailed_cli.returncode == 0
     assert "cases" not in json.loads(plain.stdout)
     assert json.loads(detailed_cli.stdout) == detailed
+
+
+def test_ambiguous_cutoff_tie_is_opt_in_failure():
+    # Equal positive BM25 scores at k=1; only one tied document is relevant.
+    docs = [
+        {"doc_id": "a", "title": "", "text": "shared term"},
+        {"doc_id": "b", "title": "", "text": "shared term"},
+    ]
+    questions = [{"id": "q", "question": "shared", "answerable": True,
+                  "relevant_doc_ids": ["a"]}]
+    ordinary = gate(docs, questions, k=1, min_hit_rate=0)
+    strict = gate(docs, questions, k=1, min_hit_rate=0,
+                  fail_on_ambiguous_ties=True)
+    assert ordinary["ambiguous_relevance_cutoff_tie_count"] == 1
+    assert ordinary["passed"] is True
+    assert strict["passed"] is False
+    from evalforge.custom_gate import github_annotations
+    assert any("ambiguous BM25 cutoff" in line for line in github_annotations(strict))
+    with pytest.raises(ValueError):
+        gate(docs, questions, fail_on_ambiguous_ties="true")
+
+
+def test_ambiguous_tie_cli_failure_preserves_evidence(tmp_path):
+    docs = [{"doc_id": "a", "title": "", "text": "shared term"},
+            {"doc_id": "b", "title": "", "text": "shared term"}]
+    questions = [{"id": "q", "question": "shared", "answerable": True,
+                  "relevant_doc_ids": ["a"]}]
+    corpus_path = tmp_path / "corpus.json"
+    questions_path = tmp_path / "questions.json"
+    output = tmp_path / "gate.json"
+    corpus_path.write_text(json.dumps(docs), encoding="utf-8")
+    questions_path.write_text(json.dumps(questions), encoding="utf-8")
+    cmd = [sys.executable, "-m", "evalforge.custom_gate", "--corpus", str(corpus_path),
+           "--questions", str(questions_path), "--k", "1", "--min-hit-rate", "0",
+           "--fail-on-ambiguous-ties", "--output", str(output)]
+    completed = subprocess.run(cmd, capture_output=True, text=True)
+    assert completed.returncode == 1, completed.stderr
+    report = json.loads(output.read_text(encoding="utf-8"))
+    assert report["ambiguous_relevance_cutoff_tie_count"] == 1
+    assert not report["passed"]
