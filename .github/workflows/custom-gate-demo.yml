@@ -46,6 +46,10 @@ jobs:
             --min-distinct-relevant-docs 4 \
             --github-annotations \
             --output custom-gate-evidence.json
+      - name: Render human-readable retrieval evidence
+        run: |
+          evalforge-custom-summary custom-gate-evidence.json --output custom-gate-summary.md
+          cat custom-gate-summary.md >> "$GITHUB_STEP_SUMMARY"
       - name: Verify reproducible evidence and deliberate failing control
         run: python examples/reproduce_custom_gate.py
       - name: Preserve evaluation evidence (including failed gates)
@@ -53,6 +57,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: custom-gate-evidence
-          path: custom-gate-evidence.json
+          path: |
+            custom-gate-evidence.json
+            custom-gate-summary.md
           if-no-files-found: warn
           retention-days: 14
