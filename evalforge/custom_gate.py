@@ -16,7 +16,8 @@ from .offline_rag_demo import evaluate, load_benchmark_json
 
 def gate(docs: list, questions: list, *, k: int = 3,
          min_hit_rate: float = 0.5, tokenizer: str = "ascii",
-         include_cases: bool = False, fail_on_ambiguous_ties: bool = False) -> dict:
+         include_cases: bool = False, fail_on_ambiguous_ties: bool = False,
+         min_answerable_questions: int = 0) -> dict:
     """Return evidence and pass/fail; reject invalid or unreachable labels."""
     if type(k) is not int or k < 1:
         raise ValueError("k must be a positive integer")
@@ -26,6 +27,8 @@ def gate(docs: list, questions: list, *, k: int = 3,
         raise ValueError("include_cases must be a boolean")
     if type(fail_on_ambiguous_ties) is not bool:
         raise ValueError("fail_on_ambiguous_ties must be a boolean")
+    if type(min_answerable_questions) is not int or min_answerable_questions < 0:
+        raise ValueError("min_answerable_questions must be a nonnegative integer")
     preflight = audit(docs, questions, tokenizer)
     warnings = {name: preflight[name] for name in (
         "unindexable_document_ids",
@@ -36,13 +39,16 @@ def gate(docs: list, questions: list, *, k: int = 3,
     result = evaluate(docs, questions, [k], tokenizer_mode=tokenizer)
     metric = result["by_top_k"][str(k)]["lexical_evidence_hit_rate"]
     ambiguous_ties = result["by_top_k"][str(k)]["answerable_mixed_relevance_cutoff_tie_count"]
-    passed = (not warnings and metric is not None and metric >= min_hit_rate
+    insufficient_questions = preflight["answerable_questions"] < min_answerable_questions
+    passed = (not warnings and not insufficient_questions and metric is not None and metric >= min_hit_rate
               and (not fail_on_ambiguous_ties or ambiguous_ties == 0))
     # Stable, machine-readable reasons let CI consumers distinguish dataset
     # integrity problems from metric regressions without parsing annotations.
     failure_reasons = []
     if warnings:
         failure_reasons.append("dataset_preflight_warnings")
+    if insufficient_questions:
+        failure_reasons.append("insufficient_answerable_questions")
     if metric is None:
         failure_reasons.append("undefined_lexical_evidence_hit_rate")
     elif metric < min_hit_rate:
@@ -55,6 +61,7 @@ def gate(docs: list, questions: list, *, k: int = 3,
         "passed": passed,
         "failure_reasons": failure_reasons,
         "k": k,
+        "minimum_answerable_questions": min_answerable_questions,
         "minimum_lexical_evidence_hit_rate": min_hit_rate,
         "observed_lexical_evidence_hit_rate": metric,
         "preflight_warnings": warnings,
@@ -82,6 +89,8 @@ def github_annotations(report: dict) -> list[str]:
     minimum = report["minimum_lexical_evidence_hit_rate"]
     if observed is None or observed < minimum:
         messages.append(f"::error title=EvalForge lexical retrieval gate::hit rate {safe(observed)} below minimum {safe(minimum)}")
+    if "insufficient_answerable_questions" in report.get("failure_reasons", []):
+        messages.append(f"::error title=EvalForge dataset size::answerable questions {report['dataset_audit']['answerable_questions']} below required {report['minimum_answerable_questions']}")
     if report.get("fail_on_ambiguous_ties") and report.get("ambiguous_relevance_cutoff_tie_count", 0):
         messages.append("::error title=EvalForge ambiguous BM25 cutoff::mixed-relevance positive-score ties make the selected top-k dependent on tie breaking")
     return messages
@@ -93,6 +102,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--questions", type=Path, required=True)
     parser.add_argument("--k", type=int, default=3)
     parser.add_argument("--min-hit-rate", type=float, default=0.5)
+    parser.add_argument("--min-answerable-questions", type=int, default=0,
+                        help="Fail if fewer than this many labeled answerable questions exist")
     parser.add_argument("--tokenizer", choices=("ascii", "unicode"), default="ascii")
     parser.add_argument("--output", type=Path, help="New JSON report; refuses overwrite")
     parser.add_argument("--include-cases", action="store_true",
@@ -106,7 +117,8 @@ def main(argv: list[str] | None = None) -> int:
                       load_benchmark_json(args.questions), k=args.k,
                       min_hit_rate=args.min_hit_rate, tokenizer=args.tokenizer,
                       include_cases=args.include_cases,
-                      fail_on_ambiguous_ties=args.fail_on_ambiguous_ties)
+                      fail_on_ambiguous_ties=args.fail_on_ambiguous_ties,
+                      min_answerable_questions=args.min_answerable_questions)
         rendered = json.dumps(result, indent=2, sort_keys=True, allow_nan=False) + "\n"
         if args.output:
             with args.output.open("x", encoding="utf-8") as stream:
