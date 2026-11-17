@@ -82,6 +82,8 @@ def test_rejects_tampered_gate_outcome(field, value):
     report[field] = value
     if field == "ambiguous_relevance_cutoff_tie_count":
         report["fail_on_ambiguous_ties"] = True
+    if field == "minimum_lexical_evidence_hit_rate":
+        report["observed_lexical_evidence_hit_rate"] = 0.5
     with pytest.raises(ValueError):
         render(report)
 
