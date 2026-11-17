@@ -9,6 +9,22 @@ description = "Reproducible AI evaluation and offline lexical RAG retrieval base
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = ["python-dotenv>=1.0,<2"]
+keywords = ["rag", "retrieval-evaluation", "llm-evaluation", "bm25", "ai-evaluation", "guardrails"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[project.urls]
+Homepage = "https://github.com/koushikchowdary6/EvalForge"
+Source = "https://github.com/koushikchowdary6/EvalForge"
+Issues = "https://github.com/koushikchowdary6/EvalForge/issues"
 
 [project.scripts]
 evalforge-bm25 = "evalforge.offline_rag_demo:main"
