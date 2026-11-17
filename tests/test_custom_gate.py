@@ -160,3 +160,29 @@ def test_ambiguous_tie_cli_failure_preserves_evidence(tmp_path):
     report = json.loads(output.read_text(encoding="utf-8"))
     assert report["ambiguous_relevance_cutoff_tie_count"] == 1
     assert not report["passed"]
+
+
+def test_minimum_answerable_sample_size_is_a_real_gate(tmp_path):
+    from evalforge.custom_gate import github_annotations
+    passing = gate(DOCS, QUESTIONS, k=1, min_hit_rate=0, min_answerable_questions=1)
+    assert passing["passed"] is True
+    assert passing["failure_reasons"] == []
+    failed = gate(DOCS, QUESTIONS, k=1, min_hit_rate=0, min_answerable_questions=2)
+    assert failed["passed"] is False
+    assert failed["failure_reasons"] == ["insufficient_answerable_questions"]
+    assert failed["minimum_answerable_questions"] == 2
+    assert any("dataset size" in line for line in github_annotations(failed))
+    for value in (-1, 1.5, True, "2"):
+        with pytest.raises(ValueError):
+            gate(DOCS, QUESTIONS, min_answerable_questions=value)
+    corpus = tmp_path / "corpus.json"
+    questions = tmp_path / "questions.json"
+    corpus.write_text(json.dumps(DOCS), encoding="utf-8")
+    questions.write_text(json.dumps(QUESTIONS), encoding="utf-8")
+    cmd = [sys.executable, "-m", "evalforge.custom_gate", "--corpus", str(corpus),
+           "--questions", str(questions), "--k", "1", "--min-hit-rate", "0",
+           "--min-answerable-questions", "2"]
+    completed = subprocess.run(cmd, capture_output=True, text=True)
+    assert completed.returncode == 1, completed.stderr
+    assert json.loads(completed.stdout)["failure_reasons"] == ["insufficient_answerable_questions"]
+    assert subprocess.run(cmd[:-1] + ["-1"], capture_output=True).returncode == 2
