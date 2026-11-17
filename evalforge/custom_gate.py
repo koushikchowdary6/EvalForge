@@ -38,10 +38,22 @@ def gate(docs: list, questions: list, *, k: int = 3,
     ambiguous_ties = result["by_top_k"][str(k)]["answerable_mixed_relevance_cutoff_tie_count"]
     passed = (not warnings and metric is not None and metric >= min_hit_rate
               and (not fail_on_ambiguous_ties or ambiguous_ties == 0))
+    # Stable, machine-readable reasons let CI consumers distinguish dataset
+    # integrity problems from metric regressions without parsing annotations.
+    failure_reasons = []
+    if warnings:
+        failure_reasons.append("dataset_preflight_warnings")
+    if metric is None:
+        failure_reasons.append("undefined_lexical_evidence_hit_rate")
+    elif metric < min_hit_rate:
+        failure_reasons.append("lexical_evidence_hit_rate_below_minimum")
+    if fail_on_ambiguous_ties and ambiguous_ties:
+        failure_reasons.append("ambiguous_relevance_cutoff_ties")
     report = {
         "schema": "evalforge.custom_retrieval_gate.v1",
         "scope": "offline_lexical_retrieval_only_not_llm_quality_or_safety",
         "passed": passed,
+        "failure_reasons": failure_reasons,
         "k": k,
         "minimum_lexical_evidence_hit_rate": min_hit_rate,
         "observed_lexical_evidence_hit_rate": metric,
