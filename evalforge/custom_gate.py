@@ -44,6 +44,23 @@ def gate(docs: list, questions: list, *, k: int = 3,
     }
 
 
+def github_annotations(report: dict) -> list[str]:
+    """Emit workflow-command-safe, actionable CI diagnostics for failed gates."""
+    if report["passed"]:
+        return []
+    def safe(value: object) -> str:
+        return (str(value).replace("%", "%25").replace("\\r", "%0D")
+                .replace("\\n", "%0A").replace(":", "%3A"))
+    messages = []
+    for name, ids in sorted(report["preflight_warnings"].items()):
+        messages.append(f"::error title=EvalForge dataset preflight::{safe(name)}: {safe(', '.join(map(str, ids)))}")
+    observed = report["observed_lexical_evidence_hit_rate"]
+    minimum = report["minimum_lexical_evidence_hit_rate"]
+    if observed is None or observed < minimum:
+        messages.append(f"::error title=EvalForge lexical retrieval gate::hit rate {safe(observed)} below minimum {safe(minimum)}")
+    return messages
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--corpus", type=Path, required=True)
@@ -52,7 +69,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--min-hit-rate", type=float, default=0.5)
     parser.add_argument("--tokenizer", choices=("ascii", "unicode"), default="ascii")
     parser.add_argument("--output", type=Path, help="New JSON report; refuses overwrite")
-    args = parser.parse_args(argv)
+    parser.add_argument("--github-annotations", action="store_true", help="Emit actionable GitHub Actions errors to stderr on failed gates")\n    args = parser.parse_args(argv)
     try:
         result = gate(load_benchmark_json(args.corpus),
                       load_benchmark_json(args.questions), k=args.k,
@@ -66,7 +83,7 @@ def main(argv: list[str] | None = None) -> int:
     except (ValueError, TypeError, OSError, RecursionError) as exc:
         print(f"EvalForge custom gate rejected: {exc}", file=sys.stderr)
         return 2
-    return 0 if result["passed"] else 1
+    if args.github_annotations:\n        for annotation in github_annotations(result):\n            print(annotation, file=sys.stderr)\n    return 0 if result["passed"] else 1
 
 
 if __name__ == "__main__":
