@@ -88,7 +88,7 @@ def render(report: dict) -> str:
         "insufficient_unanswerable_questions": observed_unanswerable < min_unanswerable,
         "insufficient_distinct_relevant_documents": observed_distinct < min_distinct,
         "undefined_lexical_evidence_hit_rate": metric == "undefined",
-        "lexical_evidence_hit_rate_below_minimum": metric != "undefined" and float(metric) < float(threshold),
+        "lexical_evidence_hit_rate_below_minimum": metric != "undefined" and report["observed_lexical_evidence_hit_rate"] < report["minimum_lexical_evidence_hit_rate"],
         "ambiguous_relevance_cutoff_ties": strict_ties and observed_ties > 0,
     }
     for reason, should_fail in expected.items():
