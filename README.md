@@ -33,6 +33,27 @@ To work from source instead, clone this repository and run `python -m pip instal
 
 Use `--corpus` and `--questions` with the BM25 CLI for compatible user-supplied JSON fixtures. Both CLIs accept `--output` and `--summary-only`; the compact report retains aggregate metrics and dataset fingerprints. For development and provider-backed evaluations, see [project status](#project-status) and `requirements.txt`. Provider-backed evaluations require configured API credentials and are **not** exercised by these offline commands.
 
+### Readable GitHub Actions evidence for a custom retrieval gate
+
+The installed `evalforge-custom-summary` command converts an existing
+`evalforge-custom-gate` JSON artifact into a small Markdown report containing
+the pass/fail result, observed versus required lexical hit rate and coverage,
+dataset SHA-256 fingerprints, and plain-English failure reasons. It rejects
+incompatible or malformed reports and refuses to overwrite an existing file.
+The [custom gate workflow](.github/workflows/custom-gate-demo.yml) publishes
+this report to the GitHub Actions job summary and retains the JSON and Markdown
+as artifacts.
+
+```bash
+evalforge-custom-gate --corpus examples/customer_support_corpus.json \\
+  --questions examples/customer_support_questions.json \\
+  --k 3 --min-hit-rate 0.50 --output gate-evidence.json
+evalforge-custom-summary gate-evidence.json --output gate-summary.md
+```
+
+This is a **lexical retrieval regression report**, not evidence of generated
+answer correctness, hallucination prevention, or production AI safety.
+
 ### Preflight your labeled dataset before benchmarking
 
 The installed `evalforge-dataset-audit` command validates custom corpus/question JSON and reports deterministic SHA-256 fingerprints, label counts, unindexable documents, answerable queries without corpus-wide lexical overlap, and answerable queries with no token overlap in their **labeled relevant documents** (even if unrelated documents share query terms). It uses **no model API calls** and does not score retrieval accuracy or generated answers.
