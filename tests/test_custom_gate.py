@@ -186,3 +186,32 @@ def test_minimum_answerable_sample_size_is_a_real_gate(tmp_path):
     assert completed.returncode == 1, completed.stderr
     assert json.loads(completed.stdout)["failure_reasons"] == ["insufficient_answerable_questions"]
     assert subprocess.run(cmd[:-1] + ["-1"], capture_output=True).returncode == 2
+
+
+def test_distinct_relevant_document_coverage_gate(tmp_path):
+    """Repeated labels for one document must not inflate dataset diversity."""
+    from evalforge.custom_gate import github_annotations
+    repeated = [QUESTIONS[0], dict(QUESTIONS[0], id="q3", question="refund")]
+    report = gate(DOCS, repeated, k=1, min_hit_rate=0,
+                  min_distinct_relevant_docs=2)
+    assert report["observed_distinct_relevant_documents"] == 1
+    assert report["minimum_distinct_relevant_documents"] == 2
+    assert report["passed"] is False
+    assert "insufficient_distinct_relevant_documents" in report["failure_reasons"]
+    assert any("relevance diversity" in line for line in github_annotations(report))
+    assert gate(DOCS, repeated, k=1, min_hit_rate=0,
+                min_distinct_relevant_docs=1)["passed"]
+    for invalid in (-1, True, 1.5, "2"):
+        with pytest.raises(ValueError):
+            gate(DOCS, QUESTIONS, min_distinct_relevant_docs=invalid)
+
+    corpus = tmp_path / "corpus.json"
+    questions = tmp_path / "questions.json"
+    corpus.write_text(json.dumps(DOCS), encoding="utf-8")
+    questions.write_text(json.dumps(repeated), encoding="utf-8")
+    cmd = [sys.executable, "-m", "evalforge.custom_gate", "--corpus", str(corpus),
+           "--questions", str(questions), "--k", "1", "--min-hit-rate", "0",
+           "--min-distinct-relevant-docs", "2"]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    assert result.returncode == 1, result.stderr
+    assert json.loads(result.stdout)["observed_distinct_relevant_documents"] == 1
