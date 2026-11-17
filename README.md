@@ -77,7 +77,7 @@ evalforge-custom-gate --corpus examples/customer_support_corpus.json \
   --k 3 --min-hit-rate 0.50 --output custom-gate.json
 ```
 
-Set thresholds using your own representative labeled data, not this synthetic example. A zero-overlap relevant label fails the gate even if unrelated documents match the question. The JSON contains corpus/question fingerprints, preflight warnings, and aggregate lexical retrieval metrics.
+Set thresholds using your own representative labeled data, not this synthetic example. A zero-overlap relevant label fails the gate even if unrelated documents match the question. Add `--fail-on-ambiguous-ties` to reject positive-score BM25 ties at the requested cutoff that mix relevant and irrelevant documents. Such ties make top-k outcomes depend on deterministic but arbitrary document-ID ordering; the gate reports `ambiguous_relevance_cutoff_tie_count` even when this stricter option is off. This diagnostic is not semantic relevance or model-safety evaluation. The JSON contains corpus/question fingerprints, preflight warnings, and aggregate lexical retrieval metrics.
 
 For debugging individual retrieval misses, add `--include-cases` to include the evaluator's per-question, per-cutoff evidence in the JSON report. The default stays compact and retains its existing schema fields; this option is intended for local inspection or CI artifacts and may reveal question text or document IDs from your dataset. Do not upload sensitive datasets or detailed reports to public CI artifacts.
 
