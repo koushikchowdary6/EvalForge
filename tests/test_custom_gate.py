@@ -80,3 +80,26 @@ def test_github_annotations_are_opt_in_and_escape_untrusted_ids(tmp_path):
     assert "::error" not in plain.stderr
     assert "::error title=EvalForge dataset preflight::" in annotated.stderr
     assert json.loads(plain.stdout) == json.loads(annotated.stdout)
+
+
+def test_opt_in_case_evidence_preserves_aggregate_contract(tmp_path):
+    compact = gate(DOCS, QUESTIONS, k=1, min_hit_rate=0)
+    detailed = gate(DOCS, QUESTIONS, k=1, min_hit_rate=0, include_cases=True)
+    assert "cases" not in compact
+    assert detailed["cases"]
+    assert {key: value for key, value in detailed.items() if key != "cases"} == compact
+    assert detailed == gate(DOCS, QUESTIONS, k=1, min_hit_rate=0, include_cases=True)
+    with pytest.raises(ValueError):
+        gate(DOCS, QUESTIONS, include_cases="yes")
+
+    corpus = tmp_path / "corpus.json"
+    questions = tmp_path / "questions.json"
+    corpus.write_text(json.dumps(DOCS), encoding="utf-8")
+    questions.write_text(json.dumps(QUESTIONS), encoding="utf-8")
+    cmd = [sys.executable, "-m", "evalforge.custom_gate", "--corpus", str(corpus),
+           "--questions", str(questions), "--k", "1", "--min-hit-rate", "0"]
+    plain = subprocess.run(cmd, capture_output=True, text=True)
+    detailed_cli = subprocess.run(cmd + ["--include-cases"], capture_output=True, text=True)
+    assert plain.returncode == detailed_cli.returncode == 0
+    assert "cases" not in json.loads(plain.stdout)
+    assert json.loads(detailed_cli.stdout) == detailed
