@@ -69,7 +69,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--min-hit-rate", type=float, default=0.5)
     parser.add_argument("--tokenizer", choices=("ascii", "unicode"), default="ascii")
     parser.add_argument("--output", type=Path, help="New JSON report; refuses overwrite")
-    parser.add_argument("--github-annotations", action="store_true", help="Emit actionable GitHub Actions errors to stderr on failed gates")\n    args = parser.parse_args(argv)
+    parser.add_argument("--github-annotations", action="store_true", help="Emit actionable GitHub Actions errors to stderr on failed gates")
+    args = parser.parse_args(argv)
     try:
         result = gate(load_benchmark_json(args.corpus),
                       load_benchmark_json(args.questions), k=args.k,
@@ -83,7 +84,10 @@ def main(argv: list[str] | None = None) -> int:
     except (ValueError, TypeError, OSError, RecursionError) as exc:
         print(f"EvalForge custom gate rejected: {exc}", file=sys.stderr)
         return 2
-    if args.github_annotations:\n        for annotation in github_annotations(result):\n            print(annotation, file=sys.stderr)\n    return 0 if result["passed"] else 1
+    if args.github_annotations:
+        for annotation in github_annotations(result):
+            print(annotation, file=sys.stderr)
+    return 0 if result["passed"] else 1
 
 
 if __name__ == "__main__":
