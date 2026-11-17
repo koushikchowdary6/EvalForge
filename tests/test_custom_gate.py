@@ -61,12 +61,16 @@ def test_cli_exit_codes_and_no_overwrite(tmp_path):
 def test_github_annotations_are_opt_in_and_escape_untrusted_ids(tmp_path):
     from evalforge.custom_gate import github_annotations
     assert github_annotations(gate(DOCS, QUESTIONS, min_hit_rate=0)) == []
-    unsafe = [dict(QUESTIONS[0], id="q%\n::warning", question="unmatchedword")]
+    unsafe = [dict(QUESTIONS[0], id="q%::warning", question="unmatchedword")]
     report = gate(DOCS, unsafe, min_hit_rate=0)
     annotations = github_annotations(report)
     assert annotations and all(line.startswith("::error title=") for line in annotations)
-    assert any("q%25%0A%3A%3Awarning" in line for line in annotations)
+    assert any("q%25%3A%3Awarning" in line for line in annotations)
     assert all("\n" not in line and "\r" not in line for line in annotations)
+    injected = dict(report, preflight_warnings={"question_ids": ["q%\n::warning"]})
+    injected_annotations = github_annotations(injected)
+    assert any("q%25%0A%3A%3Awarning" in line for line in injected_annotations)
+    assert all("\n" not in line and "\r" not in line for line in injected_annotations)
 
     corpus = tmp_path / "corpus.json"
     questions = tmp_path / "questions.json"
