@@ -71,6 +71,36 @@ def render(report: dict) -> str:
         f"| Mixed-relevance cutoff ties | {count('ambiguous_relevance_cutoff_tie_count')} | {'0 (strict)' if report.get('fail_on_ambiguous_ties') is True else 'Not gated'} |",
         "",
     ]
+    # A report is untrusted input. Check the displayed result against its
+    # underlying metrics rather than rendering contradictory evidence as PASS.
+    observed_answerable = int(_answerable(report))
+    observed_unanswerable = int(count("observed_unanswerable_questions"))
+    observed_distinct = int(count("observed_distinct_relevant_documents"))
+    observed_ties = int(count("ambiguous_relevance_cutoff_tie_count"))
+    min_answerable = int(count("minimum_answerable_questions"))
+    min_unanswerable = int(count("minimum_unanswerable_questions"))
+    min_distinct = int(count("minimum_distinct_relevant_documents"))
+    strict_ties = report.get("fail_on_ambiguous_ties")
+    if type(strict_ties) is not bool:
+        raise ValueError("Invalid tie policy")
+    expected = {
+        "insufficient_answerable_questions": observed_answerable < min_answerable,
+        "insufficient_unanswerable_questions": observed_unanswerable < min_unanswerable,
+        "insufficient_distinct_relevant_documents": observed_distinct < min_distinct,
+        "undefined_lexical_evidence_hit_rate": metric == "undefined",
+        "lexical_evidence_hit_rate_below_minimum": metric != "undefined" and float(metric) < float(threshold),
+        "ambiguous_relevance_cutoff_ties": strict_ties and observed_ties > 0,
+    }
+    for reason, should_fail in expected.items():
+        if (reason in reasons) != should_fail:
+            raise ValueError(f"Inconsistent gate diagnostic: {reason}")
+    warnings = report.get("preflight_warnings")
+    if not isinstance(warnings, dict) or any(not isinstance(v, list) for v in warnings.values()):
+        raise ValueError("Invalid preflight warnings")
+    if ("dataset_preflight_warnings" in reasons) != bool(warnings):
+        raise ValueError("Inconsistent dataset preflight diagnostic")
+    if len(reasons) != len(set(reasons)):
+        raise ValueError("Duplicate failure reasons")
     if reasons:
         lines.extend(["## Gate failures", ""])
         lines.extend(f"- {known_reasons[reason]}" for reason in reasons)
