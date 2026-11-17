@@ -65,3 +65,29 @@ def test_cli_no_overwrite_and_invalid_json(tmp_path):
     assert summary.read_bytes() == original
     artifact.write_text('{"schema":"x","schema":"y"}', encoding="utf-8")
     assert subprocess.run(cmd[:4], capture_output=True).returncode == 2
+
+
+@pytest.mark.parametrize("field,value", [
+    ("minimum_answerable_questions", 2),
+    ("minimum_unanswerable_questions", 2),
+    ("minimum_distinct_relevant_documents", 2),
+    ("minimum_lexical_evidence_hit_rate", 1.0),
+    ("observed_lexical_evidence_hit_rate", None),
+    ("ambiguous_relevance_cutoff_tie_count", 1),
+    ("preflight_warnings", {"unindexable_document_ids": ["x"]}),
+    ("failure_reasons", ["insufficient_answerable_questions"]),
+])
+def test_rejects_tampered_gate_outcome(field, value):
+    report = gate(DOCS, QUESTIONS, k=1, min_hit_rate=0)
+    report[field] = value
+    if field == "ambiguous_relevance_cutoff_tie_count":
+        report["fail_on_ambiguous_ties"] = True
+    with pytest.raises(ValueError):
+        render(report)
+
+
+def test_summary_uses_unrounded_metric_for_threshold_consistency():
+    report = gate(DOCS, QUESTIONS, k=1, min_hit_rate=0)
+    report["observed_lexical_evidence_hit_rate"] = 0.5004
+    report["minimum_lexical_evidence_hit_rate"] = 0.5003
+    assert "**Result:** PASS" in render(report)
