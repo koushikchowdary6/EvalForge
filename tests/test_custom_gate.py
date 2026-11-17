@@ -56,3 +56,27 @@ def test_cli_exit_codes_and_no_overwrite(tmp_path):
     failed = subprocess.run(cmd, capture_output=True, text=True)
     assert failed.returncode == 1, failed.stderr
     assert not json.loads(output.read_text())["passed"]
+
+
+def test_github_annotations_are_opt_in_and_escape_untrusted_ids(tmp_path):
+    from evalforge.custom_gate import github_annotations
+    assert github_annotations(gate(DOCS, QUESTIONS, min_hit_rate=0)) == []
+    unsafe = [dict(QUESTIONS[0], id="q%\\n::warning", question="unmatchedword")]
+    report = gate(DOCS, unsafe, min_hit_rate=0)
+    annotations = github_annotations(report)
+    assert annotations and all(line.startswith("::error title=") for line in annotations)
+    assert any("q%25%0A%3A%3Awarning" in line for line in annotations)
+    assert all("\\n" not in line for line in annotations)
+
+    corpus = tmp_path / "corpus.json"
+    questions = tmp_path / "questions.json"
+    corpus.write_text(json.dumps(DOCS), encoding="utf-8")
+    questions.write_text(json.dumps(unsafe), encoding="utf-8")
+    cmd = [sys.executable, "-m", "evalforge.custom_gate", "--corpus", str(corpus),
+           "--questions", str(questions), "--min-hit-rate", "0"]
+    plain = subprocess.run(cmd, capture_output=True, text=True)
+    annotated = subprocess.run(cmd + ["--github-annotations"], capture_output=True, text=True)
+    assert plain.returncode == annotated.returncode == 1
+    assert "::error" not in plain.stderr
+    assert "::error title=EvalForge dataset preflight::" in annotated.stderr
+    assert json.loads(plain.stdout) == json.loads(annotated.stdout)
