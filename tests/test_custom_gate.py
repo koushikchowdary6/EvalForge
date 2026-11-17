@@ -26,6 +26,19 @@ def test_passes_with_reproducible_evidence():
     assert "cases" not in report["benchmark"]
 
 
+def test_machine_readable_failure_reasons_are_stable():
+    passing = gate(DOCS, QUESTIONS, k=1, min_hit_rate=0)
+    assert passing["failure_reasons"] == []
+    unreachable = [dict(QUESTIONS[0], question="unmatchedword")]
+    invalid = gate(DOCS, unreachable, k=1, min_hit_rate=0)
+    assert "dataset_preflight_warnings" in invalid["failure_reasons"]
+    assert "undefined_lexical_evidence_hit_rate" not in invalid["failure_reasons"] or invalid["observed_lexical_evidence_hit_rate"] is None
+    threshold = gate(DOCS, QUESTIONS, k=1, min_hit_rate=1)
+    if threshold["observed_lexical_evidence_hit_rate"] < 1:
+        assert "lexical_evidence_hit_rate_below_minimum" in threshold["failure_reasons"]
+    assert gate(DOCS, QUESTIONS, k=1, min_hit_rate=0) == passing
+
+
 def test_fails_threshold_and_unreachable_labels():
     unreachable = [dict(QUESTIONS[0], question="unmatchedword")]
     report = gate(DOCS, unreachable, min_hit_rate=0)
