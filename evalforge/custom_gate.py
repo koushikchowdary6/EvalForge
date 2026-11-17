@@ -15,12 +15,15 @@ from .offline_rag_demo import evaluate, load_benchmark_json
 
 
 def gate(docs: list, questions: list, *, k: int = 3,
-         min_hit_rate: float = 0.5, tokenizer: str = "ascii") -> dict:
+         min_hit_rate: float = 0.5, tokenizer: str = "ascii",
+         include_cases: bool = False) -> dict:
     """Return evidence and pass/fail; reject invalid or unreachable labels."""
     if type(k) is not int or k < 1:
         raise ValueError("k must be a positive integer")
     if not isinstance(min_hit_rate, (int, float)) or isinstance(min_hit_rate, bool) or not math.isfinite(min_hit_rate) or not 0 <= min_hit_rate <= 1:
         raise ValueError("min_hit_rate must be finite and between 0 and 1")
+    if type(include_cases) is not bool:
+        raise ValueError("include_cases must be a boolean")
     preflight = audit(docs, questions, tokenizer)
     warnings = {name: preflight[name] for name in (
         "unindexable_document_ids",
@@ -31,7 +34,7 @@ def gate(docs: list, questions: list, *, k: int = 3,
     result = evaluate(docs, questions, [k], tokenizer_mode=tokenizer)
     metric = result["by_top_k"][str(k)]["lexical_evidence_hit_rate"]
     passed = not warnings and metric is not None and metric >= min_hit_rate
-    return {
+    report = {
         "schema": "evalforge.custom_retrieval_gate.v1",
         "scope": "offline_lexical_retrieval_only_not_llm_quality_or_safety",
         "passed": passed,
@@ -42,6 +45,9 @@ def gate(docs: list, questions: list, *, k: int = 3,
         "dataset_audit": preflight,
         "benchmark": {key: value for key, value in result.items() if key != "cases"},
     }
+    if include_cases:
+        report["cases"] = result["cases"]
+    return report
 
 
 def github_annotations(report: dict) -> list[str]:
@@ -69,12 +75,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--min-hit-rate", type=float, default=0.5)
     parser.add_argument("--tokenizer", choices=("ascii", "unicode"), default="ascii")
     parser.add_argument("--output", type=Path, help="New JSON report; refuses overwrite")
+    parser.add_argument("--include-cases", action="store_true",
+                        help="Include per-question retrieval diagnostics in the JSON evidence")
     parser.add_argument("--github-annotations", action="store_true", help="Emit actionable GitHub Actions errors to stderr on failed gates")
     args = parser.parse_args(argv)
     try:
         result = gate(load_benchmark_json(args.corpus),
                       load_benchmark_json(args.questions), k=args.k,
-                      min_hit_rate=args.min_hit_rate, tokenizer=args.tokenizer)
+                      min_hit_rate=args.min_hit_rate, tokenizer=args.tokenizer,
+                      include_cases=args.include_cases)
         rendered = json.dumps(result, indent=2, sort_keys=True, allow_nan=False) + "\n"
         if args.output:
             with args.output.open("x", encoding="utf-8") as stream:
