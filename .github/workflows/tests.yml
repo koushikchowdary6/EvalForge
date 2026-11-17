@@ -396,6 +396,48 @@ jobs:
         assert actual == expected, "Failed overwrite attempt changed existing evidence"
         PY
 
+    # Test the actual wheel entry point outside the checkout, including its
+    # machine-readable contract and CI failure semantics on every Python version.
+    - name: Smoke-test installed custom retrieval gate
+      run: |
+        cd "$RUNNER_TEMP"
+        "$RUNNER_TEMP/evalforge-wheel-venv/bin/python" - <<'PY'
+        import json
+        from pathlib import Path
+        Path("gate-corpus.json").write_text(json.dumps([
+            {"doc_id": "refund", "title": "Refund policy", "text": "Refund purchases"},
+            {"doc_id": "shipping", "title": "Shipping", "text": "Track shipping"}
+        ]), encoding="utf-8")
+        Path("gate-questions.json").write_text(json.dumps([
+            {"id": "q1", "question": "refund purchases", "answerable": True,
+             "relevant_doc_ids": ["refund"]}
+        ]), encoding="utf-8")
+        PY
+        "$RUNNER_TEMP/evalforge-wheel-venv/bin/evalforge-custom-gate" \
+          --corpus gate-corpus.json --questions gate-questions.json \
+          --k 1 --min-hit-rate 1 --output gate-pass.json
+        "$RUNNER_TEMP/evalforge-wheel-venv/bin/python" - <<'PY'
+        import json
+        from pathlib import Path
+        result = json.loads(Path("gate-pass.json").read_text(encoding="utf-8"))
+        assert result["schema"] == "evalforge.custom_retrieval_gate.v1"
+        assert result["passed"] is True
+        assert result["observed_lexical_evidence_hit_rate"] == 1
+        assert len(result["benchmark"]["corpus_sha256"]) == 64
+        PY
+        # A stricter-than-possible gate must fail but still export evidence.
+        if "$RUNNER_TEMP/evalforge-wheel-venv/bin/evalforge-custom-gate" \
+          --corpus gate-corpus.json --questions gate-questions.json \
+          --k 1 --min-hit-rate 1 --output gate-pass.json; then
+          echo "ERROR: custom gate overwrote an existing artifact" >&2
+          exit 1
+        fi
+        "$RUNNER_TEMP/evalforge-wheel-venv/bin/python" - <<'PY'
+        import json
+        from pathlib import Path
+        assert json.loads(Path("gate-pass.json").read_text())["passed"] is True
+        PY
+
     - name: Upload compact benchmark evidence
       if: matrix.python-version == '3.12'
       uses: actions/upload-artifact@v4
