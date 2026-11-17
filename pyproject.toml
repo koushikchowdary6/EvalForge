@@ -35,6 +35,7 @@ evalforge-compare-artifacts = "evalforge.compare_artifacts:main"
 evalforge-report-md = "evalforge.report_markdown:main"
 evalforge-dataset-audit = "evalforge.dataset_audit:main"
 evalforge-custom-gate = "evalforge.custom_gate:main"
+evalforge-custom-summary = "evalforge.custom_gate_summary:main"
 
 [project.optional-dependencies]
 test = ["pytest>=8,<9"]
