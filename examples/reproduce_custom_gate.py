@@ -77,13 +77,32 @@ def main() -> None:
                 passed["observed_lexical_evidence_hit_rate"],
                 "Coverage-only negative control unexpectedly changed retrieval score")
 
+        # The installed summary CLI must preserve the failed gate's diagnostics.
+        summary = root / "negative-control.md"
+        summary_cmd = ["evalforge-custom-summary", str(failed), "--output", str(summary)]
+        rendered = subprocess.run(summary_cmd, text=True, capture_output=True, check=False)
+        require(rendered.returncode == 0 and summary.exists(),
+                f"Failed gate could not be rendered: {rendered.stderr}")
+        markdown = summary.read_text(encoding="utf-8")
+        require("**Result:** FAIL" in markdown and
+                "Too few answerable questions" in markdown,
+                "Markdown summary omitted the failing coverage diagnostic")
+        require(passed["dataset_audit"]["corpus_sha256"] in markdown,
+                "Markdown summary omitted dataset provenance")
+        summary_before = summary.read_bytes()
+        repeated_summary = subprocess.run(summary_cmd, text=True, capture_output=True,
+                                          check=False)
+        require(repeated_summary.returncode == 2 and
+                summary.read_bytes() == summary_before,
+                "Summary CLI overwrote existing diagnostic evidence")
+
         # Evidence must be immutable by default, including on a failing gate.
         before = failed.read_bytes()
         repeat = invoke(failed, min_answerable=5)
         require(repeat.returncode == 2 and failed.read_bytes() == before,
                 "Gate overwrote an existing evaluation artifact")
     print("PASS: deterministic installed custom gate, labeled negative coverage,")
-    print("      explicit failing control, preserved evidence, no-overwrite contract")
+    print("      explicit failing control, readable failure summary, no-overwrite contract")
     print("Scope: synthetic lexical retrieval only; no LLM quality/safety claim")
 
 
