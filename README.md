@@ -79,6 +79,8 @@ evalforge-custom-gate --corpus examples/customer_support_corpus.json \
 
 Set thresholds using your own representative labeled data, not this synthetic example. A zero-overlap relevant label fails the gate even if unrelated documents match the question. The JSON contains corpus/question fingerprints, preflight warnings, and aggregate lexical retrieval metrics.
 
+In GitHub Actions, add `--github-annotations` to emit actionable `::error` diagnostics on stderr when the custom gate fails. The JSON evidence still goes to `--output` (or stdout), and exit codes are unchanged. Dataset IDs are escaped before becoming workflow commands. Upload the JSON report with `if: always()` so failed gates remain inspectable. This is an **opt-in** integration, not a guarantee that a lexical baseline measures LLM quality.
+
 ### Export a human-readable benchmark summary
 
 Generate a Markdown table from a validated offline JSON artifact for a pull request, release notes, or a recruiter-facing demo. The reporter includes dataset SHA-256 provenance and explicitly labels lexical metrics; it does not claim to evaluate generated answers or model safety.
