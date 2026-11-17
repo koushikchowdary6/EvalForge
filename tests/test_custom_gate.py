@@ -215,3 +215,33 @@ def test_distinct_relevant_document_coverage_gate(tmp_path):
     result = subprocess.run(cmd, capture_output=True, text=True)
     assert result.returncode == 1, result.stderr
     assert json.loads(result.stdout)["observed_distinct_relevant_documents"] == 1
+
+
+def test_minimum_unanswerable_coverage_is_enforced(tmp_path):
+    """A benchmark with only positive queries must not silently satisfy a negative-coverage gate."""
+    from evalforge.custom_gate import github_annotations
+    positives = [QUESTIONS[0]]
+    report = gate(DOCS, positives, k=1, min_hit_rate=0,
+                  min_unanswerable_questions=1)
+    assert report["passed"] is False
+    assert report["observed_unanswerable_questions"] == 0
+    assert report["failure_reasons"] == ["insufficient_unanswerable_questions"]
+    assert any("negative coverage" in line for line in github_annotations(report))
+    assert gate(DOCS, QUESTIONS, k=1, min_hit_rate=0,
+                min_unanswerable_questions=1)["passed"]
+    assert gate(DOCS, positives, k=1, min_hit_rate=0)["passed"]
+    for invalid in (-1, True, 1.5, "1"):
+        with pytest.raises(ValueError):
+            gate(DOCS, QUESTIONS, min_unanswerable_questions=invalid)
+
+    corpus = tmp_path / "corpus.json"
+    questions = tmp_path / "questions.json"
+    corpus.write_text(json.dumps(DOCS), encoding="utf-8")
+    questions.write_text(json.dumps(positives), encoding="utf-8")
+    cmd = [sys.executable, "-m", "evalforge.custom_gate", "--corpus", str(corpus),
+           "--questions", str(questions), "--k", "1", "--min-hit-rate", "0",
+           "--min-unanswerable-questions", "1"]
+    completed = subprocess.run(cmd, capture_output=True, text=True)
+    assert completed.returncode == 1, completed.stderr
+    assert json.loads(completed.stdout)["failure_reasons"] == ["insufficient_unanswerable_questions"]
+    assert subprocess.run(cmd[:-1] + ["-1"], capture_output=True).returncode == 2
