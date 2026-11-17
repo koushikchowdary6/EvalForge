@@ -49,8 +49,8 @@ def github_annotations(report: dict) -> list[str]:
     if report["passed"]:
         return []
     def safe(value: object) -> str:
-        return (str(value).replace("%", "%25").replace("\\r", "%0D")
-                .replace("\\n", "%0A").replace(":", "%3A"))
+        return (str(value).replace("%", "%25").replace("\r", "%0D")
+                .replace("\n", "%0A").replace(":", "%3A"))
     messages = []
     for name, ids in sorted(report["preflight_warnings"].items()):
         messages.append(f"::error title=EvalForge dataset preflight::{safe(name)}: {safe(', '.join(map(str, ids)))}")
