@@ -21,10 +21,24 @@ def _jsonl(path: Path):
         for line_no, line in enumerate(stream, 1):
             if not line.strip():
                 continue
+            def unique_pairs(pairs):
+                obj = {}
+                for key, value in pairs:
+                    if key in obj:
+                        raise ValueError(f"duplicate JSON key: {key!r}")
+                    obj[key] = value
+                return obj
+
+            def reject_constant(value):
+                raise ValueError(f"nonstandard JSON constant: {value}")
+
             try:
-                record = json.loads(line)
-            except json.JSONDecodeError as exc:
-                raise ValueError(f"{path.name}:{line_no}: invalid JSON") from exc
+                record = json.loads(
+                    line, object_pairs_hook=unique_pairs,
+                    parse_constant=reject_constant,
+                )
+            except (json.JSONDecodeError, ValueError) as exc:
+                raise ValueError(f"{path.name}:{line_no}: invalid JSON: {exc}") from exc
             if not isinstance(record, dict):
                 raise ValueError(f"{path.name}:{line_no}: expected JSON object")
             yield record
