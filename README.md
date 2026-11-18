@@ -58,6 +58,7 @@ The JSON report contains BM25 lexical retrieval metrics, source-file SHA-256 fin
 ```bash
 git clone https://github.com/koushikchowdary6/EvalForge.git
 cd EvalForge
+python -m pip install -e .
 evalforge-dataset-audit --corpus examples/customer_support_corpus.json --questions examples/customer_support_questions.json --strict
 evalforge-custom-gate --corpus examples/customer_support_corpus.json --questions examples/customer_support_questions.json --k 3 --min-hit-rate 0.50 --output gate-evidence.json
 evalforge-custom-summary gate-evidence.json --output gate-summary.md
