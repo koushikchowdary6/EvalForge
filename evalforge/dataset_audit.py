@@ -30,12 +30,15 @@ def audit(docs: list, questions: list, tokenizer: str = "ascii") -> dict:
         if not terms:
             unindexable.add(doc["doc_id"])
     no_overlap = []
+    unindexable_questions = []
     unindexable_labels = []
     no_relevant_overlap = []
     answerable = 0
     unanswerable_with_overlap = []
     for case in questions:
         query_terms = set(split(case["question"]))
+        if not query_terms:
+            unindexable_questions.append(case["id"])
         if not case["answerable"]:
             if query_terms.intersection(vocabulary):
                 unanswerable_with_overlap.append(case["id"])
@@ -60,6 +63,8 @@ def audit(docs: list, questions: list, tokenizer: str = "ascii") -> dict:
         "unanswerable_question_ids_with_corpus_token_overlap": sorted(unanswerable_with_overlap),
         "vocabulary_size": len(vocabulary),
         "unindexable_document_ids": sorted(unindexable),
+        # A question with no tokens cannot be retrieved by this lexical baseline.
+        "unindexable_question_ids": sorted(unindexable_questions),
         "answerable_question_ids_without_corpus_token_overlap": sorted(no_overlap),
         "question_ids_with_unindexable_relevance_labels": sorted(unindexable_labels),
         "answerable_question_ids_without_relevant_doc_token_overlap": sorted(no_relevant_overlap),
@@ -74,7 +79,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--questions", type=Path, required=True)
     parser.add_argument("--tokenizer", choices=("ascii", "unicode"), default="ascii")
     parser.add_argument("--strict", action="store_true",
-                        help="Fail on unreachable lexical labels or no query/corpus token overlap")
+                        help="Fail on unindexable questions, unreachable lexical labels, or no query/corpus token overlap")
     args = parser.parse_args(argv)
     try:
         report = audit(load_benchmark_json(args.corpus),
@@ -84,6 +89,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     print(json.dumps(report, sort_keys=True, allow_nan=False))
     if args.strict and (report["unindexable_document_ids"]
+                        or report["unindexable_question_ids"]
                         or report["answerable_question_ids_without_corpus_token_overlap"]
                         or report["question_ids_with_unindexable_relevance_labels"]
                         or report["answerable_question_ids_without_relevant_doc_token_overlap"]):
