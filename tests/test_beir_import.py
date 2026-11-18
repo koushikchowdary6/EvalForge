@@ -100,3 +100,28 @@ def test_source_fingerprint_changes_when_qrels_change(tmp_path):
     assert before["corpus"] == after["corpus"]
     assert before["queries"] == after["queries"]
     assert before["qrels"] != after["qrels"]
+
+
+@pytest.mark.parametrize("bad_record", [
+    '{"_id":"d1","text":"safe","text":"overridden"}',
+    '{"_id":"d1","text":"safe","metadata":{"x":1,"x":2}}',
+    '{"_id":"d1","text":"safe","weight":NaN}',
+    '{"_id":"d1","text":"safe","weight":Infinity}',
+])
+def test_ambiguous_or_nonstandard_jsonl_is_rejected(tmp_path, bad_record):
+    corpus, queries, qrels = fixture(tmp_path)
+    corpus.write_text(bad_record + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match=r"corpus\.jsonl:1: invalid JSON"):
+        convert(corpus, queries, qrels)
+
+
+def test_valid_jsonl_unicode_and_nested_metadata_remain_supported(tmp_path):
+    corpus, queries, qrels = fixture(tmp_path)
+    corpus.write_text(
+        json.dumps({"_id": "d1", "title": "Café",
+                    "text": "alpha retrieval", "metadata": {"lang": "fr"}})
+        + "\n" + json.dumps({"_id": "d2", "title": "", "text": "other topic"})
+        + "\n", encoding="utf-8")
+    documents, questions, _ = convert(corpus, queries, qrels)
+    assert documents[0]["title"] == "Café"
+    assert questions[0]["relevant_doc_ids"] == ["d1"]
