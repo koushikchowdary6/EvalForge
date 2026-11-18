@@ -101,3 +101,31 @@ def test_strict_cli_rejects_only_irrelevant_document_overlap(tmp_path):
     report = json.loads(result.stdout)
     assert report["answerable_question_ids_without_corpus_token_overlap"] == []
     assert report["answerable_question_ids_without_relevant_doc_token_overlap"] == ["q1"]
+
+
+def test_unanswerable_overlap_is_reported_without_failing_strict_preflight(tmp_path):
+    docs = [{"doc_id": "a", "title": "Refund policy", "text": "Request a refund"}]
+    questions = [
+        {"id": "unanswerable-overlap", "question": "Refund eligibility",
+         "answerable": False, "relevant_doc_ids": []},
+        {"id": "unanswerable-no-overlap", "question": "Quantum entanglement",
+         "answerable": False, "relevant_doc_ids": []},
+    ]
+    report = audit(docs, questions)
+    assert report["unanswerable_question_ids_with_corpus_token_overlap"] == [
+        "unanswerable-overlap"
+    ]
+    assert report["unanswerable_questions"] == 2
+    corpus = tmp_path / "corpus.json"
+    labels = tmp_path / "questions.json"
+    corpus.write_text(json.dumps(docs), encoding="utf-8")
+    labels.write_text(json.dumps(questions), encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, "-m", "evalforge.dataset_audit",
+         "--corpus", str(corpus), "--questions", str(labels), "--strict"],
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["unanswerable_question_ids_with_corpus_token_overlap"] == [
+        "unanswerable-overlap"
+    ]
