@@ -29,6 +29,8 @@ The optional hit-rate floor applies **only to lexical evidence at k=3 on the bun
 | --- | --- |
 | `evalforge-demo` | API-free quickstart and versioned JSON evidence |
 | `evalforge-bm25` | BM25 retrieval metrics at chosen k, including custom labeled datasets |
+| `evalforge-import-beir` | Convert locally obtained BEIR-style inputs into labeled EvalForge JSON |
+| `evalforge-benchmark-beir` | Evaluate locally obtained BEIR-style inputs directly with provenance and BM25 metrics |
 | `evalforge-dataset-audit` | Dataset integrity and lexical label-coverage preflight |
 | `evalforge-custom-gate` | Dataset-aware lexical hit-rate CI gate |
 | `evalforge-custom-summary` | Human-readable Markdown from custom gate evidence |
@@ -38,6 +40,18 @@ The optional hit-rate floor applies **only to lexical evidence at k=3 on the bun
 | `evalforge-report-md` | Export a Markdown summary of offline evidence |
 
 The bundled BM25 fixture contains **15 documents and 14 questions**. A second [customer-support example](examples/customer_support_corpus.json) is also hand-authored, not an independently sourced benchmark. See [custom dataset walkthrough](#evaluate-your-own-labeled-retrieval-dataset), [CI gate](#gate-a-custom-labeled-retrieval-dataset-in-ci), and [project status](#project-status). Provider-backed LLM/agent evaluations require configured credentials and are separate from these offline commands.
+
+## Benchmark locally obtained BEIR data
+
+The installed `evalforge-benchmark-beir` command evaluates a BEIR-style dataset directly without creating intermediate converted files. Supply your own legally obtained `corpus.jsonl`, `queries.jsonl`, and tab-separated `qrels/test.tsv`:
+
+```bash
+evalforge-benchmark-beir --corpus /path/to/corpus.jsonl \\
+  --queries /path/to/queries.jsonl --qrels /path/to/qrels/test.tsv \\
+  --k 1 3 5 --output beir-bm25-report.json
+```
+
+The JSON report contains BM25 lexical retrieval metrics, source-file SHA-256 fingerprints, and counts of excluded queries. Only queries with **positive qrels** are evaluated; unlabeled queries are excluded, never treated as unanswerable. The command does not download or redistribute benchmark data. This is a reproducible **lexical baseline**, not an LLM answer-quality, hallucination, or agent-safety measurement. No independent dataset scores are claimed until a real dataset is run and the result verified. The output file must not already exist.
 
 ## Evaluate your own dataset
 
