@@ -95,7 +95,7 @@ def test_second_output_write_failure_rolls_back_first(tmp_path, monkeypatch):
 def test_source_fingerprint_changes_when_qrels_change(tmp_path):
     corpus, queries, qrels = fixture(tmp_path)
     before = convert(corpus, queries, qrels)[2]["source_sha256"]
-    qrels.write_text(qrels.read_text(encoding="utf-8").replace("q1\\td1\\t1", "q1\\td1\\t2"), encoding="utf-8")
+    qrels.write_text(qrels.read_text(encoding="utf-8").replace("q1\td1\t1", "q1\td1\t2"), encoding="utf-8")
     after = convert(corpus, queries, qrels)[2]["source_sha256"]
     assert before["corpus"] == after["corpus"]
     assert before["queries"] == after["queries"]
