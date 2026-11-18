@@ -1,37 +1,63 @@
 # EvalForge
 
-**Evaluate RAG retrieval and AI-agent safety with reproducible, inspectable benchmarks.** Start with an API-free BM25 retrieval baseline, then explore provider-backed LLM and agent evaluation. The offline demo makes **no model calls**, needs **no API keys**, and does **not** measure answer correctness or hallucination resistance.
+**Reproducible offline RAG retrieval evaluation and CI regression gates.** EvalForge offers installable Python CLIs for labeled-document retrieval benchmarks, dataset preflight, report validation, and comparison. The offline path needs **no API key or model call**.
 
-### Install and run without API keys
+> **Scope:** The included benchmarks measure BM25 lexical retrieval on small, hand-authored datasets. They do **not** measure generated-answer correctness, hallucination resistance, or production LLM/agent safety. No independent real-world benchmark or published PyPI release is claimed.
 
-Python 3.10+ is required. Install directly from GitHub (no clone or provider credentials needed):
+## Try it in two minutes
+
+Python 3.10+:
 
 ```bash
 python -m pip install "git+https://github.com/koushikchowdary6/EvalForge.git"
-evalforge-demo  # human-readable offline benchmark summary
-evalforge-demo --json --output evaluation.json  # structured artifact, refuses overwrite
-evalforge-validate evaluation.json --min-hit-rate 0.50  # validate from any directory
-evalforge-demo --json --min-hit-rate 0.50 > gated-evaluation.json  # optional k=3 lexical gate
-evalforge-bm25 --k 1 3 5 --summary-only --output benchmark-summary.json
-evalforge-compare-lexical --k 1 3 5 --summary-only --output paired-summary.json
+evalforge-demo
+evalforge-bm25 --k 1 3 5 --summary-only
 ```
 
-**Validate a saved artifact in another CI job:** The installed wheel includes an API-free `evalforge-validate` command (also available as a [source example](examples/validate_demo_artifact.py)) with regression tests. It rejects duplicate JSON keys, malformed hashes, invalid or missing metrics, unsupported schemas, and failed lexical hit-rate gates. It can optionally compare the report's package version with the locally installed distribution. This validates the report contract and a small lexical fixture only, not model safety or production quality.
+For a reproducible JSON artifact and validation gate:
 
 ```bash
-evalforge-validate evaluation.json --min-hit-rate 0.50 --check-installed-version
+evalforge-demo --json --output evaluation.json
+evalforge-validate evaluation.json --min-hit-rate 0.50
 ```
 
-The optional `--min-hit-rate RATE` flag requires a finite threshold between 0 and 1 and fails before emitting JSON or a success summary when the bundled BM25 **lexical evidence hit rate at k=3** falls below it (or is undefined). It is a deterministic regression gate for this small fixture, **not** a model-quality, safety, or production RAG acceptance threshold. Choose and justify thresholds against your own labeled datasets before using them in CI.
+The optional hit-rate floor applies **only to lexical evidence at k=3 on the bundled fixture**; it is not a production acceptance threshold. Output commands refuse to overwrite existing files. Use new paths for subsequent runs.
 
-To work from source instead, clone this repository and run `python -m pip install .` from its root. There is **no published PyPI release**; do not use `pip install evalforge-ai` expecting this repository's code. All three commands run offline using bundled, hand-authored security retrieval fixtures. `evalforge-demo --json` emits a versioned, machine-readable object containing both benchmarks' metric-by-k values, dataset SHA-256 fingerprints, and explicit limitations; it does not enforce a production-quality threshold. The CLIs create JSON reports at specified paths and refuse to overwrite existing files. The demo also supports `--json --output PATH` for a validated artifact without redirecting stdout; it refuses to overwrite an existing path. Use a different filename for each run.
+## What you can run
 
-| Command | What it actually measures | What it does not measure |
-| --- | --- | --- |
-| `evalforge-bm25` | Deterministic BM25 retrieval metrics and lexical-evidence diagnostics on 15 documents / 14 questions | Generated-answer accuracy, semantic retrieval, or hallucination resistance |
-| `evalforge-compare-lexical` | Paired ASCII-vs-Unicode BM25 evidence metrics on a small multilingual fixture | Translation quality, LLM safety, or independent model performance |
+| Installed CLI | Purpose |
+| --- | --- |
+| `evalforge-demo` | API-free quickstart and versioned JSON evidence |
+| `evalforge-bm25` | BM25 retrieval metrics at chosen k, including custom labeled datasets |
+| `evalforge-dataset-audit` | Dataset integrity and lexical label-coverage preflight |
+| `evalforge-custom-gate` | Dataset-aware lexical hit-rate CI gate |
+| `evalforge-custom-summary` | Human-readable Markdown from custom gate evidence |
+| `evalforge-validate` | Validate saved offline demo artifacts |
+| `evalforge-compare-artifacts` | Compare validated reports on identical fixtures |
+| `evalforge-compare-lexical` | Paired ASCII/Unicode tokenizer diagnostics |
+| `evalforge-report-md` | Export a Markdown summary of offline evidence |
 
-Use `--corpus` and `--questions` with the BM25 CLI for compatible user-supplied JSON fixtures. Both CLIs accept `--output` and `--summary-only`; the compact report retains aggregate metrics and dataset fingerprints. For development and provider-backed evaluations, see [project status](#project-status) and `requirements.txt`. Provider-backed evaluations require configured API credentials and are **not** exercised by these offline commands.
+The bundled BM25 fixture contains **15 documents and 14 questions**. A second [customer-support example](examples/customer_support_corpus.json) is also hand-authored, not an independently sourced benchmark. See [custom dataset walkthrough](#evaluate-your-own-labeled-retrieval-dataset), [CI gate](#gate-a-custom-labeled-retrieval-dataset-in-ci), and [project status](#project-status). Provider-backed LLM/agent evaluations require configured credentials and are separate from these offline commands.
+
+## Evaluate your own dataset
+
+```bash
+git clone https://github.com/koushikchowdary6/EvalForge.git
+cd EvalForge
+evalforge-dataset-audit --corpus examples/customer_support_corpus.json --questions examples/customer_support_questions.json --strict
+evalforge-custom-gate --corpus examples/customer_support_corpus.json --questions examples/customer_support_questions.json --k 3 --min-hit-rate 0.50 --output gate-evidence.json
+evalforge-custom-summary gate-evidence.json --output gate-summary.md
+```
+
+Custom corpora require `doc_id`, `title`, `text`; questions require `id`, `question`, `answerable`, and `relevant_doc_ids`. Answerable questions need at least one relevant document ID; unanswerable questions need none. Choose thresholds from representative labeled data, not from these synthetic fixtures. Detailed case exports may expose question text or document IDs; do not upload sensitive datasets to public CI artifacts.
+
+## Documentation and limitations
+
+- [Custom dataset evaluation](#evaluate-your-own-labeled-retrieval-dataset) and [CI gate](#gate-a-custom-labeled-retrieval-dataset-in-ci)
+- [Artifact comparison](#compare-two-offline-evaluation-runs) and [GitHub Actions evidence](#readable-github-actions-evidence-for-a-custom-retrieval-gate)
+- [Project status](#project-status) for provider-backed capabilities and limitations
+
+For source development, run `python -m pip install .` from the cloned repository. No PyPI release is published; `pip install evalforge-ai` is **not** a supported installation instruction for this repository.
 
 ### Readable GitHub Actions evidence for a custom retrieval gate
 
