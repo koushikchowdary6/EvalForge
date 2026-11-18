@@ -33,14 +33,18 @@ def audit(docs: list, questions: list, tokenizer: str = "ascii") -> dict:
     unindexable_labels = []
     no_relevant_overlap = []
     answerable = 0
+    unanswerable_with_overlap = []
     for case in questions:
+        query_terms = set(split(case["question"]))
         if not case["answerable"]:
+            if query_terms.intersection(vocabulary):
+                unanswerable_with_overlap.append(case["id"])
             continue
         answerable += 1
-        if not set(split(case["question"])).intersection(vocabulary):
+        if not query_terms.intersection(vocabulary):
             no_overlap.append(case["id"])
         relevant_vocabulary = set().union(*(document_terms[doc_id] for doc_id in case["relevant_doc_ids"]))
-        if not set(split(case["question"])).intersection(relevant_vocabulary):
+        if not query_terms.intersection(relevant_vocabulary):
             no_relevant_overlap.append(case["id"])
         if set(case["relevant_doc_ids"]).intersection(unindexable):
             unindexable_labels.append(case["id"])
@@ -52,6 +56,8 @@ def audit(docs: list, questions: list, tokenizer: str = "ascii") -> dict:
         "questions": len(questions),
         "answerable_questions": answerable,
         "unanswerable_questions": len(questions) - answerable,
+        # Lexical overlap is a warning, not evidence of hallucination.
+        "unanswerable_question_ids_with_corpus_token_overlap": sorted(unanswerable_with_overlap),
         "vocabulary_size": len(vocabulary),
         "unindexable_document_ids": sorted(unindexable),
         "answerable_question_ids_without_corpus_token_overlap": sorted(no_overlap),
