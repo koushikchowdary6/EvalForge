@@ -125,3 +125,23 @@ def test_valid_jsonl_unicode_and_nested_metadata_remain_supported(tmp_path):
     documents, questions, _ = convert(corpus, queries, qrels)
     assert documents[0]["title"] == "Café"
     assert questions[0]["relevant_doc_ids"] == ["d1"]
+
+
+@pytest.mark.parametrize("qrels", [
+    "query-id\tcorpus-id\tscore\tscore\nq1\td1\t1\t0\n",
+    "query-id\tcorpus-id\tscore\nq1\td1\t1\textra\n",
+    "query-id\tcorpus-id\tscore\nq1\td1\n",
+    "query-id\tcorpus-id\tscore\nq1\t\t1\n",
+    "query-id\tcorpus-id\tscore\nq1\td1\t \n",
+])
+def test_malformed_qrels_tsv_rejected_without_silent_label_changes(tmp_path, qrels):
+    corpus, queries, qrel_path = fixture(tmp_path, qrels=qrels)
+    with pytest.raises(ValueError, match="qrels"):
+        convert(corpus, queries, qrel_path)
+
+
+def test_qrels_column_reordering_remains_supported(tmp_path):
+    corpus, queries, qrel_path = fixture(
+        tmp_path, qrels="score\tcorpus-id\tquery-id\n1\td1\tq1\n")
+    _, questions, _ = convert(corpus, queries, qrel_path)
+    assert questions[0]["relevant_doc_ids"] == ["d1"]
