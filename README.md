@@ -96,14 +96,14 @@ answer correctness, hallucination prevention, or production AI safety.
 
 ### Preflight your labeled dataset before benchmarking
 
-The installed `evalforge-dataset-audit` command validates custom corpus/question JSON and reports deterministic SHA-256 fingerprints, label counts, unindexable documents, answerable queries without corpus-wide lexical overlap, and answerable queries with no token overlap in their **labeled relevant documents** (even if unrelated documents share query terms). It uses **no model API calls** and does not score retrieval accuracy or generated answers.
+The installed `evalforge-dataset-audit` command validates custom corpus/question JSON and reports deterministic SHA-256 fingerprints, label counts, unindexable documents, answerable queries without corpus-wide lexical overlap, and answerable queries with no token overlap in their **labeled relevant documents** (even if unrelated documents share query terms), and **tokenless questions** (including unanswerable labels that cannot be searched by the selected lexical tokenizer). It uses **no model API calls** and does not score retrieval accuracy or generated answers.
 
 ```bash
 evalforge-dataset-audit --corpus examples/customer_support_corpus.json \
   --questions examples/customer_support_questions.json --strict
 ```
 
-The command prints machine-readable JSON. Exit code **0** means the dataset is structurally valid and (with `--strict`) no flagged lexical coverage problems were found, including labeled-document overlap; **1** means strict coverage checks failed; **2** means invalid input. A clean preflight is **not** evidence of model quality, absence of data leakage, or semantic relevance. The `--tokenizer unicode` option uses a Unicode lexical baseline rather than the default ASCII tokenizer.
+The command prints machine-readable JSON. Exit code **0** means the dataset is structurally valid and (with `--strict`) no flagged lexical coverage problems were found, including labeled-document overlap and tokenless questions; **1** means strict coverage checks failed; **2** means invalid input. A clean preflight is **not** evidence of model quality, absence of data leakage, or semantic relevance. The `--tokenizer unicode` option uses a Unicode lexical baseline rather than the default ASCII tokenizer.
 
 ### Evaluate your own labeled retrieval dataset
 
