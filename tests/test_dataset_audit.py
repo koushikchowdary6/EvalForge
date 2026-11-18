@@ -129,3 +129,33 @@ def test_unanswerable_overlap_is_reported_without_failing_strict_preflight(tmp_p
     assert json.loads(result.stdout)["unanswerable_question_ids_with_corpus_token_overlap"] == [
         "unanswerable-overlap"
     ]
+
+
+
+def test_tokenless_questions_are_reported_and_strictly_rejected(tmp_path):
+    # ASCII tokenization cannot index these questions, including a negative label.
+    docs = [{"doc_id": "a", "title": "Refund", "text": "Request a refund"}]
+    questions = [
+        {"id": "answerable", "question": "!!!", "answerable": True, "relevant_doc_ids": ["a"]},
+        {"id": "unanswerable", "question": "???", "answerable": False, "relevant_doc_ids": []},
+    ]
+    report = audit(docs, questions)
+    assert report["unindexable_question_ids"] == ["answerable", "unanswerable"]
+    corpus = tmp_path / "corpus.json"
+    labels = tmp_path / "questions.json"
+    corpus.write_text(json.dumps(docs), encoding="utf-8")
+    labels.write_text(json.dumps(questions), encoding="utf-8")
+    cmd = [sys.executable, "-m", "evalforge.dataset_audit",
+           "--corpus", str(corpus), "--questions", str(labels)]
+    non_strict = subprocess.run(cmd, capture_output=True, text=True)
+    assert non_strict.returncode == 0, non_strict.stderr
+    assert json.loads(non_strict.stdout)["unindexable_question_ids"] == ["answerable", "unanswerable"]
+    strict = subprocess.run(cmd + ["--strict"], capture_output=True, text=True)
+    assert strict.returncode == 1, strict.stderr
+
+
+def test_unicode_tokenizer_indexes_non_ascii_questions():
+    docs = [{"doc_id": "a", "title": "भुगतान", "text": "जानकारी"}]
+    questions = [{"id": "q", "question": "भुगतान", "answerable": True, "relevant_doc_ids": ["a"]}]
+    assert audit(docs, questions, tokenizer="ascii")["unindexable_question_ids"] == ["q"]
+    assert audit(docs, questions, tokenizer="unicode")["unindexable_question_ids"] == []
