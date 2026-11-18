@@ -61,3 +61,26 @@ def test_duplicate_query_ids_rejected(tmp_path):
                            {"_id": "q1", "text": "two"}])
     with pytest.raises(ValueError, match="duplicate"):
         convert(corpus, queries, qrels)
+
+
+def test_second_output_write_failure_rolls_back_first(tmp_path, monkeypatch):
+    """A write failure after preflight must not leave a half-converted pair."""
+    from pathlib import Path
+
+    corpus, queries, qrels = fixture(tmp_path)
+    out_c = tmp_path / "converted-corpus.json"
+    out_q = tmp_path / "converted-questions.json"
+    original_open = Path.open
+
+    def fail_second_output(self, *args, **kwargs):
+        if self == out_q and args and args[0] == "x":
+            raise OSError("simulated second output failure")
+        return original_open(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", fail_second_output)
+    args = ["--corpus", str(corpus), "--queries", str(queries),
+            "--qrels", str(qrels), "--output-corpus", str(out_c),
+            "--output-questions", str(out_q)]
+    assert main(args) == 2
+    assert not out_c.exists()
+    assert not out_q.exists()
