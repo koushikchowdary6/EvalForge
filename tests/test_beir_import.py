@@ -1,5 +1,6 @@
 """Contract tests for importing externally obtained BEIR-style retrieval data."""
 import json
+import hashlib
 
 import pytest
 
@@ -29,6 +30,11 @@ def test_conversion_does_not_infer_unanswerable(tmp_path):
     assert cases == [{"id": "q1", "question": "alpha retrieval",
                       "answerable": True, "relevant_doc_ids": ["d1"]}]
     assert report["excluded_queries_without_positive_qrels"] == 1
+    assert report["source_sha256"] == {
+        "corpus": hashlib.sha256(corpus.read_bytes()).hexdigest(),
+        "queries": hashlib.sha256(queries.read_bytes()).hexdigest(),
+        "qrels": hashlib.sha256(qrels.read_bytes()).hexdigest(),
+    }
 
 
 def test_cli_writes_valid_files_and_refuses_overwrite(tmp_path):
@@ -84,3 +90,13 @@ def test_second_output_write_failure_rolls_back_first(tmp_path, monkeypatch):
     assert main(args) == 2
     assert not out_c.exists()
     assert not out_q.exists()
+
+
+def test_source_fingerprint_changes_when_qrels_change(tmp_path):
+    corpus, queries, qrels = fixture(tmp_path)
+    before = convert(corpus, queries, qrels)[2]["source_sha256"]
+    qrels.write_text(qrels.read_text(encoding="utf-8").replace("q1\\td1\\t1", "q1\\td1\\t2"), encoding="utf-8")
+    after = convert(corpus, queries, qrels)[2]["source_sha256"]
+    assert before["corpus"] == after["corpus"]
+    assert before["queries"] == after["queries"]
+    assert before["qrels"] != after["qrels"]
