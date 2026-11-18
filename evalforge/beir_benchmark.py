@@ -47,8 +47,17 @@ def main(argv=None):
                            cutoffs=args.k, tokenizer=args.tokenizer)
         serialized = json.dumps(result, indent=2, ensure_ascii=False, allow_nan=False) + "\n"
         if args.output:
-            with args.output.open("x", encoding="utf-8") as stream:
-                stream.write(serialized)
+            created = False
+            try:
+                with args.output.open("x", encoding="utf-8") as stream:
+                    created = True
+                    stream.write(serialized)
+            except OSError:
+                # Do not leave a truncated report if writing fails (e.g. full disk).
+                # Never delete a pre-existing file rejected by exclusive creation.
+                if created:
+                    args.output.unlink(missing_ok=True)
+                raise
         else:
             sys.stdout.write(serialized)
     except (OSError, ValueError, TypeError, RecursionError) as exc:
