@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -27,6 +28,15 @@ def _jsonl(path: Path):
             if not isinstance(record, dict):
                 raise ValueError(f"{path.name}:{line_no}: expected JSON object")
             yield record
+
+
+def _sha256(path: Path) -> str:
+    """Fingerprint exact source bytes for independent benchmark provenance."""
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def convert(corpus_path: Path, queries_path: Path, qrels_path: Path):
@@ -70,6 +80,11 @@ def convert(corpus_path: Path, queries_path: Path, qrels_path: Path):
     documents = [docs[doc_id] for doc_id in sorted(docs)]
     validate(documents, questions)
     return documents, questions, {
+        "source_sha256": {
+            "corpus": _sha256(corpus_path),
+            "queries": _sha256(queries_path),
+            "qrels": _sha256(qrels_path),
+        },
         "corpus_documents": len(documents),
         "source_queries": len(queries),
         "labeled_queries": len(questions),
