@@ -33,6 +33,7 @@ def audit(docs: list, questions: list, tokenizer: str = "ascii") -> dict:
     unindexable_questions = []
     unindexable_labels = []
     no_relevant_overlap = []
+    partial_relevant_overlap = []
     answerable = 0
     unanswerable_with_overlap = []
     for case in questions:
@@ -49,6 +50,9 @@ def audit(docs: list, questions: list, tokenizer: str = "ascii") -> dict:
         relevant_vocabulary = set().union(*(document_terms[doc_id] for doc_id in case["relevant_doc_ids"]))
         if not query_terms.intersection(relevant_vocabulary):
             no_relevant_overlap.append(case["id"])
+        elif any(not query_terms.intersection(document_terms[doc_id])
+                 for doc_id in case["relevant_doc_ids"]):
+            partial_relevant_overlap.append(case["id"])
         if set(case["relevant_doc_ids"]).intersection(unindexable):
             unindexable_labels.append(case["id"])
     return {
@@ -68,6 +72,8 @@ def audit(docs: list, questions: list, tokenizer: str = "ascii") -> dict:
         "answerable_question_ids_without_corpus_token_overlap": sorted(no_overlap),
         "question_ids_with_unindexable_relevance_labels": sorted(unindexable_labels),
         "answerable_question_ids_without_relevant_doc_token_overlap": sorted(no_relevant_overlap),
+        # Some relevance labels have no lexical evidence even when others do.
+        "answerable_question_ids_with_partial_relevant_doc_token_overlap": sorted(partial_relevant_overlap),
         "corpus_sha256": _fingerprint(docs),
         "questions_sha256": _fingerprint(questions),
     }
