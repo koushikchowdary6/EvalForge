@@ -96,10 +96,19 @@ def main(argv=None):
             raise ValueError("output cannot overwrite input")
         if any(p.exists() for p in outputs):
             raise ValueError("output already exists; refusing to overwrite")
-        for path, data in zip(outputs, (docs, questions)):
-            with path.open("x", encoding="utf-8") as stream:
-                json.dump(data, stream, ensure_ascii=False, indent=2, allow_nan=False)
-                stream.write("\n")
+        # If the second write fails, do not leave the first output looking like
+        # a complete conversion. Never remove files we did not create.
+        created = []
+        try:
+            for path, data in zip(outputs, (docs, questions)):
+                with path.open("x", encoding="utf-8") as stream:
+                    created.append(path)
+                    json.dump(data, stream, ensure_ascii=False, indent=2, allow_nan=False)
+                    stream.write("\n")
+        except (OSError, ValueError, TypeError, RecursionError):
+            for path in reversed(created):
+                path.unlink(missing_ok=True)
+            raise
         print(json.dumps(report, sort_keys=True))
     except (OSError, ValueError, TypeError, RecursionError) as exc:
         print(f"BEIR conversion rejected: {exc}", file=sys.stderr)
