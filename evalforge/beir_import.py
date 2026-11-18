@@ -70,10 +70,12 @@ def convert(corpus_path: Path, queries_path: Path, qrels_path: Path):
     labels = {}
     with qrels_path.open(encoding="utf-8", newline="") as stream:
         reader = csv.DictReader(stream, delimiter="\t")
-        if not {"query-id", "corpus-id", "score"}.issubset(reader.fieldnames or []):
-            raise ValueError("qrels must have query-id, corpus-id, score columns")
+        if reader.fieldnames is None or set(reader.fieldnames) != {"query-id", "corpus-id", "score"} or len(reader.fieldnames) != 3:
+            raise ValueError("qrels must have exactly query-id, corpus-id, score columns")
         seen = set()
-        for row in reader:
+        for line_no, row in enumerate(reader, 2):
+            if None in row or any(value is None or not value.strip() for value in row.values()):
+                raise ValueError(f"qrels:{line_no}: missing or extra TSV fields")
             key = (row["query-id"], row["corpus-id"])
             if key in seen:
                 raise ValueError("duplicate qrel pair")
