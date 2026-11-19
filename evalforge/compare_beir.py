@@ -72,17 +72,45 @@ def compare(baseline: dict, candidate: dict, *, k: int, max_drop: float = 0.0) -
     }
 
 
+def compare_all(baseline: dict, candidate: dict, *, max_drop: float = 0.0) -> dict:
+    """Gate every reported cutoff, rejecting missing or mismatched cutoffs."""
+    try:
+        left = baseline["evaluation"]["by_top_k"]
+        right = candidate["evaluation"]["by_top_k"]
+    except (TypeError, KeyError) as exc:
+        raise ValueError("missing BEIR cutoff summaries") from exc
+    if not isinstance(left, dict) or not isinstance(right, dict) or not left or set(left) != set(right):
+        raise ValueError("reports must contain identical nonempty cutoff sets")
+    cutoffs = []
+    for key in left:
+        if not isinstance(key, str) or not key.isdecimal() or str(int(key)) != key or int(key) < 1:
+            raise ValueError("invalid cutoff key")
+        cutoffs.append(int(key))
+    comparisons = [compare(baseline, candidate, k=k, max_drop=max_drop)
+                   for k in sorted(cutoffs)]
+    return {
+        "schema_version": 1,
+        "comparison_scope": "same_source_beir_lexical_evidence_all_cutoffs",
+        "max_allowed_drop": max_drop,
+        "passed": all(item["passed"] for item in comparisons),
+        "by_top_k": {str(item["k"]): item for item in comparisons},
+    }
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("baseline", type=Path)
     parser.add_argument("candidate", type=Path)
-    parser.add_argument("--k", type=int, required=True)
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--k", type=int, help="Compare one retrieval cutoff")
+    group.add_argument("--all-k", action="store_true", help="Gate every identical cutoff in both reports")
     parser.add_argument("--max-drop", type=float, default=0.0)
     args = parser.parse_args(argv)
     try:
         baseline = json.loads(args.baseline.read_text(encoding="utf-8"))
         candidate = json.loads(args.candidate.read_text(encoding="utf-8"))
-        result = compare(baseline, candidate, k=args.k, max_drop=args.max_drop)
+        result = (compare_all(baseline, candidate, max_drop=args.max_drop)
+                  if args.all_k else compare(baseline, candidate, k=args.k, max_drop=args.max_drop))
         print(json.dumps(result, indent=2, allow_nan=False))
         return 0 if result["passed"] else 1
     except (OSError, UnicodeError, ValueError, TypeError, AttributeError, RecursionError) as exc:
