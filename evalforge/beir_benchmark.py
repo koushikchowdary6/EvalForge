@@ -37,6 +37,10 @@ def main(argv=None):
     parser.add_argument("--output", type=Path, help="New JSON report path; refuses overwrite")
     args = parser.parse_args(argv)
     try:
+        # Reject invalid cutoffs before parsing potentially large external datasets.
+        # Keep the same positive-integer contract as the retrieval evaluator.
+        if any(k <= 0 for k in args.k):
+            raise ValueError("retrieval cutoffs must be positive integers")
         if args.output and args.output.resolve() in {
             args.corpus.resolve(), args.queries.resolve(), args.qrels.resolve()
         }:
