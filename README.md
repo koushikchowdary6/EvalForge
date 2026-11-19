@@ -72,8 +72,6 @@ regresses beyond the allowed absolute drop. This is a deterministic lexical
 regression check, not a statistical significance test. Each per-cutoff result
 retains the baseline and candidate scores and source fingerprints.
 
-```
-
 The comparator emits a JSON summary with the conservative lexical hit-rate
 delta. Exit code **0** means no regression beyond the allowed absolute drop,
 **1** means a regression, and **2** means invalid or incomparable evidence.
