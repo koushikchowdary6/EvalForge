@@ -72,3 +72,12 @@ jobs:
           assert list(files("evalforge").joinpath("data").glob("*.json"))
           PY
           /tmp/evalforge-wheel-smoke/sdist-venv/bin/evalforge-benchmark-beir --help
+
+      - name: Upload verified distribution artifacts
+        if: success() && matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: evalforge-distributions
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
