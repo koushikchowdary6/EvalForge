@@ -60,7 +60,7 @@ def main(argv=None):
                 raise
         else:
             sys.stdout.write(serialized)
-    except (OSError, ValueError, TypeError, RecursionError) as exc:
+    except (OSError, UnicodeError, ValueError, TypeError, RecursionError) as exc:
         print(f"BEIR benchmark rejected: {exc}", file=sys.stderr)
         return 2
     return 0
