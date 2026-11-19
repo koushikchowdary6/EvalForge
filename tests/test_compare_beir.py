@@ -67,7 +67,12 @@ def test_rejects_inconsistent_counts_and_missing_tokenizer(tmp_path):
     baseline = reports(tmp_path)
     candidate = copy.deepcopy(baseline)
     candidate["source"]["labeled_queries"] += 1
-    with pytest.raises(ValueError, match="counts do not reconcile"):
+    with pytest.raises(ValueError, match="labeled query count does not match evaluation"):
+        compare(baseline, candidate, k=1)
+
+    candidate = copy.deepcopy(baseline)
+    candidate["source"]["excluded_queries_without_positive_qrels"] += 1
+    with pytest.raises(ValueError, match="included and excluded query counts do not reconcile"):
         compare(baseline, candidate, k=1)
 
     candidate = copy.deepcopy(baseline)
