@@ -46,5 +46,5 @@ def test_provenance_preserved_when_comparison_detects_regression():
     candidate = deepcopy(baseline)
     candidate["bm25"]["lexical_evidence_hit_rate_by_k"].update({"1": 0.25, "3": 0.25})
     result = compare(baseline, candidate)
-    assert result["bm25_regression_cutoffs"] == ["3"]
+    assert result["bm25_regression_cutoffs"] == ["1", "3"]
     assert result["provenance"]["datasets"]["bm25"]["corpus_sha256"] == "a" * 64
