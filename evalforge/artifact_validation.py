@@ -58,6 +58,13 @@ def validate(report: dict, threshold: float, expected_version: str | None = None
                 or not (-1 <= score <= 1 if section == "paired_tokenizer" else 0 <= score <= 1)
             ):
                 raise ValueError(f"Invalid {section} metric at k={k}")
+    # A hit at k=1 remains a hit at larger cutoffs. A decreasing rate
+    # indicates a malformed report or a regression in metric computation.
+    hits = report["bm25"]["lexical_evidence_hit_rate_by_k"]
+    observed = [hits[k] for k in ("1", "3", "5")]
+    if any(left is not None and right is not None and left > right + 1e-12
+           for left, right in zip(observed, observed[1:])):
+        raise ValueError("Lexical evidence hit rate must not decrease as k increases")
     hit = report["bm25"]["lexical_evidence_hit_rate_by_k"]["3"]
     if hit is None or hit < threshold:
         raise ValueError(f"Lexical evidence hit rate at k=3 ({hit}) below {threshold}")
