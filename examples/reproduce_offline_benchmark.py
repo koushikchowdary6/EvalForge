@@ -58,7 +58,10 @@ def main() -> None:
         hit_rates = altered["bm25"]["lexical_evidence_hit_rate_by_k"]
         require(hit_rates["3"] is not None and hit_rates["3"] > 0,
                 "Bundled fixture no longer has a positive hit rate at k=3")
-        hit_rates["3"] = 0.0
+        # Degrade every cutoff together: hit rate must remain nondecreasing
+        # with k, even for the intentionally poor candidate.
+        for cutoff in hit_rates:
+            hit_rates[cutoff] = 0.0
         degraded.write_text(json.dumps(altered), encoding="utf-8")
         failure = subprocess.run(
             ["evalforge-compare-artifacts", str(baseline), str(degraded),
