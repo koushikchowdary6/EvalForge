@@ -166,3 +166,19 @@ def test_bom_inside_jsonl_is_not_silently_ignored(tmp_path):
     corpus.write_bytes(corpus.read_bytes() + b"\xef\xbb\xbf" + b'{"_id":"d3","text":"extra"}\n')
     with pytest.raises(ValueError, match=r"corpus\.jsonl:3: invalid JSON"):
         convert(corpus, queries, qrels)
+
+
+@pytest.mark.parametrize("source", ["corpus", "queries", "qrels"])
+def test_cli_reports_invalid_utf8_without_traceback(tmp_path, source, capsys):
+    corpus, queries, qrels = fixture(tmp_path)
+    paths = {"corpus": corpus, "queries": queries, "qrels": qrels}
+    paths[source].write_bytes(b"\\xff\\xfe invalid UTF-8")
+    out_c = tmp_path / "converted-corpus.json"
+    out_q = tmp_path / "converted-questions.json"
+    args = ["--corpus", str(corpus), "--queries", str(queries),
+            "--qrels", str(qrels), "--output-corpus", str(out_c),
+            "--output-questions", str(out_q)]
+    assert main(args) == 2
+    assert "BEIR conversion rejected:" in capsys.readouterr().err
+    assert not out_c.exists()
+    assert not out_q.exists()
