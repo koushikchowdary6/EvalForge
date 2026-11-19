@@ -108,3 +108,20 @@ def test_source_fingerprints_detect_dataset_drift_even_when_metrics_match(tmp_pa
     assert before["source"]["source_sha256"]["queries"] != after["source"]["source_sha256"]["queries"]
     assert before["source"]["source_sha256"]["corpus"] == after["source"]["source_sha256"]["corpus"]
     assert before["source"]["source_sha256"]["qrels"] == after["source"]["source_sha256"]["qrels"]
+
+
+def test_invalid_utf8_is_reported_without_traceback_or_partial_output(tmp_path, capsys):
+    """All three source readers must fail cleanly on malformed UTF-8."""
+    for source_index in range(3):
+        case_dir = tmp_path / str(source_index)
+        case_dir.mkdir()
+        corpus, queries, qrels = sources(case_dir)
+        (corpus, queries, qrels)[source_index].write_bytes(b"\xff\xfe invalid UTF-8")
+        out = case_dir / "report.json"
+        args = ["--corpus", str(corpus), "--queries", str(queries),
+                "--qrels", str(qrels), "--output", str(out)]
+        assert main(args) == 2
+        captured = capsys.readouterr()
+        assert "BEIR benchmark rejected:" in captured.err
+        assert "Traceback" not in captured.err
+        assert not out.exists()
