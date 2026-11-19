@@ -145,3 +145,24 @@ def test_qrels_column_reordering_remains_supported(tmp_path):
         tmp_path, qrels="score\tcorpus-id\tquery-id\n1\td1\tq1\n")
     _, questions, _ = convert(corpus, queries, qrel_path)
     assert questions[0]["relevant_doc_ids"] == ["d1"]
+
+
+@pytest.mark.parametrize("source", ["corpus", "queries", "qrels"])
+def test_utf8_bom_from_export_is_accepted_without_changing_fingerprint(tmp_path, source):
+    corpus, queries, qrels = fixture(tmp_path)
+    paths = {"corpus": corpus, "queries": queries, "qrels": qrels}
+    target = paths[source]
+    original = target.read_bytes()
+    target.write_bytes(b"\xef\xbb\xbf" + original)
+
+    documents, questions, provenance = convert(corpus, queries, qrels)
+    assert len(documents) == 2
+    assert [case["id"] for case in questions] == ["q1"]
+    assert provenance["source_sha256"][source] == hashlib.sha256(target.read_bytes()).hexdigest()
+
+
+def test_bom_inside_jsonl_is_not_silently_ignored(tmp_path):
+    corpus, queries, qrels = fixture(tmp_path)
+    corpus.write_bytes(corpus.read_bytes() + b"\xef\xbb\xbf" + b'{"_id":"d3","text":"extra"}\n')
+    with pytest.raises(ValueError, match=r"corpus\.jsonl:3: invalid JSON"):
+        convert(corpus, queries, qrels)
