@@ -182,3 +182,26 @@ def test_cli_reports_invalid_utf8_without_traceback(tmp_path, source, capsys):
     assert "BEIR conversion rejected:" in capsys.readouterr().err
     assert not out_c.exists()
     assert not out_q.exists()
+
+
+def test_unicode_serialization_failure_rolls_back_both_outputs(tmp_path, monkeypatch, capsys):
+    """An encoding failure in the second report must not leave partial evidence."""
+    corpus, queries, qrels = fixture(tmp_path)
+    out_c = tmp_path / "converted-corpus.json"
+    out_q = tmp_path / "converted-questions.json"
+    original_dump = json.dump
+
+    def fail_second_dump(data, stream, *args, **kwargs):
+        if stream.name == str(out_q):
+            stream.write("[")  # Simulate an incomplete file before encoding fails.
+            raise UnicodeEncodeError("utf-8", "\\ud800", 0, 1, "surrogate not allowed")
+        return original_dump(data, stream, *args, **kwargs)
+
+    monkeypatch.setattr(json, "dump", fail_second_dump)
+    args = ["--corpus", str(corpus), "--queries", str(queries),
+            "--qrels", str(qrels), "--output-corpus", str(out_c),
+            "--output-questions", str(out_q)]
+    assert main(args) == 2
+    assert "BEIR conversion rejected:" in capsys.readouterr().err
+    assert not out_c.exists()
+    assert not out_q.exists()
