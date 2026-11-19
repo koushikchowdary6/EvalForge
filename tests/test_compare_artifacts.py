@@ -178,7 +178,7 @@ def test_cli_failed_publish_leaves_no_partial_report_or_tempfile(tmp_path, monke
 def test_absolute_floor_fails_without_relative_regression():
     """An unchanged weak model must not pass solely because baseline is weak."""
     weak = fixture()
-    weak["bm25"]["lexical_evidence_hit_rate_by_k"]["3"] = 0.25
+    weak["bm25"]["lexical_evidence_hit_rate_by_k"].update({"1": 0.25, "3": 0.25})
     report = compare(weak, copy.deepcopy(weak), min_hit_rate=0.5)
     assert report["bm25_regression_cutoffs"] == []
     assert report["minimum_hit_rate_failed"] is True
@@ -198,7 +198,7 @@ def test_absolute_floor_cli_exit_and_report(tmp_path, capsys):
     from evalforge.compare_artifacts import main
 
     weak = fixture()
-    weak["bm25"]["lexical_evidence_hit_rate_by_k"]["3"] = 0.25
+    weak["bm25"]["lexical_evidence_hit_rate_by_k"].update({"1": 0.25, "3": 0.25})
     path = tmp_path / "weak.json"
     path.write_text(json.dumps(weak), encoding="utf-8")
     assert main([str(path), str(path), "--min-hit-rate", "0.5"]) == 1
@@ -215,7 +215,7 @@ def test_github_annotations_report_absolute_floor_failure(tmp_path, capsys):
     from evalforge.compare_artifacts import main
 
     weak = fixture()
-    weak["bm25"]["lexical_evidence_hit_rate_by_k"]["3"] = 0.25
+    weak["bm25"]["lexical_evidence_hit_rate_by_k"].update({"1": 0.25, "3": 0.25})
     path = tmp_path / "weak.json"
     path.write_text(json.dumps(weak), encoding="utf-8")
     assert main([str(path), str(path), "--min-hit-rate", "0.5", "--github-annotations"]) == 1
