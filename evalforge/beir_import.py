@@ -17,7 +17,7 @@ from .offline_rag_demo import validate
 
 
 def _jsonl(path: Path):
-    with path.open(encoding="utf-8") as stream:
+    with path.open(encoding="utf-8-sig") as stream:
         for line_no, line in enumerate(stream, 1):
             if not line.strip():
                 continue
@@ -68,7 +68,7 @@ def convert(corpus_path: Path, queries_path: Path, qrels_path: Path):
             raise ValueError("invalid or duplicate query _id")
         queries[query_id] = row.get("text")
     labels = {}
-    with qrels_path.open(encoding="utf-8", newline="") as stream:
+    with qrels_path.open(encoding="utf-8-sig", newline="") as stream:
         reader = csv.DictReader(stream, delimiter="\t")
         if reader.fieldnames is None or set(reader.fieldnames) != {"query-id", "corpus-id", "score"} or len(reader.fieldnames) != 3:
             raise ValueError("qrels must have exactly query-id, corpus-id, score columns")
