@@ -51,6 +51,19 @@ def test_invalid_cutoff_does_not_create_report(tmp_path):
                  "--qrels", str(qrels), "--k", "0", "--output", str(out)]) == 2
     assert not out.exists()
 
+
+def test_invalid_cutoff_is_rejected_before_reading_external_files(tmp_path, capsys):
+    """Large or unavailable BEIR inputs must not be parsed for invalid k."""
+    missing = tmp_path / "missing.jsonl"
+    out = tmp_path / "report.json"
+    args = ["--corpus", str(missing), "--queries", str(missing),
+            "--qrels", str(missing), "--k", "-1", "--output", str(out)]
+    assert main(args) == 2
+    error = capsys.readouterr().err
+    assert "cutoffs must be positive integers" in error
+    assert "No such file" not in error
+    assert not out.exists()
+
 def test_failed_report_write_removes_only_new_partial_file(tmp_path, monkeypatch):
     """A write failure must not leave misleading, truncated benchmark evidence."""
     from pathlib import Path
