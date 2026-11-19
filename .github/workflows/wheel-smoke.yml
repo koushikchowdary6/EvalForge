@@ -46,3 +46,10 @@ jobs:
           "$VENV/bin/evalforge-bm25" --help
           "$VENV/bin/evalforge-dataset-audit" --help
           "$VENV/bin/evalforge-custom-gate" --help
+
+      - name: Run installed offline demo and validate its artifact
+        working-directory: /tmp/evalforge-wheel-smoke
+        run: |
+          VENV=/tmp/evalforge-wheel-smoke/venv
+          "$VENV/bin/evalforge-demo" --json --output /tmp/evalforge-wheel-smoke/evaluation.json
+          "$VENV/bin/evalforge-validate" /tmp/evalforge-wheel-smoke/evaluation.json --min-hit-rate 0.50
