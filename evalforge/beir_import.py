@@ -143,7 +143,7 @@ def main(argv=None):
                     created.append(path)
                     json.dump(data, stream, ensure_ascii=False, indent=2, allow_nan=False)
                     stream.write("\n")
-        except (OSError, ValueError, TypeError, RecursionError):
+        except (OSError, UnicodeError, ValueError, TypeError, RecursionError):
             for path in reversed(created):
                 path.unlink(missing_ok=True)
             raise
