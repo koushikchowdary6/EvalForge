@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from pathlib import Path
 import sys
 
@@ -35,12 +36,24 @@ def main(argv=None):
     parser.add_argument("--k", type=int, nargs="+", default=[1, 3, 5])
     parser.add_argument("--tokenizer", choices=("ascii", "unicode"), default="ascii")
     parser.add_argument("--output", type=Path, help="New JSON report path; refuses overwrite")
+    parser.add_argument("--min-evidence-hit-rate", type=float,
+                        help="Minimum conservative positive-score hit rate at --gate-k")
+    parser.add_argument("--gate-k", type=int,
+                        help="Cutoff to gate; must also appear in --k")
     args = parser.parse_args(argv)
     try:
         # Reject invalid cutoffs before parsing potentially large external datasets.
         # Keep the same positive-integer contract as the retrieval evaluator.
         if any(k <= 0 for k in args.k):
             raise ValueError("retrieval cutoffs must be positive integers")
+        if (args.min_evidence_hit_rate is None) != (args.gate_k is None):
+            raise ValueError("--min-evidence-hit-rate and --gate-k must be supplied together")
+        if args.min_evidence_hit_rate is not None and (
+            not math.isfinite(args.min_evidence_hit_rate)
+            or not 0 <= args.min_evidence_hit_rate <= 1
+            or args.gate_k not in args.k
+        ):
+            raise ValueError("gate threshold must be in [0, 1] and --gate-k must be in --k")
         if args.output and args.output.resolve() in {
             args.corpus.resolve(), args.queries.resolve(), args.qrels.resolve()
         }:
@@ -64,6 +77,17 @@ def main(argv=None):
                 raise
         else:
             sys.stdout.write(serialized)
+        if args.min_evidence_hit_rate is not None:
+            observed = result["evaluation"]["by_top_k"][str(args.gate_k)][
+                "lexical_evidence_hit_lower_bound"
+            ]
+            if observed is None or observed < args.min_evidence_hit_rate:
+                print(
+                    f"BEIR evidence gate failed: hit lower bound at k={args.gate_k} "
+                    f"is {observed}, required >= {args.min_evidence_hit_rate}",
+                    file=sys.stderr,
+                )
+                return 1
     except (OSError, UnicodeError, ValueError, TypeError, RecursionError) as exc:
         print(f"BEIR benchmark rejected: {exc}", file=sys.stderr)
         return 2
