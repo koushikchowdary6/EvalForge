@@ -141,7 +141,7 @@ def main(argv=None):
                 path.unlink(missing_ok=True)
             raise
         print(json.dumps(report, sort_keys=True))
-    except (OSError, ValueError, TypeError, RecursionError) as exc:
+    except (OSError, UnicodeError, ValueError, TypeError, RecursionError) as exc:
         print(f"BEIR conversion rejected: {exc}", file=sys.stderr)
         return 2
     return 0
