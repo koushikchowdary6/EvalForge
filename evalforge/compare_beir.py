@@ -33,6 +33,20 @@ def compare(baseline: dict, candidate: dict, *, k: int, max_drop: float = 0.0) -
                any(ch not in "0123456789abcdef" for ch in v)
                for v in fingerprints.values()):
             raise ValueError("invalid source SHA-256 fingerprint")
+        for field in ("labeled_queries", "excluded_queries_without_positive_qrels"):
+            count = source.get(field)
+            if type(count) is not int or count < 0:
+                raise ValueError(f"invalid source query count: {field}")
+        for field in ("corpus_size", "question_count"):
+            count = evaluation.get(field)
+            if type(count) is not int or count < 0:
+                raise ValueError(f"invalid evaluation size: {field}")
+        if (source["labeled_queries"] + source["excluded_queries_without_positive_qrels"]
+                != evaluation["question_count"]):
+            raise ValueError("included and excluded query counts do not reconcile")
+        parameters = evaluation.get("parameters")
+        if not isinstance(parameters, dict) or not isinstance(parameters.get("tokenizer"), str):
+            raise ValueError("missing tokenizer configuration")
         if evaluation.get("method") != "lexical_bm25_retrieval_only":
             raise ValueError("incompatible retrieval method")
         by_k = evaluation.get("by_top_k")
