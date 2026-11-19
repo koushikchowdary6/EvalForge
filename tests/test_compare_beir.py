@@ -60,3 +60,22 @@ def test_cli_exit_codes(tmp_path, capsys):
     assert json.loads(capsys.readouterr().out)["passed"] is False
     assert main(args + ["--max-drop", "1"]) == 0
     assert main(args + ["--max-drop", "-1"]) == 2
+
+def test_rejects_inconsistent_counts_and_missing_tokenizer(tmp_path):
+    import pytest
+
+    baseline = reports(tmp_path)
+    candidate = copy.deepcopy(baseline)
+    candidate["source"]["labeled_queries"] += 1
+    with pytest.raises(ValueError, match="counts do not reconcile"):
+        compare(baseline, candidate, k=1)
+
+    candidate = copy.deepcopy(baseline)
+    candidate["evaluation"]["parameters"] = None
+    with pytest.raises(ValueError, match="tokenizer configuration"):
+        compare(baseline, candidate, k=1)
+
+    candidate = copy.deepcopy(baseline)
+    candidate["source"]["labeled_queries"] = True
+    with pytest.raises(ValueError, match="source query count"):
+        compare(baseline, candidate, k=1)
