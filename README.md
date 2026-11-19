@@ -44,6 +44,29 @@ Only queries with positive relevance judgments are scored; this is a lexical
 retrieval regression gate, **not** a claim about answer quality or a
 recommended universal threshold. Choose a threshold from your own baseline.
 
+## Compare two BEIR runs without mixing datasets
+
+Use the new installed `evalforge-compare-beir` command to check a
+retrieval baseline against a candidate run. It **refuses** to compare
+different source-file SHA-256 fingerprints, missing cutoffs, or mismatched
+query inclusion counts. Tokenizer changes are allowed, but both reports
+must use the same BEIR corpus, queries, and qrels.
+
+```bash
+evalforge-benchmark-beir --corpus corpus.jsonl --queries queries.jsonl \
+  --qrels qrels.tsv --tokenizer ascii --k 1 3 5 --output baseline.json
+evalforge-benchmark-beir --corpus corpus.jsonl --queries queries.jsonl \
+  --qrels qrels.tsv --tokenizer unicode --k 1 3 5 --output candidate.json
+evalforge-compare-beir baseline.json candidate.json --k 5 --max-drop 0.02
+```
+
+The comparator emits a JSON summary with the conservative lexical hit-rate
+delta. Exit code **0** means no regression beyond the allowed absolute drop,
+**1** means a regression, and **2** means invalid or incomparable evidence.
+It does not compare embedding retrievers, generated answers, or safety
+outcomes. Reports are generated locally from data you supply; no independent
+benchmark scores are claimed.
+
 ## What you can run
 
 | Installed CLI | Purpose |
@@ -52,6 +75,7 @@ recommended universal threshold. Choose a threshold from your own baseline.
 | `evalforge-bm25` | BM25 retrieval metrics at chosen k, including custom labeled datasets |
 | `evalforge-import-beir` | Convert locally obtained BEIR-style inputs into labeled EvalForge JSON |
 | `evalforge-benchmark-beir` | Evaluate locally obtained BEIR-style inputs directly with provenance and BM25 metrics |
+| `evalforge-compare-beir` | Compare conservative retrieval hit-rate reports on identical BEIR source files |
 | `evalforge-dataset-audit` | Dataset integrity and lexical label-coverage preflight |
 | `evalforge-custom-gate` | Dataset-aware lexical hit-rate CI gate |
 | `evalforge-custom-summary` | Human-readable Markdown from custom gate evidence |
