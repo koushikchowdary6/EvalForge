@@ -41,3 +41,20 @@ def test_python_api_accepts_valid_threshold(valid_report):
 def test_python_api_enforces_quality_gate(valid_report):
     with pytest.raises(ValueError, match="below"):
         validate(valid_report, 0.76)
+
+
+@pytest.mark.parametrize("rates", [
+    {"1": 0.8, "3": 0.6, "5": 0.9},
+    {"1": 0.1, "3": 0.9, "5": 0.7},
+])
+def test_python_api_rejects_decreasing_hit_rate(valid_report, rates):
+    valid_report["bm25"]["lexical_evidence_hit_rate_by_k"] = rates
+    with pytest.raises(ValueError, match="must not decrease"):
+        validate(valid_report, 0.0)
+
+
+def test_python_api_allows_equal_hit_rates(valid_report):
+    valid_report["bm25"]["lexical_evidence_hit_rate_by_k"] = {
+        "1": 0.5, "3": 0.5, "5": 0.5,
+    }
+    validate(valid_report, 0.5)
