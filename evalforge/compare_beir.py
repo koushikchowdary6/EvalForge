@@ -97,6 +97,29 @@ def compare_all(baseline: dict, candidate: dict, *, max_drop: float = 0.0) -> di
     }
 
 
+
+def _reject_duplicate_keys(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+
+def _reject_nonfinite_constant(value):
+    raise ValueError(f"non-finite JSON constant: {value}")
+
+
+def _load_report(path: Path) -> dict:
+    """Read strict JSON so duplicated provenance or scores cannot be hidden."""
+    return json.loads(
+        path.read_text(encoding="utf-8"),
+        object_pairs_hook=_reject_duplicate_keys,
+        parse_constant=_reject_nonfinite_constant,
+    )
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("baseline", type=Path)
@@ -107,8 +130,8 @@ def main(argv=None):
     parser.add_argument("--max-drop", type=float, default=0.0)
     args = parser.parse_args(argv)
     try:
-        baseline = json.loads(args.baseline.read_text(encoding="utf-8"))
-        candidate = json.loads(args.candidate.read_text(encoding="utf-8"))
+        baseline = _load_report(args.baseline)
+        candidate = _load_report(args.candidate)
         result = (compare_all(baseline, candidate, max_drop=args.max_drop)
                   if args.all_k else compare(baseline, candidate, k=args.k, max_drop=args.max_drop))
         print(json.dumps(result, indent=2, allow_nan=False))
