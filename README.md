@@ -23,6 +23,27 @@ evalforge-validate evaluation.json --min-hit-rate 0.50
 
 The optional hit-rate floor applies **only to lexical evidence at k=3 on the bundled fixture**; it is not a production acceptance threshold. Output commands refuse to overwrite existing files. Use new paths for subsequent runs.
 
+## Gate a local BEIR retrieval benchmark in CI
+
+After obtaining BEIR-format `corpus.jsonl`, `queries.jsonl`, and a qrels TSV
+from a source you are authorized to use, run:
+
+```bash
+evalforge-benchmark-beir \
+  --corpus corpus.jsonl --queries queries.jsonl --qrels qrels.tsv \
+  --k 1 3 5 --gate-k 5 --min-evidence-hit-rate 0.60 \
+  --output beir-evidence.json
+```
+
+The command exits **0** when the conservative positive-BM25-score hit-rate
+lower bound at k=5 meets the threshold, **1** when the quality gate fails,
+and **2** on invalid inputs or configuration. A failed quality gate still
+writes the JSON evidence report for debugging. The lower bound accounts for
+positive-score cutoff ties rather than crediting arbitrary document-ID order.
+Only queries with positive relevance judgments are scored; this is a lexical
+retrieval regression gate, **not** a claim about answer quality or a
+recommended universal threshold. Choose a threshold from your own baseline.
+
 ## What you can run
 
 | Installed CLI | Purpose |
