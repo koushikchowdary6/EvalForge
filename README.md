@@ -46,8 +46,8 @@ The bundled BM25 fixture contains **15 documents and 14 questions**. A second [c
 The installed `evalforge-benchmark-beir` command evaluates a BEIR-style dataset directly without creating intermediate converted files. Supply your own legally obtained `corpus.jsonl`, `queries.jsonl`, and tab-separated `qrels/test.tsv`:
 
 ```bash
-evalforge-benchmark-beir --corpus /path/to/corpus.jsonl \\
-  --queries /path/to/queries.jsonl --qrels /path/to/qrels/test.tsv \\
+evalforge-benchmark-beir --corpus /path/to/corpus.jsonl \
+  --queries /path/to/queries.jsonl --qrels /path/to/qrels/test.tsv \
   --k 1 3 5 --output beir-bm25-report.json
 ```
 
