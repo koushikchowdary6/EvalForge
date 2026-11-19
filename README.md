@@ -53,6 +53,26 @@ evalforge-benchmark-beir --corpus /path/to/corpus.jsonl \\
 
 The JSON report contains BM25 lexical retrieval metrics, source-file SHA-256 fingerprints, and counts of excluded queries. Only queries with **positive qrels** are evaluated; unlabeled queries are excluded, never treated as unanswerable. The command does not download or redistribute benchmark data. This is a reproducible **lexical baseline**, not an LLM answer-quality, hallucination, or agent-safety measurement. No independent dataset scores are claimed until a real dataset is run and the result verified. The output file must not already exist.
 
+## Reproduce a benchmark on independent data
+
+The bundled fixtures are smoke tests, **not** evidence of real-world retrieval performance. To assess generalization, obtain a BEIR-format dataset from its original publisher under its applicable license. Keep the corpus, queries, and positive relevance judgments together, and record the dataset name, source URL, version or download date, split, and license alongside the resulting report.
+
+From a fresh installation, run the same dataset and cutoffs twice to check reproducibility:
+
+```bash
+python -m pip install "git+https://github.com/koushikchowdary6/EvalForge.git"
+evalforge-benchmark-beir --corpus /path/to/corpus.jsonl \
+  --queries /path/to/queries.jsonl --qrels /path/to/qrels/test.tsv \
+  --k 1 3 5 --output baseline-run-1.json
+evalforge-benchmark-beir --corpus /path/to/corpus.jsonl \
+  --queries /path/to/queries.jsonl --qrels /path/to/qrels/test.tsv \
+  --k 1 3 5 --output baseline-run-2.json
+```
+
+Check that both reports agree on input SHA-256 fingerprints, included/excluded query counts, and per-cutoff retrieval metrics. Use distinct output paths because the CLI deliberately refuses to overwrite existing reports. When comparing different retrieval systems, use the **same** data files, relevance labels, tokenizer policy, cutoffs, and query inclusion rules; otherwise score differences may reflect evaluation setup rather than model quality. Report the full per-cutoff metrics and excluded-query count, not only the best score. Do not publish source documents, queries, or detailed artifacts unless their license and privacy constraints allow it.
+
+This procedure has not yet been run against an independently sourced dataset in this repository. It measures a deterministic BM25 lexical baseline, **not** LLM answer quality or agent safety.
+
 ## Evaluate your own dataset
 
 ```bash
