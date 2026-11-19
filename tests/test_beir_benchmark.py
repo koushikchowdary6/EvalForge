@@ -90,3 +90,21 @@ def test_failed_report_write_removes_only_new_partial_file(tmp_path, monkeypatch
     out.write_text("existing evidence", encoding="utf-8")
     assert main(args) == 2
     assert out.read_text(encoding="utf-8") == "existing evidence"
+
+
+def test_source_fingerprints_detect_dataset_drift_even_when_metrics_match(tmp_path):
+    """Reproducibility checks must catch changed inputs, not just changed scores."""
+    corpus, queries, qrels = sources(tmp_path)
+    before = benchmark(corpus, queries, qrels, cutoffs=(1,))
+
+    # Changing an excluded query must not change retrieval metrics, but must
+    # change the recorded source fingerprint so runs cannot be conflated.
+    queries.write_text(
+        queries.read_text(encoding="utf-8").replace("no labels", "unscored changed query"),
+        encoding="utf-8",
+    )
+    after = benchmark(corpus, queries, qrels, cutoffs=(1,))
+    assert before["evaluation"] == after["evaluation"]
+    assert before["source"]["source_sha256"]["queries"] != after["source"]["source_sha256"]["queries"]
+    assert before["source"]["source_sha256"]["corpus"] == after["source"]["source_sha256"]["corpus"]
+    assert before["source"]["source_sha256"]["qrels"] == after["source"]["source_sha256"]["qrels"]
