@@ -41,8 +41,13 @@ def compare(baseline: dict, candidate: dict, *, k: int, max_drop: float = 0.0) -
             count = evaluation.get(field)
             if type(count) is not int or count < 0:
                 raise ValueError(f"invalid evaluation size: {field}")
+        source_queries = source.get("source_queries")
+        if type(source_queries) is not int or source_queries < 0:
+            raise ValueError("invalid source query count: source_queries")
+        if source["labeled_queries"] != evaluation["question_count"]:
+            raise ValueError("labeled query count does not match evaluation")
         if (source["labeled_queries"] + source["excluded_queries_without_positive_qrels"]
-                != evaluation["question_count"]):
+                != source_queries):
             raise ValueError("included and excluded query counts do not reconcile")
         parameters = evaluation.get("parameters")
         if not isinstance(parameters, dict) or not isinstance(parameters.get("tokenizer"), str):
