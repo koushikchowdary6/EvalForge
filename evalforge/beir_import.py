@@ -73,6 +73,8 @@ def convert(corpus_path: Path, queries_path: Path, qrels_path: Path):
         if reader.fieldnames is None or set(reader.fieldnames) != {"query-id", "corpus-id", "score"} or len(reader.fieldnames) != 3:
             raise ValueError("qrels must have exactly query-id, corpus-id, score columns")
         seen = set()
+        positive_pairs = 0
+        nonpositive_pairs = 0
         for line_no, row in enumerate(reader, 2):
             if None in row or any(value is None or not value.strip() for value in row.values()):
                 raise ValueError(f"qrels:{line_no}: missing or extra TSV fields")
@@ -87,7 +89,10 @@ def convert(corpus_path: Path, queries_path: Path, qrels_path: Path):
             except (ValueError, TypeError) as exc:
                 raise ValueError("qrel score must be an integer") from exc
             if score > 0:
+                positive_pairs += 1
                 labels.setdefault(key[0], set()).add(key[1])
+            else:
+                nonpositive_pairs += 1
     questions = [
         {"id": query_id, "question": queries[query_id], "answerable": True,
          "relevant_doc_ids": sorted(labels[query_id])}
@@ -104,6 +109,8 @@ def convert(corpus_path: Path, queries_path: Path, qrels_path: Path):
         "corpus_documents": len(documents),
         "source_queries": len(queries),
         "labeled_queries": len(questions),
+        "positive_qrel_pairs": positive_pairs,
+        "excluded_nonpositive_qrel_pairs": nonpositive_pairs,
         "excluded_queries_without_positive_qrels": len(queries) - len(questions),
         "scope": "positive_qrels_only_no_unanswerable_inference",
     }
