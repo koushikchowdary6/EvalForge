@@ -60,6 +60,20 @@ evalforge-benchmark-beir --corpus corpus.jsonl --queries queries.jsonl \
 evalforge-compare-beir baseline.json candidate.json --k 5 --max-drop 0.02
 ```
 
+For a stricter CI check, **gate every reported cutoff** rather than selecting
+one favorable `k`. Both reports must contain the same nonempty set of cutoffs:
+
+```bash
+evalforge-compare-beir baseline.json candidate.json --all-k --max-drop 0.02
+```
+
+The JSON output includes `by_top_k` results and fails if **any** cutoff
+regresses beyond the allowed absolute drop. This is a deterministic lexical
+regression check, not a statistical significance test. Each per-cutoff result
+retains the baseline and candidate scores and source fingerprints.
+
+```
+
 The comparator emits a JSON summary with the conservative lexical hit-rate
 delta. Exit code **0** means no regression beyond the allowed absolute drop,
 **1** means a regression, and **2** means invalid or incomparable evidence.
