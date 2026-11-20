@@ -143,6 +143,19 @@ def main(argv=None):
             source = report.get("source")
             if not isinstance(source, dict) or source.get("source_sha256") != manifest["input_sha256"]:
                 raise ValueError("Benchmark source SHA-256 does not match the run manifest")
+            if (report.get("schema_version") != 1
+                    or report.get("benchmark_scope") != "offline_lexical_bm25_positive_qrels_only"):
+                raise ValueError("Benchmark schema or scope differs from the requested run")
+            evaluation = report.get("evaluation")
+            if not isinstance(evaluation, dict):
+                raise ValueError("Benchmark evaluation must be an object")
+            expected_tokenizer = {"ascii": "ascii_alphanumeric",
+                                  "unicode": "unicode_alphanumeric"}[tokenizer]
+            if evaluation.get("tokenizer_mode") not in (tokenizer, expected_tokenizer):
+                raise ValueError(f"Benchmark tokenizer differs from requested {tokenizer}")
+            by_k = evaluation.get("by_top_k")
+            if not isinstance(by_k, dict) or set(by_k) != {"1", "3", "5", "10"}:
+                raise ValueError("Benchmark did not report all requested cutoffs")
         except (OSError, ValueError) as exc:
             print(f"{tokenizer} benchmark produced unreadable JSON: {exc}", file=sys.stderr)
             return 2
