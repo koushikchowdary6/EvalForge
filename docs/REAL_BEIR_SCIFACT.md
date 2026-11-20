@@ -96,7 +96,8 @@ python scripts/run_scifact.py \
   --dataset scifact --output-dir scifact-evidence \
   --evalforge-revision "$(git rev-parse HEAD)" \
   --source-url "https://github.com/beir-cellar/beir" \
-  --download-date YYYY-MM-DD --max-drop 0.02
+  --download-date YYYY-MM-DD --max-drop 0.02 \
+  --timeout-seconds 1800
 ```
 
 Replace `YYYY-MM-DD` with the actual date the data was obtained. The Git
@@ -105,5 +106,15 @@ a different checkout, supply that exact revision instead. The runner refuses
 nonempty output directories to protect existing artifacts and preserves its
 manifest even when a subprocess fails. A comparison exit code of **1** is a
 quality-gate failure with retained evidence, not proof of a broken runner.
-The optional `--max-drop` sets the maximum absolute drop permitted at each cutoff\n(default `0.02`, inclusive range `0` to `1`). The chosen tolerance is saved in\n`manifest.json` and forwarded to the comparison CLI. Set it from a defensible\nbaseline or deployment policy; it is not a statistically validated threshold.\n\nNo independently sourced benchmark results are claimed until the commands
+The optional `--max-drop` sets the maximum absolute drop permitted at each cutoff
+(default `0.02`, inclusive range `0` to `1`). The chosen tolerance is saved in
+`manifest.json` and forwarded to the comparison CLI. Set it from a defensible\nbaseline or deployment policy; it is not a statistically validated threshold.
+
+Each benchmark and comparison command has a configurable per-command timeout
+(default 1800 seconds). A timeout exits 2 and preserves the manifest and any
+completed reports; it does not count as a benchmark result. Set
+`--timeout-seconds` to a positive finite number appropriate for the machine
+and dataset. Timeout handling does not validate the upstream dataset.
+
+No independently sourced benchmark results are claimed until the commands
 are executed and the artifacts reviewed.
