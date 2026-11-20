@@ -12,6 +12,19 @@ from pathlib import Path
 import sys
 
 
+def _require_same_tokenizer(baseline: dict, candidate: dict) -> None:
+    """Reject configuration drift when comparing reproducibility baselines."""
+    try:
+        left = baseline["evaluation"]["parameters"]["tokenizer"]
+        right = candidate["evaluation"]["parameters"]["tokenizer"]
+    except (KeyError, TypeError) as exc:
+        raise ValueError("missing tokenizer configuration") from exc
+    if not isinstance(left, str) or not left or not isinstance(right, str) or not right:
+        raise ValueError("missing tokenizer configuration")
+    if left != right:
+        raise ValueError("tokenizer configurations differ; disable --require-same-tokenizer only for deliberate tokenizer experiments")
+
+
 def compare(baseline: dict, candidate: dict, *, k: int, max_drop: float = 0.0) -> dict:
     if type(k) is not int or k < 1:
         raise ValueError("k must be a positive integer")
@@ -147,11 +160,14 @@ def main(argv=None):
     group.add_argument("--k", type=int, help="Compare one retrieval cutoff")
     group.add_argument("--all-k", action="store_true", help="Gate every identical cutoff in both reports")
     parser.add_argument("--max-drop", type=float, default=0.0)
+    parser.add_argument("--require-same-tokenizer", action="store_true", help="Reject tokenizer drift between baseline and candidate")
     parser.add_argument("--output", type=Path, help="Write JSON evidence to a new file (never overwrite)")
     args = parser.parse_args(argv)
     try:
         baseline = _load_report(args.baseline)
         candidate = _load_report(args.candidate)
+        if args.require_same_tokenizer:
+            _require_same_tokenizer(baseline, candidate)
         result = (compare_all(baseline, candidate, max_drop=args.max_drop)
                   if args.all_k else compare(baseline, candidate, k=args.k, max_drop=args.max_drop))
         payload = json.dumps(result, indent=2, allow_nan=False) + "\n"
