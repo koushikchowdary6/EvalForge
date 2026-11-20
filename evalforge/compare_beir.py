@@ -147,13 +147,20 @@ def main(argv=None):
     group.add_argument("--k", type=int, help="Compare one retrieval cutoff")
     group.add_argument("--all-k", action="store_true", help="Gate every identical cutoff in both reports")
     parser.add_argument("--max-drop", type=float, default=0.0)
+    parser.add_argument("--output", type=Path, help="Write JSON evidence to a new file (never overwrite)")
     args = parser.parse_args(argv)
     try:
         baseline = _load_report(args.baseline)
         candidate = _load_report(args.candidate)
         result = (compare_all(baseline, candidate, max_drop=args.max_drop)
                   if args.all_k else compare(baseline, candidate, k=args.k, max_drop=args.max_drop))
-        print(json.dumps(result, indent=2, allow_nan=False))
+        payload = json.dumps(result, indent=2, allow_nan=False) + "\n"
+        if args.output is None:
+            print(payload, end="")
+        else:
+            # Exclusive creation prevents overwriting prior CI evidence.
+            with args.output.open("x", encoding="utf-8") as handle:
+                handle.write(payload)
         return 0 if result["passed"] else 1
     except (OSError, UnicodeError, ValueError, TypeError, AttributeError, RecursionError) as exc:
         print(f"BEIR comparison rejected: {exc}", file=sys.stderr)
