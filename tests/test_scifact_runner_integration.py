@@ -34,6 +34,16 @@ if pathlib.Path(sys.argv[0]).name == 'evalforge-benchmark-beir':
         key: hashlib.sha256(pathlib.Path(args[args.index(flag) + 1]).read_bytes()).hexdigest()
         for key, flag in (('corpus', '--corpus'), ('queries', '--queries'), ('qrels', '--qrels'))
     }}
+    report['schema_version'] = 1
+    report['benchmark_scope'] = 'offline_lexical_bm25_positive_qrels_only'
+    report['evaluation'] = {
+        'tokenizer_mode': args[args.index('--tokenizer') + 1],
+        'by_top_k': {str(k): {} for k in (1, 3, 5, 10)},
+    }
+    if os.environ.get('BENCHMARK_WRONG_TOKENIZER') == '1':
+        report['evaluation']['tokenizer_mode'] = 'incorrect'
+    if os.environ.get('BENCHMARK_MISSING_CUTOFF') == '1':
+        del report['evaluation']['by_top_k']['5']
 out.write_text(json.dumps(report), encoding='utf-8')
 if pathlib.Path(sys.argv[0]).name == 'evalforge-compare-beir':
     manifest = json.loads((out.parent / 'manifest.json').read_text())
@@ -349,3 +359,23 @@ def test_runner_rejects_comparison_with_inconsistent_provenance(tmp_path):
     assert (output / "scifact-ascii.json").exists()
     assert (output / "scifact-unicode.json").exists()
     assert (output / "scifact-comparison.json").exists()
+
+
+def test_runner_rejects_benchmark_with_wrong_tokenizer(tmp_path):
+    output, cmd, env = _setup(tmp_path)
+    env['BENCHMARK_WRONG_TOKENIZER'] = '1'
+    completed = subprocess.run(cmd, env=env, capture_output=True, text=True, check=False)
+    assert completed.returncode == 2, completed.stderr
+    assert 'Benchmark tokenizer differs' in completed.stderr
+    assert (output / 'scifact-ascii.json').exists()
+    assert not (output / 'scifact-comparison.json').exists()
+
+
+def test_runner_rejects_benchmark_with_missing_cutoff(tmp_path):
+    output, cmd, env = _setup(tmp_path)
+    env['BENCHMARK_MISSING_CUTOFF'] = '1'
+    completed = subprocess.run(cmd, env=env, capture_output=True, text=True, check=False)
+    assert completed.returncode == 2, completed.stderr
+    assert 'all requested cutoffs' in completed.stderr
+    assert (output / 'scifact-ascii.json').exists()
+    assert not (output / 'scifact-comparison.json').exists()
