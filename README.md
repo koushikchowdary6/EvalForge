@@ -64,10 +64,10 @@ For a stricter CI check, **gate every reported cutoff** rather than selecting
 one favorable `k`. Both reports must contain the same nonempty set of cutoffs:
 
 ```bash
-evalforge-compare-beir baseline.json candidate.json --all-k --max-drop 0.02
+evalforge-compare-beir baseline.json candidate.json --all-k --max-drop 0.02 --output comparison.json
 ```
 
-The JSON output includes `by_top_k` results and fails if **any** cutoff
+With `--output`, the comparator writes machine-readable evidence even when the\nquality gate fails (exit code 1). It refuses to overwrite an existing file;\nuse a fresh artifact path for each run. Without `--output`, JSON is printed\nto stdout.\n\nThe JSON output includes `by_top_k` results and fails if **any** cutoff
 regresses beyond the allowed absolute drop. This is a deterministic lexical
 regression check, not a statistical significance test. Each per-cutoff result
 retains the baseline and candidate scores and source fingerprints.
