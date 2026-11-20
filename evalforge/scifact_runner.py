@@ -132,14 +132,14 @@ def main(argv=None):
         except subprocess.TimeoutExpired:
             print(f"{tokenizer} benchmark exceeded {args.timeout_seconds:g}s; evidence retained", file=sys.stderr)
             return 2
-        except FileNotFoundError:
-            print("Install EvalForge first: benchmark CLI was not found", file=sys.stderr)
+        except OSError as exc:
+            print(f"Could not launch {tokenizer} benchmark: {exc}", file=sys.stderr)
             return 2
         if not inputs_unchanged():
             return 2
         if completed.returncode:
             print(f"{tokenizer} benchmark failed with exit {completed.returncode}", file=sys.stderr)
-            return completed.returncode
+            return 2
         if not output.is_file():
             print(f"{tokenizer} benchmark exited successfully but did not write {output}", file=sys.stderr)
             return 2
@@ -183,8 +183,8 @@ def main(argv=None):
     except subprocess.TimeoutExpired:
         print(f"Comparison exceeded {args.timeout_seconds:g}s; evidence retained", file=sys.stderr)
         return 2
-    except FileNotFoundError:
-        print("Install EvalForge first: comparison CLI was not found", file=sys.stderr)
+    except OSError as exc:
+        print(f"Could not launch comparison CLI: {exc}", file=sys.stderr)
         return 2
     if not inputs_unchanged():
         return 2
@@ -222,7 +222,7 @@ def main(argv=None):
         print("Comparison quality gate failed; evidence retained (this may be a valid finding).", file=sys.stderr)
     elif completed.returncode:
         print("Comparison could not be completed; inspect retained evidence.", file=sys.stderr)
-    return completed.returncode
+    return completed.returncode if completed.returncode in (0, 1) else 2
 
 
 if __name__ == "__main__":
