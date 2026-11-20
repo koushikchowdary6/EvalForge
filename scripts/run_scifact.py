@@ -50,11 +50,16 @@ def main(argv=None):
     parser.add_argument("--download-date", required=True, help="Date dataset was obtained (YYYY-MM-DD)")
     parser.add_argument("--max-drop", type=float, default=0.02,
                         help="Maximum permitted absolute lexical hit-rate drop at each cutoff (default: 0.02)")
+    parser.add_argument("--timeout-seconds", type=float, default=1800,
+                        help="Per-command timeout in seconds (default: 1800)")
     args = parser.parse_args(argv)
 
     import math
     if not math.isfinite(args.max_drop) or not 0 <= args.max_drop <= 1:
         parser.error("--max-drop must be a finite number in [0, 1]")
+
+    if not math.isfinite(args.timeout_seconds) or args.timeout_seconds <= 0:
+        parser.error("--timeout-seconds must be a positive finite number")
 
     files = {
         "corpus": args.dataset / "corpus.jsonl",
@@ -85,6 +90,7 @@ def main(argv=None):
         "cutoffs": [1, 3, 5, 10],
         "tokenizers": ["ascii", "unicode"],
         "comparison_max_drop": args.max_drop,
+        "command_timeout_seconds": args.timeout_seconds,
         "comparison_threshold_note": "Illustrative tolerance, not a validated SciFact acceptance criterion",
     }
     # Persist provenance before running so a failed command is auditable.
@@ -117,7 +123,10 @@ def main(argv=None):
             "--output", str(output),
         ]
         try:
-            completed = subprocess.run(command, check=False)
+            completed = subprocess.run(command, check=False, timeout=args.timeout_seconds)
+        except subprocess.TimeoutExpired:
+            print(f"{tokenizer} benchmark exceeded {args.timeout_seconds:g}s; evidence retained", file=sys.stderr)
+            return 2
         except FileNotFoundError:
             print("Install EvalForge first: benchmark CLI was not found", file=sys.stderr)
             return 2
@@ -142,7 +151,10 @@ def main(argv=None):
         "--output", str(args.output_dir / "scifact-comparison.json"),
     ]
     try:
-        completed = subprocess.run(command, check=False)
+        completed = subprocess.run(command, check=False, timeout=args.timeout_seconds)
+    except subprocess.TimeoutExpired:
+        print(f"Comparison exceeded {args.timeout_seconds:g}s; evidence retained", file=sys.stderr)
+        return 2
     except FileNotFoundError:
         print("Install EvalForge first: comparison CLI was not found", file=sys.stderr)
         return 2
