@@ -67,7 +67,7 @@ retrieval regression. Omit this flag when intentionally comparing ASCII and
 Unicode tokenization.
 
 ```bash
-evalforge-compare-beir baseline.json candidate.json --all-k \\
+evalforge-compare-beir baseline.json candidate.json --all-k \
   --require-same-tokenizer --max-drop 0.02
 ```
 
