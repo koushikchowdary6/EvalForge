@@ -73,11 +73,16 @@ def main(argv=None):
         parser.error("Output directory must already exist")
     if any(args.output_dir.iterdir()):
         parser.error("Output directory must be empty to avoid overwriting evidence")
+    # date.fromisoformat also accepts compact YYYYMMDD on supported Python
+    # versions. Require the documented format for stable provenance metadata.
+    import re
+    from datetime import date
+    if not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", args.download_date):
+        parser.error("--download-date must use YYYY-MM-DD")
     try:
-        from datetime import date
         date.fromisoformat(args.download_date)
     except ValueError:
-        parser.error("--download-date must be a valid ISO date")
+        parser.error("--download-date must be a valid calendar date")
 
     manifest = {
         "dataset": "BEIR SciFact",
