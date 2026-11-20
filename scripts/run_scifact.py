@@ -85,6 +85,19 @@ def main(argv=None):
     manifest_path = args.output_dir / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
+    def inputs_unchanged():
+        """Do not accept evidence if the benchmark inputs changed mid-run."""
+        for key, path in files.items():
+            try:
+                current = sha256(path)
+            except OSError as exc:
+                print(f"SciFact {key} input became unreadable: {exc}", file=sys.stderr)
+                return False
+            if current != manifest["input_sha256"][key]:
+                print(f"SciFact {key} input changed during evaluation; evidence is not comparable", file=sys.stderr)
+                return False
+        return True
+
     reports = {}
     for tokenizer in ("ascii", "unicode"):
         output = args.output_dir / f"scifact-{tokenizer}.json"
@@ -101,6 +114,8 @@ def main(argv=None):
             completed = subprocess.run(command, check=False)
         except FileNotFoundError:
             print("Install EvalForge first: benchmark CLI was not found", file=sys.stderr)
+            return 2
+        if not inputs_unchanged():
             return 2
         if completed.returncode:
             print(f"{tokenizer} benchmark failed with exit {completed.returncode}", file=sys.stderr)
@@ -124,6 +139,8 @@ def main(argv=None):
         completed = subprocess.run(command, check=False)
     except FileNotFoundError:
         print("Install EvalForge first: comparison CLI was not found", file=sys.stderr)
+        return 2
+    if not inputs_unchanged():
         return 2
     if completed.returncode in (0, 1):
         comparison_path = args.output_dir / "scifact-comparison.json"
