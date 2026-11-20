@@ -16,6 +16,5 @@ def test_scifact_module_has_working_help():
 
 
 def test_scifact_installed_entry_point_declared():
-    import tomllib
-    project = tomllib.loads((Path(__file__).resolve().parents[1] / "pyproject.toml").read_text())
-    assert project["project"]["scripts"]["evalforge-run-scifact"] == "evalforge.scifact_runner:main"
+    config = (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text()
+    assert 'evalforge-run-scifact = "evalforge.scifact_runner:main"' in config
