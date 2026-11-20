@@ -36,7 +36,24 @@ if pathlib.Path(sys.argv[0]).name == 'evalforge-benchmark-beir':
     }}
 out.write_text(json.dumps(report), encoding='utf-8')
 if pathlib.Path(sys.argv[0]).name == 'evalforge-compare-beir':
-    sys.exit(int(os.environ.get('COMPARE_EXIT', '0')))
+    manifest = json.loads((out.parent / 'manifest.json').read_text())
+    exit_code = int(os.environ.get('COMPARE_EXIT', '0'))
+    max_drop = float(args[args.index('--max-drop') + 1])
+    report.update({
+        'schema_version': 1,
+        'comparison_scope': 'same_source_beir_lexical_evidence_all_cutoffs',
+        'max_allowed_drop': max_drop,
+        'passed': exit_code == 0,
+        'by_top_k': {
+            str(k): {
+                'k': k, 'source_sha256': manifest['input_sha256'],
+                'baseline_tokenizer': 'ascii', 'candidate_tokenizer': 'unicode',
+                'max_allowed_drop': max_drop, 'passed': exit_code == 0,
+            } for k in (1, 3, 5, 10)
+        },
+    })
+    out.write_text(json.dumps(report), encoding='utf-8')
+    sys.exit(exit_code)
 """
     for name in ("evalforge-benchmark-beir", "evalforge-compare-beir"):
         path = bin_dir / name
