@@ -296,3 +296,24 @@ def test_runner_rejects_mismatched_report_provenance(tmp_path):
     assert (output / "manifest.json").exists()
     assert (output / "scifact-ascii.json").exists()
     assert not (output / "scifact-comparison.json").exists()
+
+
+def test_runner_rejects_non_object_provenance_without_traceback(tmp_path):
+    output, cmd, env = _setup(tmp_path)
+    benchmark = tmp_path / "bin" / "evalforge-benchmark-beir"
+    benchmark.write_text(
+        "#!/usr/bin/env python3\\n".replace("\\n", "\n")
+        + "import json, pathlib, sys\n"
+        + "args = sys.argv[1:]\n"
+        + "pathlib.Path(args[args.index('--output') + 1]).write_text("
+        + "json.dumps({'source': []}))\n",
+        encoding="utf-8",
+    )
+    benchmark.chmod(0o755)
+    completed = subprocess.run(cmd, env=env, capture_output=True, text=True, check=False)
+    assert completed.returncode == 2, completed.stderr
+    assert "source SHA-256 does not match" in completed.stderr
+    assert "Traceback" not in completed.stderr
+    assert (output / "manifest.json").exists()
+    assert (output / "scifact-ascii.json").exists()
+    assert not (output / "scifact-comparison.json").exists()
