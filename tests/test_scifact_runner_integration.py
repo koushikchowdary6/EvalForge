@@ -27,7 +27,14 @@ def _setup(tmp_path, comparison_exit=0):
 import json, os, pathlib, sys
 args = sys.argv[1:]
 out = pathlib.Path(args[args.index('--output') + 1])
-out.write_text(json.dumps({'argv': args}), encoding='utf-8')
+report = {'argv': args}
+if pathlib.Path(sys.argv[0]).name == 'evalforge-benchmark-beir':
+    import hashlib
+    report['source'] = {'source_sha256': {
+        key: hashlib.sha256(pathlib.Path(args[args.index(flag) + 1]).read_bytes()).hexdigest()
+        for key, flag in (('corpus', '--corpus'), ('queries', '--queries'), ('qrels', '--qrels'))
+    }}
+out.write_text(json.dumps(report), encoding='utf-8')
 if pathlib.Path(sys.argv[0]).name == 'evalforge-compare-beir':
     sys.exit(int(os.environ.get('COMPARE_EXIT', '0')))
 """
@@ -269,3 +276,21 @@ def test_invalid_timeout_is_rejected_before_writing(tmp_path):
         assert completed.returncode == 2
         assert "--timeout-seconds must be a positive finite number" in completed.stderr
         assert list(output.iterdir()) == []
+
+
+def test_runner_rejects_mismatched_report_provenance(tmp_path):
+    output, cmd, env = _setup(tmp_path)
+    benchmark = tmp_path / "bin" / "evalforge-benchmark-beir"
+    benchmark.write_text(
+        "#!/usr/bin/env python3\\nimport json, pathlib, sys\\n"
+        "args = sys.argv[1:]\\n"
+        "pathlib.Path(args[args.index('--output') + 1]).write_text("
+        "json.dumps({'source': {'source_sha256': {'corpus': 'incorrect'}}}))\\n",
+        encoding="utf-8",
+    )
+    benchmark.chmod(0o755)
+    completed = subprocess.run(cmd, env=env, capture_output=True, text=True, check=False)
+    assert completed.returncode == 2
+    assert "source SHA-256 does not match" in completed.stderr
+    assert (output / "manifest.json").exists()
+    assert not (output / "scifact-comparison.json").exists()
