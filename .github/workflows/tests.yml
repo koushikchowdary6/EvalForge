@@ -62,6 +62,17 @@ jobs:
         cd "$RUNNER_TEMP"
         "$RUNNER_TEMP/evalforge-wheel-venv/bin/evalforge-demo" > installed-demo.txt
         grep -q "EvalForge offline quickstart: PASS" installed-demo.txt
+        # The flagship SciFact orchestrator must be installed in the wheel,
+        # importable outside the checkout, and expose its required inputs.
+        "$RUNNER_TEMP/evalforge-wheel-venv/bin/evalforge-run-scifact" --help > scifact-help.txt
+        "$RUNNER_TEMP/evalforge-wheel-venv/bin/python" - <<'PY'
+        from pathlib import Path
+        help_text = Path("scifact-help.txt").read_text(encoding="utf-8")
+        for option in ("--dataset", "--output-dir", "--evalforge-revision",
+                       "--source-url", "--download-date", "--max-drop",
+                       "--timeout-seconds"):
+            assert option in help_text, f"Missing SciFact CLI option: {option}"
+        PY
         # Validate the machine-readable developer contract from the isolated wheel.
         "$RUNNER_TEMP/evalforge-wheel-venv/bin/evalforge-demo" --json > installed-demo.json
         "$RUNNER_TEMP/evalforge-wheel-venv/bin/python" - <<'PY'
