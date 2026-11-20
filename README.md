@@ -23,6 +23,42 @@ evalforge-validate evaluation.json --min-hit-rate 0.50
 
 The optional hit-rate floor applies **only to lexical evidence at k=3 on the bundled fixture**; it is not a production acceptance threshold. Output commands refuse to overwrite existing files. Use new paths for subsequent runs.
 
+## Run the SciFact reproducibility workflow
+
+The installed `evalforge-run-scifact` command orchestrates two **BM25 lexical**
+retrieval baselines (ASCII and Unicode tokenization), compares all four
+cutoffs (k=1, 3, 5, 10), and retains SHA-256 input provenance. It does **not**
+download SciFact, evaluate generated answers, or establish an independent
+benchmark result by itself.
+
+Obtain the BEIR SciFact dataset from its original publisher, check the
+applicable license, and extract it so the directory contains
+`corpus.jsonl`, `queries.jsonl`, and `qrels/test.tsv`. Then run:
+
+```bash
+mkdir scifact-evidence
+evalforge-run-scifact \
+  --dataset /path/to/scifact \
+  --output-dir scifact-evidence \
+  --evalforge-revision "$(git rev-parse HEAD)" \
+  --source-url "https://github.com/beir-cellar/beir" \
+  --download-date YYYY-MM-DD \
+  --max-drop 0.02
+```
+
+Replace `YYYY-MM-DD` with the actual acquisition date and `--source-url`
+with the **exact location used to obtain your dataset** (the URL above is a
+publisher-project reference, not proof of the download). The revision example
+assumes you are running inside an EvalForge checkout at the installed revision;
+for a Git URL installation, record the exact pinned commit SHA instead.
+The output directory must exist and be empty. On completion inspect
+`manifest.json`, `scifact-ascii.json`, `scifact-unicode.json`, and
+`scifact-comparison.json`. Exit 0 means the illustrative tokenizer comparison
+gate passed, 1 means it failed, and 2 indicates invalid inputs or execution
+errors. A failed gate is **not** evidence that the retrieval system is unsafe.
+Publish measured scores only after actually executing the benchmark and
+verifying the artifacts.
+
 ## Gate a local BEIR retrieval benchmark in CI
 
 After obtaining BEIR-format `corpus.jsonl`, `queries.jsonl`, and a qrels TSV
