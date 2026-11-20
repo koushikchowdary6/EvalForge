@@ -63,7 +63,8 @@ def compare(baseline: dict, candidate: dict, *, k: int, max_drop: float = 0.0) -
                 != source_queries):
             raise ValueError("included and excluded query counts do not reconcile")
         parameters = evaluation.get("parameters")
-        if not isinstance(parameters, dict) or not isinstance(parameters.get("tokenizer"), str):
+        if (not isinstance(parameters, dict) or not isinstance(parameters.get("tokenizer"), str)
+                or not parameters["tokenizer"].strip()):
             raise ValueError("missing tokenizer configuration")
         if evaluation.get("method") != "lexical_bm25_retrieval_only":
             raise ValueError("incompatible retrieval method")
