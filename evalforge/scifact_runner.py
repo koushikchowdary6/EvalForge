@@ -169,9 +169,29 @@ def main(argv=None):
             print("Comparison exited without writing JSON evidence", file=sys.stderr)
             return 2
         try:
-            load_json_object(comparison_path)
-        except (OSError, ValueError) as exc:
-            print(f"Comparison produced unreadable JSON evidence: {exc}", file=sys.stderr)
+            evidence = load_json_object(comparison_path)
+            if (evidence.get("schema_version") != 1
+                    or evidence.get("comparison_scope") != "same_source_beir_lexical_evidence_all_cutoffs"
+                    or evidence.get("max_allowed_drop") != args.max_drop):
+                raise ValueError("Comparison schema, scope, or threshold differs from the requested run")
+            by_k = evidence.get("by_top_k")
+            if not isinstance(by_k, dict) or set(by_k) != {"1", "3", "5", "10"}:
+                raise ValueError("Comparison did not report every requested cutoff")
+            for cutoff, item in by_k.items():
+                if (not isinstance(item, dict)
+                        or item.get("source_sha256") != manifest["input_sha256"]
+                        or item.get("k") != int(cutoff)
+                        or item.get("baseline_tokenizer") != "ascii"
+                        or item.get("candidate_tokenizer") != "unicode"
+                        or item.get("max_allowed_drop") != args.max_drop
+                        or type(item.get("passed")) is not bool):
+                    raise ValueError(f"Comparison evidence inconsistent at k={cutoff}")
+            if (type(evidence.get("passed")) is not bool
+                    or evidence["passed"] != all(item["passed"] for item in by_k.values())
+                    or evidence["passed"] != (completed.returncode == 0)):
+                raise ValueError("Comparison exit status disagrees with the reported gate outcome")
+        except (OSError, ValueError, TypeError) as exc:
+            print(f"Comparison produced invalid JSON evidence: {exc}", file=sys.stderr)
             return 2
     if completed.returncode == 1:
         print("Comparison quality gate failed; evidence retained (this may be a valid finding).", file=sys.stderr)
