@@ -92,10 +92,10 @@ benchmark results. Use a fresh, empty output directory:
 
 ```bash
 mkdir scifact-evidence
-python scripts/run_scifact.py \\
-  --dataset scifact --output-dir scifact-evidence \\
-  --evalforge-revision "$(git rev-parse HEAD)" \\
-  --source-url "https://github.com/beir-cellar/beir" \\
+python scripts/run_scifact.py \
+  --dataset scifact --output-dir scifact-evidence \
+  --evalforge-revision "$(git rev-parse HEAD)" \
+  --source-url "https://github.com/beir-cellar/beir" \
   --download-date YYYY-MM-DD
 ```
 
