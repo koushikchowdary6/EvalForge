@@ -156,3 +156,44 @@ def test_duplicate_json_keys_are_rejected(tmp_path):
     completed = subprocess.run(cmd, env=env, capture_output=True, text=True, check=False)
     assert completed.returncode == 2
     assert "Duplicate JSON key" in completed.stderr
+
+
+def test_runner_rejects_dataset_mutation_during_benchmark(tmp_path):
+    output, cmd, env = _setup(tmp_path)
+    benchmark = tmp_path / "bin" / "evalforge-benchmark-beir"
+    benchmark.write_text(
+        "#!/usr/bin/env python3\n"
+        "import pathlib, sys\n"
+        "args = sys.argv[1:]\n"
+        "corpus = pathlib.Path(args[args.index('--corpus') + 1])\n"
+        "corpus.write_text('modified during run\\n')\n"
+        "pathlib.Path(args[args.index('--output') + 1]).write_text('{}')\n",
+        encoding="utf-8",
+    )
+    benchmark.chmod(0o755)
+    completed = subprocess.run(cmd, env=env, capture_output=True, text=True, check=False)
+    assert completed.returncode == 2
+    assert "corpus input changed during evaluation" in completed.stderr
+    assert (output / "manifest.json").exists()
+    assert not (output / "scifact-comparison.json").exists()
+
+
+def test_runner_rejects_dataset_mutation_during_comparison(tmp_path):
+    output, cmd, env = _setup(tmp_path)
+    comparator = tmp_path / "bin" / "evalforge-compare-beir"
+    comparator.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, pathlib, sys\n"
+        "args = sys.argv[1:]\n"
+        "manifest = json.loads((pathlib.Path(args[0]).parent / 'manifest.json').read_text())\n"
+        "corpus = pathlib.Path(sys.argv[0]).parent.parent / 'dataset' / 'corpus.jsonl'\n"
+        "corpus.write_text('modified during comparison\\n')\n"
+        "pathlib.Path(args[args.index('--output') + 1]).write_text('{}')\n",
+        encoding="utf-8",
+    )
+    comparator.chmod(0o755)
+    completed = subprocess.run(cmd, env=env, capture_output=True, text=True, check=False)
+    assert completed.returncode == 2
+    assert "corpus input changed during evaluation" in completed.stderr
+    assert (output / "scifact-ascii.json").exists()
+    assert (output / "scifact-unicode.json").exists()
