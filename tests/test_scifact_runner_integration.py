@@ -197,3 +197,26 @@ def test_runner_rejects_dataset_mutation_during_comparison(tmp_path):
     assert "corpus input changed during evaluation" in completed.stderr
     assert (output / "scifact-ascii.json").exists()
     assert (output / "scifact-unicode.json").exists()
+
+
+def test_custom_comparison_tolerance_is_recorded_and_forwarded(tmp_path):
+    output, cmd, env = _setup(tmp_path)
+    completed = subprocess.run(cmd + ["--max-drop", "0.125"], env=env,
+                               capture_output=True, text=True, check=False)
+    assert completed.returncode == 0, completed.stderr
+    manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["comparison_max_drop"] == 0.125
+    comparison = json.loads((output / "scifact-comparison.json").read_text(encoding="utf-8"))["argv"]
+    assert comparison[comparison.index("--max-drop") + 1] == "0.125"
+
+
+def test_invalid_comparison_tolerance_is_rejected_before_writing(tmp_path):
+    for value in ("-0.01", "1.01", "nan", "inf"):
+        case = tmp_path / value.replace(".", "_").replace("-", "neg")
+        case.mkdir()
+        output, cmd, env = _setup(case)
+        completed = subprocess.run(cmd + ["--max-drop", value], env=env,
+                                   capture_output=True, text=True, check=False)
+        assert completed.returncode == 2
+        assert "--max-drop must be a finite number in [0, 1]" in completed.stderr
+        assert list(output.iterdir()) == []
