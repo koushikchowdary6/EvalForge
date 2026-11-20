@@ -80,6 +80,12 @@ def test_rejects_inconsistent_counts_and_missing_tokenizer(tmp_path):
     with pytest.raises(ValueError, match="tokenizer configuration"):
         compare(baseline, candidate, k=1)
 
+    for invalid_tokenizer in ("", "   "):
+        candidate = copy.deepcopy(baseline)
+        candidate["evaluation"]["parameters"]["tokenizer"] = invalid_tokenizer
+        with pytest.raises(ValueError, match="tokenizer configuration"):
+            compare(baseline, candidate, k=1)
+
     candidate = copy.deepcopy(baseline)
     candidate["source"]["labeled_queries"] = True
     with pytest.raises(ValueError, match="source query count"):
