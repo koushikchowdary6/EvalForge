@@ -48,7 +48,13 @@ def main(argv=None):
     parser.add_argument("--evalforge-revision", required=True, help="Installed EvalForge commit or release identifier")
     parser.add_argument("--source-url", required=True, help="Upstream dataset source URL")
     parser.add_argument("--download-date", required=True, help="Date dataset was obtained (YYYY-MM-DD)")
+    parser.add_argument("--max-drop", type=float, default=0.02,
+                        help="Maximum permitted absolute lexical hit-rate drop at each cutoff (default: 0.02)")
     args = parser.parse_args(argv)
+
+    import math
+    if not math.isfinite(args.max_drop) or not 0 <= args.max_drop <= 1:
+        parser.error("--max-drop must be a finite number in [0, 1]")
 
     files = {
         "corpus": args.dataset / "corpus.jsonl",
@@ -78,7 +84,7 @@ def main(argv=None):
         "input_sha256": {key: sha256(path) for key, path in files.items()},
         "cutoffs": [1, 3, 5, 10],
         "tokenizers": ["ascii", "unicode"],
-        "comparison_max_drop": 0.02,
+        "comparison_max_drop": args.max_drop,
         "comparison_threshold_note": "Illustrative tolerance, not a validated SciFact acceptance criterion",
     }
     # Persist provenance before running so a failed command is auditable.
@@ -132,7 +138,7 @@ def main(argv=None):
 
     command = [
         "evalforge-compare-beir", str(reports["ascii"]), str(reports["unicode"]),
-        "--all-k", "--max-drop", "0.02",
+        "--all-k", "--max-drop", str(args.max_drop),
         "--output", str(args.output_dir / "scifact-comparison.json"),
     ]
     try:
