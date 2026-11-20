@@ -181,8 +181,8 @@ def main(argv=None):
                 if (not isinstance(item, dict)
                         or item.get("source_sha256") != manifest["input_sha256"]
                         or item.get("k") != int(cutoff)
-                        or item.get("baseline_tokenizer") != "ascii"
-                        or item.get("candidate_tokenizer") != "unicode"
+                        or item.get("baseline_tokenizer") not in ("ascii", "ascii_alphanumeric")
+                        or item.get("candidate_tokenizer") not in ("unicode", "unicode_alphanumeric")
                         or item.get("max_allowed_drop") != args.max_drop
                         or type(item.get("passed")) is not bool):
                     raise ValueError(f"Comparison evidence inconsistent at k={cutoff}")
