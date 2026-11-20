@@ -69,3 +69,55 @@ def test_noncanonical_and_impossible_download_dates_rejected(tmp_path):
         assert result.returncode == 2, (bad_date, result.stderr)
         assert "--download-date" in result.stderr
         assert list(output.iterdir()) == [], "Invalid dates must not create evidence"
+
+
+def test_benchmark_subprocess_failure_uses_error_exit_code(tmp_path, monkeypatch, capsys):
+    """A failed benchmark must never masquerade as a comparison gate failure."""
+    from evalforge import scifact_runner
+
+    dataset = tmp_path / "scifact"
+    (dataset / "qrels").mkdir(parents=True)
+    for filename in ("corpus.jsonl", "queries.jsonl", "qrels/test.tsv"):
+        (dataset / filename).write_text("", encoding="utf-8")
+    output = tmp_path / "evidence"
+    output.mkdir()
+
+    def fail_benchmark(command, **kwargs):
+        assert command[0] == "evalforge-benchmark-beir"
+        return subprocess.CompletedProcess(command, 7)
+
+    monkeypatch.setattr(scifact_runner.subprocess, "run", fail_benchmark)
+    result = scifact_runner.main([
+        "--dataset", str(dataset), "--output-dir", str(output),
+        "--evalforge-revision", "test", "--source-url", "https://example.org/dataset",
+        "--download-date", "2026-11-20",
+    ])
+    assert result == 2
+    assert "benchmark failed with exit 7" in capsys.readouterr().err
+    assert (output / "manifest.json").is_file()
+    assert not (output / "scifact-comparison.json").exists()
+
+
+def test_benchmark_launch_oserror_is_reported(tmp_path, monkeypatch, capsys):
+    """Permission and executable launch failures return 2 without a traceback."""
+    from evalforge import scifact_runner
+
+    dataset = tmp_path / "scifact"
+    (dataset / "qrels").mkdir(parents=True)
+    for filename in ("corpus.jsonl", "queries.jsonl", "qrels/test.tsv"):
+        (dataset / filename).write_text("", encoding="utf-8")
+    output = tmp_path / "evidence"
+    output.mkdir()
+
+    def denied(command, **kwargs):
+        raise PermissionError("executable not permitted")
+
+    monkeypatch.setattr(scifact_runner.subprocess, "run", denied)
+    result = scifact_runner.main([
+        "--dataset", str(dataset), "--output-dir", str(output),
+        "--evalforge-revision", "test", "--source-url", "https://example.org/dataset",
+        "--download-date", "2026-11-20",
+    ])
+    assert result == 2
+    assert "Could not launch ascii benchmark" in capsys.readouterr().err
+    assert (output / "manifest.json").is_file()
