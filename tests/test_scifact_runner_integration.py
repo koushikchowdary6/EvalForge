@@ -52,6 +52,8 @@ if pathlib.Path(sys.argv[0]).name == 'evalforge-compare-beir':
             } for k in (1, 3, 5, 10)
         },
     })
+    if os.environ.get('COMPARE_BAD_SOURCE') == '1':
+        report['by_top_k']['5']['source_sha256'] = {'corpus': 'wrong'}
     out.write_text(json.dumps(report), encoding='utf-8')
     sys.exit(exit_code)
 """
@@ -334,3 +336,16 @@ def test_runner_rejects_non_object_provenance_without_traceback(tmp_path):
     assert (output / "manifest.json").exists()
     assert (output / "scifact-ascii.json").exists()
     assert not (output / "scifact-comparison.json").exists()
+
+
+def test_runner_rejects_comparison_with_inconsistent_provenance(tmp_path):
+    output, cmd, env = _setup(tmp_path)
+    env['COMPARE_BAD_SOURCE'] = '1'
+    completed = subprocess.run(cmd, env=env, capture_output=True, text=True, check=False)
+    assert completed.returncode == 2, completed.stderr
+    assert "Comparison evidence inconsistent at k=5" in completed.stderr
+    assert "Traceback" not in completed.stderr
+    assert (output / "manifest.json").exists()
+    assert (output / "scifact-ascii.json").exists()
+    assert (output / "scifact-unicode.json").exists()
+    assert (output / "scifact-comparison.json").exists()
