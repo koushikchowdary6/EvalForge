@@ -73,3 +73,41 @@ def test_failed_quality_gate_retains_all_evidence(tmp_path):
         "manifest.json", "scifact-ascii.json", "scifact-unicode.json",
         "scifact-comparison.json",
     ))
+
+
+def test_success_exit_without_benchmark_artifact_is_error(tmp_path):
+    output, cmd, env = _setup(tmp_path)
+    benchmark = tmp_path / "bin" / "evalforge-benchmark-beir"
+    benchmark.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+    benchmark.chmod(0o755)
+    completed = subprocess.run(cmd, env=env, capture_output=True, text=True, check=False)
+    assert completed.returncode == 2
+    assert "did not write" in completed.stderr
+    assert (output / "manifest.json").exists()
+    assert not (output / "scifact-comparison.json").exists()
+
+
+def test_success_exit_without_comparison_artifact_is_error(tmp_path):
+    output, cmd, env = _setup(tmp_path)
+    comparator = tmp_path / "bin" / "evalforge-compare-beir"
+    comparator.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+    comparator.chmod(0o755)
+    completed = subprocess.run(cmd, env=env, capture_output=True, text=True, check=False)
+    assert completed.returncode == 2
+    assert "without writing JSON evidence" in completed.stderr
+    assert (output / "scifact-ascii.json").exists()
+    assert (output / "scifact-unicode.json").exists()
+
+
+def test_invalid_benchmark_json_is_error(tmp_path):
+    output, cmd, env = _setup(tmp_path)
+    benchmark = tmp_path / "bin" / "evalforge-benchmark-beir"
+    benchmark.write_text(
+        "#!/usr/bin/env python3\nimport pathlib, sys\n"
+        "pathlib.Path(sys.argv[sys.argv.index('--output') + 1]).write_text('{bad')\n",
+        encoding="utf-8",
+    )
+    benchmark.chmod(0o755)
+    completed = subprocess.run(cmd, env=env, capture_output=True, text=True, check=False)
+    assert completed.returncode == 2
+    assert "unreadable JSON" in completed.stderr
