@@ -60,6 +60,17 @@ evalforge-benchmark-beir --corpus corpus.jsonl --queries queries.jsonl \
 evalforge-compare-beir baseline.json candidate.json --k 5 --max-drop 0.02
 ```
 
+For reproducibility checks where the baseline and candidate are supposed to use
+the **same tokenizer**, add `--require-same-tokenizer`. This rejects accidental
+tokenizer drift with exit code **2** rather than reporting a misleading
+retrieval regression. Omit this flag when intentionally comparing ASCII and
+Unicode tokenization.
+
+```bash
+evalforge-compare-beir baseline.json candidate.json --all-k \\
+  --require-same-tokenizer --max-drop 0.02
+```
+
 For a stricter CI check, **gate every reported cutoff** rather than selecting
 one favorable `k`. Both reports must contain the same nonempty set of cutoffs:
 
