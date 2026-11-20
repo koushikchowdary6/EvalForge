@@ -84,3 +84,38 @@ def test_rejects_inconsistent_counts_and_missing_tokenizer(tmp_path):
     candidate["source"]["labeled_queries"] = True
     with pytest.raises(ValueError, match="source query count"):
         compare(baseline, candidate, k=1)
+
+
+def test_cli_export_is_machine_readable_and_never_overwrites(tmp_path, capsys):
+    baseline = reports(tmp_path)
+    first = tmp_path / "baseline.json"
+    second = tmp_path / "candidate.json"
+    output = tmp_path / "comparison.json"
+    first.write_text(json.dumps(baseline), encoding="utf-8")
+    second.write_text(json.dumps(baseline), encoding="utf-8")
+
+    args = [str(first), str(second), "--k", "1", "--output", str(output)]
+    assert main(args) == 0
+    assert capsys.readouterr().out == ""
+    evidence = json.loads(output.read_text(encoding="utf-8"))
+    assert evidence["passed"] is True
+    assert evidence["source_sha256"] == baseline["source"]["source_sha256"]
+
+    # An existing artifact must survive both successful and failed gate attempts.
+    original = output.read_bytes()
+    assert main(args) == 2
+    assert output.read_bytes() == original
+    assert "File exists" in capsys.readouterr().err
+
+
+def test_cli_export_preserves_failing_gate_evidence(tmp_path):
+    baseline = reports(tmp_path)
+    candidate = copy.deepcopy(baseline)
+    candidate["evaluation"]["by_top_k"]["1"]["lexical_evidence_hit_lower_bound"] = 0
+    first = tmp_path / "baseline.json"
+    second = tmp_path / "candidate.json"
+    output = tmp_path / "failed-gate.json"
+    first.write_text(json.dumps(baseline), encoding="utf-8")
+    second.write_text(json.dumps(candidate), encoding="utf-8")
+    assert main([str(first), str(second), "--k", "1", "--output", str(output)]) == 1
+    assert json.loads(output.read_text(encoding="utf-8"))["passed"] is False
