@@ -140,7 +140,8 @@ def main(argv=None):
             return 2
         try:
             report = load_json_object(output)
-            if report.get("source", {}).get("source_sha256") != manifest["input_sha256"]:
+            source = report.get("source")
+            if not isinstance(source, dict) or source.get("source_sha256") != manifest["input_sha256"]:
                 raise ValueError("Benchmark source SHA-256 does not match the run manifest")
         except (OSError, ValueError) as exc:
             print(f"{tokenizer} benchmark produced unreadable JSON: {exc}", file=sys.stderr)
