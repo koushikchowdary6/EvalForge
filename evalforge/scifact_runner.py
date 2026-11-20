@@ -156,7 +156,14 @@ def main(argv=None):
                 raise ValueError("Benchmark evaluation must be an object")
             expected_tokenizer = {"ascii": "ascii_alphanumeric",
                                   "unicode": "unicode_alphanumeric"}[tokenizer]
-            if evaluation.get("tokenizer_mode") not in (tokenizer, expected_tokenizer):
+            # Installed BM25 reports identify the tokenizer in parameters.tokenizer.
+            # Older subprocess fixtures use evaluation.tokenizer_mode instead.
+            parameters = evaluation.get("parameters")
+            reported_tokenizer = (
+                parameters.get("tokenizer") if isinstance(parameters, dict)
+                else evaluation.get("tokenizer_mode")
+            )
+            if reported_tokenizer not in (tokenizer, expected_tokenizer):
                 raise ValueError(f"Benchmark tokenizer differs from requested {tokenizer}")
             by_k = evaluation.get("by_top_k")
             if not isinstance(by_k, dict) or set(by_k) != {"1", "3", "5", "10"}:
