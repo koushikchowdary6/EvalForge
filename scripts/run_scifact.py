@@ -85,6 +85,15 @@ def main(argv=None):
         if completed.returncode:
             print(f"{tokenizer} benchmark failed with exit {completed.returncode}", file=sys.stderr)
             return completed.returncode
+        if not output.is_file():
+            print(f"{tokenizer} benchmark exited successfully but did not write {output}", file=sys.stderr)
+            return 2
+        try:
+            with output.open(encoding="utf-8") as report_file:
+                json.load(report_file)
+        except (OSError, ValueError) as exc:
+            print(f"{tokenizer} benchmark produced unreadable JSON: {exc}", file=sys.stderr)
+            return 2
         reports[tokenizer] = output
 
     command = [
@@ -97,6 +106,17 @@ def main(argv=None):
     except FileNotFoundError:
         print("Install EvalForge first: comparison CLI was not found", file=sys.stderr)
         return 2
+    if completed.returncode in (0, 1):
+        comparison_path = args.output_dir / "scifact-comparison.json"
+        if not comparison_path.is_file():
+            print("Comparison exited without writing JSON evidence", file=sys.stderr)
+            return 2
+        try:
+            with comparison_path.open(encoding="utf-8") as comparison_file:
+                json.load(comparison_file)
+        except (OSError, ValueError) as exc:
+            print(f"Comparison produced unreadable JSON evidence: {exc}", file=sys.stderr)
+            return 2
     if completed.returncode == 1:
         print("Comparison quality gate failed; evidence retained (this may be a valid finding).", file=sys.stderr)
     elif completed.returncode:
