@@ -220,3 +220,52 @@ def test_invalid_comparison_tolerance_is_rejected_before_writing(tmp_path):
         assert completed.returncode == 2
         assert "--max-drop must be a finite number in [0, 1]" in completed.stderr
         assert list(output.iterdir()) == []
+
+
+def test_benchmark_timeout_retains_manifest_and_stops_pipeline(tmp_path):
+    output, cmd, env = _setup(tmp_path)
+    benchmark = tmp_path / "bin" / "evalforge-benchmark-beir"
+    benchmark.write_text(
+        "#!/usr/bin/env python3\nimport time\ntime.sleep(5)\n", encoding="utf-8"
+    )
+    benchmark.chmod(0o755)
+    completed = subprocess.run(
+        cmd + ["--timeout-seconds", "0.1"], env=env,
+        capture_output=True, text=True, check=False, timeout=10,
+    )
+    assert completed.returncode == 2
+    assert "benchmark exceeded" in completed.stderr
+    assert (output / "manifest.json").exists()
+    assert not (output / "scifact-comparison.json").exists()
+
+
+def test_comparison_timeout_retains_completed_benchmarks(tmp_path):
+    output, cmd, env = _setup(tmp_path)
+    comparator = tmp_path / "bin" / "evalforge-compare-beir"
+    comparator.write_text(
+        "#!/usr/bin/env python3\nimport time\ntime.sleep(5)\n", encoding="utf-8"
+    )
+    comparator.chmod(0o755)
+    completed = subprocess.run(
+        cmd + ["--timeout-seconds", "0.2"], env=env,
+        capture_output=True, text=True, check=False, timeout=10,
+    )
+    assert completed.returncode == 2
+    assert "Comparison exceeded" in completed.stderr
+    assert (output / "scifact-ascii.json").exists()
+    assert (output / "scifact-unicode.json").exists()
+    assert (output / "manifest.json").exists()
+
+
+def test_invalid_timeout_is_rejected_before_writing(tmp_path):
+    for value in ("0", "-1", "nan", "inf"):
+        case = tmp_path / value.replace("-", "neg")
+        case.mkdir()
+        output, cmd, env = _setup(case)
+        completed = subprocess.run(
+            cmd + ["--timeout-seconds", value], env=env,
+            capture_output=True, text=True, check=False,
+        )
+        assert completed.returncode == 2
+        assert "--timeout-seconds must be a positive finite number" in completed.stderr
+        assert list(output.iterdir()) == []
