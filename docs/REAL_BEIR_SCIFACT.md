@@ -81,3 +81,29 @@ judgments; excluded queries must not be silently treated as failures or
 successes. A SciFact run would provide independently sourced *retrieval*
 evidence, not proof of production RAG quality or generalization to other
 datasets.
+
+## Optional: run both baselines with a provenance manifest
+
+The standard-library runner automates the two CLI invocations and comparison,
+while recording the input SHA-256 hashes, declared EvalForge revision, Python
+version, source URL, download date, cutoffs, and tokenizer configurations.
+It **does not download the dataset**, verify the declared revision, or invent
+benchmark results. Use a fresh, empty output directory:
+
+```bash
+mkdir scifact-evidence
+python scripts/run_scifact.py \\
+  --dataset scifact --output-dir scifact-evidence \\
+  --evalforge-revision "$(git rev-parse HEAD)" \\
+  --source-url "https://github.com/beir-cellar/beir" \\
+  --download-date YYYY-MM-DD
+```
+
+Replace `YYYY-MM-DD` with the actual date the data was obtained. The Git
+revision must identify the **installed** EvalForge version; if installing from
+a different checkout, supply that exact revision instead. The runner refuses
+nonempty output directories to protect existing artifacts and preserves its
+manifest even when a subprocess fails. A comparison exit code of **1** is a
+quality-gate failure with retained evidence, not proof of a broken runner.
+No independently sourced benchmark results are claimed until the commands
+are executed and the artifacts reviewed.
