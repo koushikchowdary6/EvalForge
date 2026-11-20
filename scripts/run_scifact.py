@@ -21,6 +21,26 @@ def sha256(path):
     return digest.hexdigest()
 
 
+def load_json_object(path):
+    """Reject non-object or nonstandard JSON masquerading as benchmark evidence."""
+    def reject_constant(value):
+        raise ValueError(f"Non-finite JSON constant: {value}")
+
+    def reject_duplicates(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError(f"Duplicate JSON key: {key}")
+            result[key] = value
+        return result
+
+    with path.open(encoding="utf-8") as source:
+        data = json.load(source, parse_constant=reject_constant, object_pairs_hook=reject_duplicates)
+    if not isinstance(data, dict):
+        raise ValueError("Expected a JSON object report")
+    return data
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dataset", type=Path, required=True, help="Extracted BEIR SciFact directory")
@@ -89,8 +109,7 @@ def main(argv=None):
             print(f"{tokenizer} benchmark exited successfully but did not write {output}", file=sys.stderr)
             return 2
         try:
-            with output.open(encoding="utf-8") as report_file:
-                json.load(report_file)
+            load_json_object(output)
         except (OSError, ValueError) as exc:
             print(f"{tokenizer} benchmark produced unreadable JSON: {exc}", file=sys.stderr)
             return 2
@@ -112,8 +131,7 @@ def main(argv=None):
             print("Comparison exited without writing JSON evidence", file=sys.stderr)
             return 2
         try:
-            with comparison_path.open(encoding="utf-8") as comparison_file:
-                json.load(comparison_file)
+            load_json_object(comparison_path)
         except (OSError, ValueError) as exc:
             print(f"Comparison produced unreadable JSON evidence: {exc}", file=sys.stderr)
             return 2
