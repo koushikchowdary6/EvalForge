@@ -84,7 +84,7 @@ datasets.
 
 ## Optional: run both baselines with a provenance manifest
 
-The standard-library runner automates the two CLI invocations and comparison,
+The installed `evalforge-run-scifact` CLI automates the two benchmark invocations and comparison,
 while recording the input SHA-256 hashes, declared EvalForge revision, Python
 version, source URL, download date, cutoffs, and tokenizer configurations.
 It **does not download the dataset**, verify the declared revision, or invent
