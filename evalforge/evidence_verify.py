@@ -18,13 +18,16 @@ def verify_bundle(directory: Path) -> dict:
     if manifest_path.is_symlink() or not manifest_path.is_file():
         raise ValueError("Evidence manifest is missing or a symlink")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if manifest.get("schema_version") != 1:
+    if not isinstance(manifest, dict):
+        raise ValueError("Evidence manifest must be a JSON object")
+    if type(manifest.get("schema_version")) is not int or manifest["schema_version"] != 1:
         raise ValueError("Unsupported evidence manifest schema")
     hashes = manifest.get("sha256")
     if not isinstance(hashes, dict) or set(hashes) != set(REQUIRED):
         raise ValueError("Manifest must hash exactly the three evidence JSON files")
-    if not isinstance(manifest.get("git_revision"), str) or len(manifest["git_revision"]) != 40:
-        raise ValueError("Missing 40-character Git revision")
+    revision = manifest.get("git_revision")
+    if not isinstance(revision, str) or len(revision) != 40 or any(c not in "0123456789abcdefABCDEF" for c in revision):
+        raise ValueError("Git revision must be a 40-character hexadecimal SHA")
     for name in REQUIRED:
         expected = hashes[name]
         if not isinstance(expected, str) or len(expected) != 64 or any(c not in "0123456789abcdef" for c in expected):
