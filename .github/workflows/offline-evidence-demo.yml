@@ -103,7 +103,7 @@ jobs:
               "evalforge_version": version("evalforge-ai"),
               "sha256": hashes,
           }
-          (folder / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\\n")
+          (folder / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
           loaded = json.loads((folder / "manifest.json").read_text())
           for name, expected in loaded["sha256"].items():
               actual = hashlib.sha256((folder / name).read_bytes()).hexdigest()
