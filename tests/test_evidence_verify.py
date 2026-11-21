@@ -55,3 +55,29 @@ def test_corrupt_json_rejected_even_with_matching_hash(bundle):
     path.write_text(json.dumps(manifest))
     with pytest.raises(json.JSONDecodeError):
         verify_bundle(bundle)
+
+
+def test_symlinked_manifest_rejected(bundle, tmp_path):
+    original = bundle / "manifest.json"
+    external = tmp_path.parent / f"{tmp_path.name}-external-manifest.json"
+    external.write_bytes(original.read_bytes())
+    original.unlink()
+    try:
+        original.symlink_to(external)
+    except (OSError, NotImplementedError):
+        pytest.skip("Symlinks unavailable on this platform")
+    with pytest.raises(ValueError, match="manifest.*symlink"):
+        verify_bundle(bundle)
+
+
+def test_symlinked_report_rejected_even_with_matching_hash(bundle, tmp_path):
+    original = bundle / "baseline.json"
+    external = tmp_path.parent / f"{tmp_path.name}-external-report.json"
+    external.write_bytes(original.read_bytes())
+    original.unlink()
+    try:
+        original.symlink_to(external)
+    except (OSError, NotImplementedError):
+        pytest.skip("Symlinks unavailable on this platform")
+    with pytest.raises(ValueError, match="symlink"):
+        verify_bundle(bundle)
