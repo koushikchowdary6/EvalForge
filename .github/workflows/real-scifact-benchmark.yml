@@ -2,6 +2,13 @@ name: Real SciFact benchmark (manual)
 
 on:
   workflow_dispatch:
+  # Run against the public dataset automatically; manual runs remain available.
+  schedule:
+    - cron: '17 9 * * 1'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/real-scifact-benchmark.yml'
 
 permissions:
   contents: read
