@@ -133,3 +133,18 @@ def test_hash_matching_comparison_outcome_inconsistency_rejected(tmp_path):
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     with pytest.raises(ValueError, match="outcome disagrees"):
         verify(evidence)
+
+
+@pytest.mark.parametrize("number", ["1e999", "-1e999"])
+def test_hash_matching_overflowed_json_number_rejected(tmp_path, number):
+    evidence, _ = bundle(tmp_path)
+    name = "scifact-ascii.json"
+    report = (evidence / name).read_text(encoding="utf-8")
+    payload = report[:-1] + ', "overflowed_metric": ' + number + '}'
+    (evidence / name).write_text(payload, encoding="utf-8")
+    manifest_path = evidence / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["output_sha256"][name] = _hash(payload.encode("utf-8"))
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ValueError, match="Non-finite JSON number"):
+        verify(evidence)
