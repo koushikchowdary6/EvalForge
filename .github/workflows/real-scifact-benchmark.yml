@@ -1,0 +1,107 @@
+name: Real SciFact benchmark (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scifact:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install the checked-out package
+        run: python -m pip install .
+      - name: Download official BEIR SciFact data with bounded extraction
+        env:
+          SCIFACT_URL: https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/scifact.zip
+        run: |
+          python - <<'PY'
+          import hashlib
+          import os
+          import urllib.request
+          import zipfile
+          from pathlib import Path
+
+          url = os.environ["SCIFACT_URL"]
+          archive = Path("scifact.zip")
+          maximum = 50 * 1024 * 1024
+          request = urllib.request.Request(url, headers={"User-Agent": "EvalForge-benchmark/0.1"})
+          digest = hashlib.sha256()
+          with urllib.request.urlopen(request, timeout=60) as response, archive.open("wb") as target:
+              if response.geturl() != url:
+                  raise SystemExit("Unexpected dataset download redirect")
+              total = 0
+              while chunk := response.read(1024 * 1024):
+                  total += len(chunk)
+                  if total > maximum:
+                      raise SystemExit("Dataset archive exceeds 50 MiB limit")
+                  digest.update(chunk)
+                  target.write(chunk)
+          print("SciFact source archive SHA-256:", digest.hexdigest())
+          expected = {"corpus.jsonl", "queries.jsonl", "qrels/test.tsv"}
+          with zipfile.ZipFile(archive) as bundle:
+              entries = {}
+              for member in bundle.infolist():
+                  normalized = member.filename.replace("\\", "/")
+                  for suffix in expected:
+                      if normalized == suffix or normalized.endswith("/" + suffix):
+                          if suffix in entries:
+                              raise SystemExit(f"Ambiguous SciFact member: {suffix}")
+                          if member.file_size > 100 * 1024 * 1024:
+                              raise SystemExit(f"Dataset member exceeds limit: {suffix}")
+                          entries[suffix] = member
+              if set(entries) != expected:
+                  raise SystemExit(f"Missing SciFact members: {sorted(expected - set(entries))}")
+              for suffix, member in entries.items():
+                  output = Path("scifact") / suffix
+                  output.parent.mkdir(parents=True, exist_ok=True)
+                  with bundle.open(member) as source, output.open("wb") as target:
+                      total = 0
+                      while chunk := source.read(1024 * 1024):
+                          total += len(chunk)
+                          if total > 100 * 1024 * 1024:
+                              raise SystemExit(f"Uncompressed member exceeds limit: {suffix}")
+                          target.write(chunk)
+          Path("scifact-archive-sha256.txt").write_text(digest.hexdigest() + "  scifact.zip\n")
+          PY
+      - name: Run two actual BM25 retrieval baselines
+        id: benchmark
+        continue-on-error: true
+        env:
+          SCIFACT_URL: https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/scifact.zip
+        run: |
+          mkdir -p scifact-evidence
+          evalforge-run-scifact --dataset scifact --output-dir scifact-evidence \
+            --evalforge-revision "$GITHUB_SHA" --source-url "$SCIFACT_URL" \
+            --download-date "$(date -u +%F)" --max-drop 0.02
+      - name: Verify completed evidence and produce a human-readable report
+        if: steps.benchmark.outcome == 'success' || steps.benchmark.outcome == 'failure'
+        id: verify
+        continue-on-error: true
+        run: |
+          evalforge-verify-scifact scifact-evidence --dataset scifact
+          evalforge-report-scifact scifact-evidence --output scifact-evidence/RESULTS.md
+          cat scifact-evidence/RESULTS.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve provenance and measured evidence even on a quality-gate failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: real-scifact-bm25-evidence
+          path: |
+            scifact-evidence/
+            scifact-archive-sha256.txt
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Fail if benchmark or evidence verification failed
+        if: always()
+        env:
+          BENCHMARK_OUTCOME: ${{ steps.benchmark.outcome }}
+          VERIFY_OUTCOME: ${{ steps.verify.outcome }}
+        run: |
+          test "$BENCHMARK_OUTCOME" = success && test "$VERIFY_OUTCOME" = success
