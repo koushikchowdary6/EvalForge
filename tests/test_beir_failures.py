@@ -40,6 +40,14 @@ def test_failure_reasons_and_no_fabricated_hits(tmp_path):
     assert failures["q2"]["top_k_positive_results"][0]["doc_id"] == "d2"
     assert failures["q3"]["reason"] == "all_query_terms_oov"
     assert failures["q3"]["top_k_positive_results"] == []
+    assert report["failure_reason_counts"] == {
+        "no_query_tokens": 0,
+        "all_query_terms_oov": 1,
+        "no_positive_relevant_overlap": 1,
+        "relevant_docs_outside_top_k": 0,
+    }
+    assert failures["q2"]["first_positive_relevant_rank"] is None
+    assert failures["q3"]["first_positive_relevant_score"] is None
     assert report == analyze(corpus, queries, qrels, k=1)
 
 
@@ -71,3 +79,22 @@ def test_invalid_options_do_not_write(tmp_path):
     assert main(args + ["--k", "0"]) == 2
     assert main(args + ["--limit", "0"]) == 2
     assert not out.exists()
+
+
+def test_ranked_relevant_document_outside_cutoff(tmp_path):
+    corpus = tmp_path / "corpus.jsonl"
+    queries = tmp_path / "queries.jsonl"
+    qrels = tmp_path / "qrels.tsv"
+    corpus.write_text(
+        json.dumps({"_id": "d1", "title": "", "text": "alpha alpha alpha alpha"}) + "\n"
+        + json.dumps({"_id": "d2", "title": "", "text": "alpha"}) + "\n",
+        encoding="utf-8",
+    )
+    queries.write_text(json.dumps({"_id": "q1", "text": "alpha"}) + "\n", encoding="utf-8")
+    qrels.write_text("query-id\\tcorpus-id\\tscore\\nq1\\td2\\t1\\n".replace("\\\\t", "\\t").replace("\\\\n", "\\n"), encoding="utf-8")
+    report = analyze(corpus, queries, qrels, k=1)
+    assert report["queries_without_positive_relevant_hit"] == 1
+    assert report["failure_reason_counts"]["relevant_docs_outside_top_k"] == 1
+    failure = report["shown_failures"][0]
+    assert failure["first_positive_relevant_rank"] == 2
+    assert failure["first_positive_relevant_score"] > 0
