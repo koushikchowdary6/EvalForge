@@ -23,6 +23,16 @@ evalforge-validate evaluation.json --min-hit-rate 0.50
 
 The optional hit-rate floor applies **only to lexical evidence at k=3 on the bundled fixture**; it is not a production acceptance threshold. Output commands refuse to overwrite existing files. Use new paths for subsequent runs.
 
+## Verify downloadable CI evidence
+
+The [offline evaluation demo workflow](https://github.com/koushikchowdary6/EvalForge/actions/workflows/offline-evidence-demo.yml) produces an `offline-evaluation-evidence` artifact containing three JSON reports and a SHA-256 manifest. Download and extract it, then verify its contents with the installed CLI:
+
+```bash
+evalforge-verify-evidence /path/to/extracted/offline-evaluation-evidence
+```
+
+A successful verification means the three JSON files match the manifest's hashes; a mismatch or malformed bundle exits with code 2. **This is an integrity check, not a digital signature or independent confirmation of benchmark quality.** Artifacts expire after 14 days, and the included dataset is hand-authored.
+
 ## Run the SciFact reproducibility workflow
 
 The installed `evalforge-run-scifact` command orchestrates two **BM25 lexical**
