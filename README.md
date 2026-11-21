@@ -69,6 +69,24 @@ errors. A failed gate is **not** evidence that the retrieval system is unsafe.
 Publish measured scores only after actually executing the benchmark and
 verifying the artifacts.
 
+## Verify a completed SciFact benchmark
+
+After running `evalforge-run-scifact`, independently check that its three
+reports still match the finalized manifest:
+
+```bash
+evalforge-verify-scifact scifact-evidence --dataset /path/to/scifact
+```
+
+The optional `--dataset` argument also re-hashes the original corpus, queries,
+and test qrels. Without it, only the three output reports and the recorded
+input-digest format are checked. Incomplete runs, missing reports, modified
+files, symlinks, and malformed JSON are rejected with exit code **2**.
+A successful verification confirms **integrity relative to the local manifest**,
+not the authenticity of the dataset, the correctness of reported metrics, or
+independent SciFact performance. Preserve a trusted copy of the source
+fingerprints separately when sharing evidence.
+
 ## Gate a local BEIR retrieval benchmark in CI
 
 After obtaining BEIR-format `corpus.jsonl`, `queries.jsonl`, and a qrels TSV
