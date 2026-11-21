@@ -23,6 +23,26 @@ evalforge-validate evaluation.json --min-hit-rate 0.50
 
 The optional hit-rate floor applies **only to lexical evidence at k=3 on the bundled fixture**; it is not a production acceptance threshold. Output commands refuse to overwrite existing files. Use new paths for subsequent runs.
 
+## Debug missed retrieval queries
+
+For a local BEIR-format dataset, inspect which positively labeled queries BM25
+misses and the top-ranked documents it retrieved instead. This is useful for
+finding vocabulary gaps and hard negatives before changing a retriever.
+
+```bash
+evalforge-beir-failures \
+  --corpus /path/to/corpus.jsonl \
+  --queries /path/to/queries.jsonl \
+  --qrels /path/to/qrels/test.tsv \
+  --k 5 --limit 20 --output failures.json
+```
+
+The JSON includes source-file SHA-256 fingerprints, total failed-query count,
+positive-score top-k results, and failure reasons. `--limit` truncates only
+the displayed examples, not the totals. A zero BM25 score is **not** counted
+as retrieved lexical evidence. Only queries with positive qrels are scored;
+this does not evaluate answer correctness or infer unanswerability.
+
 ## Verify downloadable CI evidence
 
 The [offline evaluation demo workflow](https://github.com/koushikchowdary6/EvalForge/actions/workflows/offline-evidence-demo.yml) produces an `offline-evaluation-evidence` artifact containing three JSON reports and a SHA-256 manifest. Download and extract it, then verify its contents with the installed CLI:
