@@ -110,6 +110,8 @@ jobs:
               if actual != expected:
                   raise SystemExit(f"Artifact checksum mismatch: {name}")
           PY
+      - name: Verify bundle with installed consumer CLI
+        run: evalforge-verify-evidence demo-evidence
       - name: Verify installed regression and absolute-quality gates
         run: python examples/reproduce_offline_benchmark.py
       - name: Upload developer-facing demo evidence
