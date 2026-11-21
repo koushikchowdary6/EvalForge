@@ -112,10 +112,35 @@ jobs:
           PY
       - name: Verify bundle with installed consumer CLI
         run: evalforge-verify-evidence demo-evidence
+      - name: Reject tampered downloadable evidence using installed CLI
+        run: |
+          python - <<'PY'
+          import shutil
+          import subprocess
+          import tempfile
+          from pathlib import Path
+
+          with tempfile.TemporaryDirectory() as temporary:
+              bundle = Path(temporary) / "evidence"
+              shutil.copytree("demo-evidence", bundle)
+              baseline = bundle / "baseline.json"
+              baseline.write_bytes(baseline.read_bytes() + b"\\n ")
+              result = subprocess.run(
+                  ["evalforge-verify-evidence", str(bundle)],
+                  capture_output=True,
+                  text=True,
+                  check=False,
+              )
+              if result.returncode != 2 or "SHA-256 mismatch" not in result.stderr:
+                  raise SystemExit(
+                      "Installed verifier did not reject tampered evidence as expected: "
+                      f"exit={result.returncode}, stderr={result.stderr!r}"
+                  )
+          PY
       - name: Verify installed regression and absolute-quality gates
         run: python examples/reproduce_offline_benchmark.py
       - name: Upload developer-facing demo evidence
-        if: always()
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: offline-evaluation-evidence
