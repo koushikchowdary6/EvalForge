@@ -26,6 +26,10 @@ def analyze(corpus: Path, queries: Path, qrels: Path, *, k: int = 5,
     index = _build_bm25_index(docs, tokenize)
     failures = []
     successes = 0
+    reason_counts = {name: 0 for name in (
+        "no_query_tokens", "all_query_terms_oov",
+        "no_positive_relevant_overlap", "relevant_docs_outside_top_k",
+    )}
     for case in cases:
         ranked = _rank_with_bm25_index(case["question"], docs, index, tokenize)
         # Zero BM25 score is not evidence of lexical retrieval.
@@ -45,6 +49,11 @@ def analyze(corpus: Path, queries: Path, qrels: Path, *, k: int = 5,
             reason = "no_positive_relevant_overlap"
         else:
             reason = "relevant_docs_outside_top_k"
+        reason_counts[reason] += 1
+        first_relevant = next(
+            ((rank, score) for rank, (doc_id, score) in enumerate(ranked, 1)
+             if doc_id in relevant and score > 0), None
+        )
         failures.append({
             "query_id": case["id"],
             "query": case["question"],
@@ -54,6 +63,8 @@ def analyze(corpus: Path, queries: Path, qrels: Path, *, k: int = 5,
                 for doc_id, score in retrieved
             ],
             "reason": reason,
+            "first_positive_relevant_rank": first_relevant[0] if first_relevant else None,
+            "first_positive_relevant_score": first_relevant[1] if first_relevant else None,
         })
     failures.sort(key=lambda row: row["query_id"])
     return {
@@ -65,6 +76,7 @@ def analyze(corpus: Path, queries: Path, qrels: Path, *, k: int = 5,
         "labeled_queries": len(cases),
         "queries_with_positive_relevant_hit": successes,
         "queries_without_positive_relevant_hit": len(failures),
+        "failure_reason_counts": reason_counts,
         "shown_failures": failures[:limit],
         "truncated": len(failures) > limit,
     }
