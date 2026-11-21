@@ -121,3 +121,28 @@ def test_benchmark_launch_oserror_is_reported(tmp_path, monkeypatch, capsys):
     assert result == 2
     assert "Could not launch ascii benchmark" in capsys.readouterr().err
     assert (output / "manifest.json").is_file()
+
+
+def test_unreadable_input_fingerprint_returns_error_without_evidence(tmp_path, monkeypatch, capsys):
+    """An input read failure is an execution error, never a valid benchmark."""
+    from evalforge import scifact_runner
+
+    dataset = tmp_path / "scifact"
+    (dataset / "qrels").mkdir(parents=True)
+    for filename in ("corpus.jsonl", "queries.jsonl", "qrels/test.tsv"):
+        (dataset / filename).write_text("", encoding="utf-8")
+    output = tmp_path / "evidence"
+    output.mkdir()
+
+    def unreadable(path):
+        raise PermissionError("source file cannot be read")
+
+    monkeypatch.setattr(scifact_runner, "sha256", unreadable)
+    result = scifact_runner.main([
+        "--dataset", str(dataset), "--output-dir", str(output),
+        "--evalforge-revision", "test", "--source-url", "https://example.org/dataset",
+        "--download-date", "2026-11-20",
+    ])
+    assert result == 2
+    assert "Cannot fingerprint SciFact inputs" in capsys.readouterr().err
+    assert list(output.iterdir()) == []
