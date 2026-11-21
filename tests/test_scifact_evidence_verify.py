@@ -28,8 +28,12 @@ def bundle(tmp_path):
                 "schema_version": 1,
                 "comparison_scope": "same_source_beir_lexical_evidence_all_cutoffs",
                 "passed": True,
+                "max_allowed_drop": 0.02,
                 "by_top_k": {
-                    str(k): {"k": k, "passed": True, "source_sha256": input_hashes}
+                    str(k): {"k": k, "passed": True, "source_sha256": input_hashes,
+                             "baseline_hit_lower_bound": 0.7,
+                             "candidate_hit_lower_bound": 0.7,
+                             "delta": 0.0, "max_allowed_drop": 0.02}
                     for k in (1, 3, 5, 10)
                 },
             }
@@ -131,7 +135,7 @@ def test_hash_matching_comparison_outcome_inconsistency_rejected(tmp_path):
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     manifest["output_sha256"][name] = _hash(payload)
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-    with pytest.raises(ValueError, match="outcome disagrees"):
+    with pytest.raises(ValueError, match="comparison"):
         verify(evidence)
 
 
@@ -147,4 +151,24 @@ def test_hash_matching_overflowed_json_number_rejected(tmp_path, number):
     manifest["output_sha256"][name] = _hash(payload.encode("utf-8"))
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     with pytest.raises(ValueError, match="Non-finite JSON number"):
+        verify(evidence)
+
+
+@pytest.mark.parametrize("field,value", [
+    ("delta", 0.3),
+    ("candidate_hit_lower_bound", 0.1),
+    ("max_allowed_drop", 0.5),
+])
+def test_hash_matching_fabricated_comparison_rejected(tmp_path, field, value):
+    evidence, _ = bundle(tmp_path)
+    name = "scifact-comparison.json"
+    report = json.loads((evidence / name).read_text(encoding="utf-8"))
+    report["by_top_k"]["3"][field] = value
+    payload = json.dumps(report).encode()
+    (evidence / name).write_bytes(payload)
+    manifest_path = evidence / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["output_sha256"][name] = _hash(payload)
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ValueError, match="SciFact comparison"):
         verify(evidence)
