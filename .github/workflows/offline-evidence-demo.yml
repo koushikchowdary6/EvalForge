@@ -6,11 +6,13 @@ on:
     paths:
       - "evalforge/**"
       - "pyproject.toml"
+      - "examples/reproduce_offline_benchmark.py"
       - ".github/workflows/offline-evidence-demo.yml"
   pull_request:
     paths:
       - "evalforge/**"
       - "pyproject.toml"
+      - "examples/reproduce_offline_benchmark.py"
       - ".github/workflows/offline-evidence-demo.yml"
   workflow_dispatch:
 
@@ -75,6 +77,8 @@ jobs:
           with Path(__import__("os").environ["GITHUB_STEP_SUMMARY"]).open("a") as output:
               output.write(summary)
           PY
+      - name: Verify installed regression and absolute-quality gates
+        run: python examples/reproduce_offline_benchmark.py
       - name: Upload developer-facing demo evidence
         if: always()
         uses: actions/upload-artifact@v4
