@@ -109,6 +109,24 @@ def verify(directory, dataset=None):
                 or type(item.get("k")) is not int or item["k"] != int(cutoff)
                 or type(item.get("passed")) is not bool):
             raise ValueError(f"Invalid SciFact comparison evidence at k={cutoff}")
+    # Bind comparison scores to the actual hashed benchmark reports. Otherwise a
+    # self-consistent comparison JSON can invent scores without changing either run.
+    for cutoff in ("1", "3", "5", "10"):
+        item = by_k[cutoff]
+        for tokenizer, field in (("ascii", "baseline_hit_lower_bound"),
+                                 ("unicode", "candidate_hit_lower_bound")):
+            report = reports[f"scifact-{tokenizer}.json"]
+            summary = report["evaluation"]["by_top_k"][cutoff]
+            if not isinstance(summary, dict):
+                raise ValueError(f"Invalid SciFact {tokenizer} cutoff summary at k={cutoff}")
+            score = summary.get("lexical_evidence_hit_lower_bound")
+            if (type(score) not in (int, float) or not math.isfinite(score)
+                    or not 0 <= score <= 1):
+                raise ValueError(f"Invalid SciFact {tokenizer} retrieval score at k={cutoff}")
+            if (type(item.get(field)) not in (int, float)
+                    or not math.isclose(item[field], score, rel_tol=0, abs_tol=1e-12)):
+                raise ValueError(f"SciFact comparison score disagrees with {tokenizer} report at k={cutoff}")
+
     # Recompute the quality gate; a matching hash does not prove arithmetic integrity.
     threshold = comparison.get("max_allowed_drop")
     if type(threshold) not in (int, float) or not math.isfinite(threshold) or not 0 <= threshold <= 1:
