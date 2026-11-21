@@ -55,9 +55,50 @@ def verify(directory, dataset=None):
         raise ValueError("Manifest lacks finalized SciFact output hashes")
     if not isinstance(inputs, dict) or set(inputs) != set(INPUTS):
         raise ValueError("Manifest lacks SciFact input hashes")
+    reports = {}
     for name in REPORTS:
         _check_hash(directory / name, outputs[name])
-        _read_object(directory / name)
+        reports[name] = _read_object(directory / name)
+
+    # Hashes alone cannot establish that the files are SciFact reports.
+    # Check the provenance and metric schema before declaring evidence valid.
+    for tokenizer in ("ascii", "unicode"):
+        report = reports[f"scifact-{tokenizer}.json"]
+        source = report.get("source")
+        evaluation = report.get("evaluation")
+        if (type(report.get("schema_version")) is not int
+                or report["schema_version"] != 1
+                or report.get("benchmark_scope") != "offline_lexical_bm25_positive_qrels_only"
+                or not isinstance(source, dict)
+                or source.get("source_sha256") != inputs
+                or not isinstance(evaluation, dict)):
+            raise ValueError(f"Invalid SciFact {tokenizer} report schema or provenance")
+        parameters = evaluation.get("parameters")
+        mode = (parameters.get("tokenizer") if isinstance(parameters, dict)
+                else evaluation.get("tokenizer_mode"))
+        expected = {"ascii": "ascii_alphanumeric", "unicode": "unicode_alphanumeric"}[tokenizer]
+        if mode not in (tokenizer, expected):
+            raise ValueError(f"Invalid SciFact {tokenizer} tokenizer")
+        if not isinstance(evaluation.get("by_top_k"), dict) or set(evaluation["by_top_k"]) != {"1", "3", "5", "10"}:
+            raise ValueError(f"Missing SciFact {tokenizer} cutoffs")
+
+    comparison = reports["scifact-comparison.json"]
+    by_k = comparison.get("by_top_k")
+    if (type(comparison.get("schema_version")) is not int
+            or comparison["schema_version"] != 1
+            or comparison.get("comparison_scope") != "same_source_beir_lexical_evidence_all_cutoffs"
+            or not isinstance(by_k, dict)
+            or set(by_k) != {"1", "3", "5", "10"}
+            or type(comparison.get("passed")) is not bool):
+        raise ValueError("Invalid SciFact comparison schema")
+    for cutoff, item in by_k.items():
+        if (not isinstance(item, dict)
+                or item.get("source_sha256") != inputs
+                or type(item.get("k")) is not int or item["k"] != int(cutoff)
+                or type(item.get("passed")) is not bool):
+            raise ValueError(f"Invalid SciFact comparison evidence at k={cutoff}")
+    if comparison["passed"] != all(item["passed"] for item in by_k.values()):
+        raise ValueError("SciFact comparison outcome disagrees with cutoff results")
     for key, value in inputs.items():
         if not isinstance(value, str) or len(value) != 64 or any(c not in "0123456789abcdef" for c in value):
             raise ValueError(f"Invalid input SHA-256 digest: {key}")
