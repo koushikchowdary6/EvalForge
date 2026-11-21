@@ -109,6 +109,23 @@ def verify(directory, dataset=None):
                 or type(item.get("k")) is not int or item["k"] != int(cutoff)
                 or type(item.get("passed")) is not bool):
             raise ValueError(f"Invalid SciFact comparison evidence at k={cutoff}")
+    # Recompute the quality gate; a matching hash does not prove arithmetic integrity.
+    threshold = comparison.get("max_allowed_drop")
+    if type(threshold) not in (int, float) or not math.isfinite(threshold) or not 0 <= threshold <= 1:
+        raise ValueError("Invalid SciFact comparison drop threshold")
+    for cutoff, item in by_k.items():
+        baseline = item.get("baseline_hit_lower_bound")
+        candidate = item.get("candidate_hit_lower_bound")
+        delta = item.get("delta")
+        allowed = item.get("max_allowed_drop")
+        if any(type(v) not in (int, float) or not math.isfinite(v) for v in (baseline, candidate, delta, allowed)):
+            raise ValueError(f"Invalid SciFact comparison scores at k={cutoff}")
+        if not (0 <= baseline <= 1 and 0 <= candidate <= 1 and allowed == threshold):
+            raise ValueError(f"Invalid SciFact comparison bounds at k={cutoff}")
+        if not math.isclose(delta, candidate - baseline, rel_tol=0, abs_tol=1e-12):
+            raise ValueError(f"Inconsistent SciFact comparison delta at k={cutoff}")
+        if item["passed"] != (baseline - candidate <= allowed + 1e-12):
+            raise ValueError(f"Inconsistent SciFact comparison gate at k={cutoff}")
     if comparison["passed"] != all(item["passed"] for item in by_k.values()):
         raise ValueError("SciFact comparison outcome disagrees with cutoff results")
     for key, value in inputs.items():
