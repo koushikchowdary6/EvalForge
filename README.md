@@ -87,6 +87,25 @@ not the authenticity of the dataset, the correctness of reported metrics, or
 independent SciFact performance. Preserve a trusted copy of the source
 fingerprints separately when sharing evidence.
 
+## Share a verified SciFact result as Markdown
+
+After completing the real-data run above, render a compact score table from the
+**verified** evidence bundle. This command does not download data, rerun
+retrieval, invent scores, or imply independent verification of dataset origin.
+
+```bash
+evalforge-report-scifact scifact-evidence --dataset /path/to/scifact --output scifact-results.md
+```
+
+The table reports the ASCII and Unicode BM25 conservative lexical evidence
+hit-rate lower bounds at k=1, 3, 5, and 10, plus the observed differences
+and the illustrative regression gate. It includes the operator-supplied
+source, acquisition date, and EvalForge revision. The optional `--dataset`
+rechecks the original input file hashes; without it only the completed
+bundle is verified. Output refuses to overwrite existing files. **Do not
+publish the generated table as a real SciFact benchmark unless the input
+data was genuinely acquired and evaluated.**
+
 ## Gate a local BEIR retrieval benchmark in CI
 
 After obtaining BEIR-format `corpus.jsonl`, `queries.jsonl`, and a qrels TSV
