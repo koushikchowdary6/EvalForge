@@ -1,947 +1,120 @@
 # EvalForge
 
-**Reproducible offline RAG retrieval evaluation and CI regression gates.** EvalForge offers installable Python CLIs for labeled-document retrieval benchmarks, dataset preflight, report validation, and comparison. The offline path needs **no API key or model call**.
+EvalForge is a Python toolkit for evaluating retrieval and, optionally, LLM and agent systems. The core offline path measures BM25 lexical retrieval on labeled document sets. It needs no API key and makes no model calls.
 
-> **Scope:** The included benchmarks measure BM25 lexical retrieval on small, hand-authored datasets. They do **not** measure generated-answer correctness, hallucination resistance, or production LLM/agent safety. No independent real-world benchmark or published PyPI release is claimed.
+The bundled benchmarks use small, hand-authored datasets. They measure lexical retrieval, not generated-answer correctness, hallucination resistance, or production LLM or agent safety.
 
-## Try it in two minutes
+Requires Python 3.10 or newer. Licensed under MIT.
 
-Python 3.10+:
+## Install
+
+From a clone:
+
+```bash
+git clone https://github.com/koushikchowdary6/EvalForge.git
+cd EvalForge
+python -m pip install -e ".[test]"
+```
+
+Or install the package directly from GitHub:
 
 ```bash
 python -m pip install "git+https://github.com/koushikchowdary6/EvalForge.git"
+```
+
+This installs the `evalforge-*` command-line tools. Provider-backed LLM and agent evaluation also needs API keys and the optional extra:
+
+```bash
+python -m pip install -e ".[providers]"
+```
+
+## Run the offline retrieval demo
+
+No API keys required:
+
+```bash
 evalforge-demo
 evalforge-bm25 --k 1 3 5 --summary-only
 ```
 
-For a reproducible JSON artifact and validation gate:
+Write a JSON report and check it against a hit-rate floor. The floor applies only to lexical evidence at k=3 on the bundled fixture. It is not a production acceptance threshold. Output commands refuse to overwrite an existing file.
 
 ```bash
 evalforge-demo --json --output evaluation.json
 evalforge-validate evaluation.json --min-hit-rate 0.50
 ```
 
-The optional hit-rate floor applies **only to lexical evidence at k=3 on the bundled fixture**; it is not a production acceptance threshold. Output commands refuse to overwrite existing files. Use new paths for subsequent runs.
-
-## Verify downloadable CI evidence
-
-The [offline evaluation demo workflow](https://github.com/koushikchowdary6/EvalForge/actions/workflows/offline-evidence-demo.yml) produces an `offline-evaluation-evidence` artifact containing three JSON reports and a SHA-256 manifest. Download and extract it, then verify its contents with the installed CLI:
+From a source checkout you can also run:
 
 ```bash
-evalforge-verify-evidence /path/to/extracted/offline-evaluation-evidence
-```
-
-A successful verification means the three JSON files match the manifest's hashes; a mismatch or malformed bundle exits with code 2. **This is an integrity check, not a digital signature or independent confirmation of benchmark quality.** Artifacts expire after 14 days, and the included dataset is hand-authored.
-
-## Run the SciFact reproducibility workflow
-
-The installed `evalforge-run-scifact` command orchestrates two **BM25 lexical**
-retrieval baselines (ASCII and Unicode tokenization), compares all four
-cutoffs (k=1, 3, 5, 10), and retains SHA-256 input provenance. It does **not**
-download SciFact, evaluate generated answers, or establish an independent
-benchmark result by itself.
-
-Obtain the BEIR SciFact dataset from its original publisher, check the
-applicable license, and extract it so the directory contains
-`corpus.jsonl`, `queries.jsonl`, and `qrels/test.tsv`. Then run:
-
-```bash
-mkdir scifact-evidence
-evalforge-run-scifact \
-  --dataset /path/to/scifact \
-  --output-dir scifact-evidence \
-  --evalforge-revision "$(git rev-parse HEAD)" \
-  --source-url "https://github.com/beir-cellar/beir" \
-  --download-date YYYY-MM-DD \
-  --max-drop 0.02
-```
-
-Replace `YYYY-MM-DD` with the actual acquisition date and `--source-url`
-with the **exact location used to obtain your dataset** (the URL above is a
-publisher-project reference, not proof of the download). The revision example
-assumes you are running inside an EvalForge checkout at the installed revision;
-for a Git URL installation, record the exact pinned commit SHA instead.
-The output directory must exist and be empty. On completion inspect
-`manifest.json`, `scifact-ascii.json`, `scifact-unicode.json`, and
-`scifact-comparison.json`. Exit 0 means the illustrative tokenizer comparison
-gate passed, 1 means it failed, and 2 indicates invalid inputs or execution
-errors. A failed gate is **not** evidence that the retrieval system is unsafe.
-Publish measured scores only after actually executing the benchmark and
-verifying the artifacts.
-
-## Verify a completed SciFact benchmark
-
-After running `evalforge-run-scifact`, independently check that its three
-reports still match the finalized manifest:
-
-```bash
-evalforge-verify-scifact scifact-evidence --dataset /path/to/scifact
-```
-
-The optional `--dataset` argument also re-hashes the original corpus, queries,
-and test qrels. Without it, only the three output reports and the recorded
-input-digest format are checked. Incomplete runs, missing reports, modified
-files, symlinks, and malformed JSON are rejected with exit code **2**.
-A successful verification confirms **integrity relative to the local manifest**,
-not the authenticity of the dataset, the correctness of reported metrics, or
-independent SciFact performance. Preserve a trusted copy of the source
-fingerprints separately when sharing evidence.
-
-## Share a verified SciFact result as Markdown
-
-After completing the real-data run above, render a compact score table from the
-**verified** evidence bundle. This command does not download data, rerun
-retrieval, invent scores, or imply independent verification of dataset origin.
-
-```bash
-evalforge-report-scifact scifact-evidence --dataset /path/to/scifact --output scifact-results.md
-```
-
-The table reports the ASCII and Unicode BM25 conservative lexical evidence
-hit-rate lower bounds at k=1, 3, 5, and 10, plus the observed differences
-and the illustrative regression gate. It includes the operator-supplied
-source, acquisition date, and EvalForge revision. The optional `--dataset`
-rechecks the original input file hashes; without it only the completed
-bundle is verified. Output refuses to overwrite existing files. **Do not
-publish the generated table as a real SciFact benchmark unless the input
-data was genuinely acquired and evaluated.**
-
-## Gate a local BEIR retrieval benchmark in CI
-
-After obtaining BEIR-format `corpus.jsonl`, `queries.jsonl`, and a qrels TSV
-from a source you are authorized to use, run:
-
-```bash
-evalforge-benchmark-beir \
-  --corpus corpus.jsonl --queries queries.jsonl --qrels qrels.tsv \
-  --k 1 3 5 --gate-k 5 --min-evidence-hit-rate 0.60 \
-  --output beir-evidence.json
-```
-
-The command exits **0** when the conservative positive-BM25-score hit-rate
-lower bound at k=5 meets the threshold, **1** when the quality gate fails,
-and **2** on invalid inputs or configuration. A failed quality gate still
-writes the JSON evidence report for debugging. The lower bound accounts for
-positive-score cutoff ties rather than crediting arbitrary document-ID order.
-Only queries with positive relevance judgments are scored; this is a lexical
-retrieval regression gate, **not** a claim about answer quality or a
-recommended universal threshold. Choose a threshold from your own baseline.
-
-## Compare two BEIR runs without mixing datasets
-
-Use the new installed `evalforge-compare-beir` command to check a
-retrieval baseline against a candidate run. It **refuses** to compare
-different source-file SHA-256 fingerprints, missing cutoffs, or mismatched
-query inclusion counts. Tokenizer changes are allowed, but both reports
-must use the same BEIR corpus, queries, and qrels.
-
-```bash
-evalforge-benchmark-beir --corpus corpus.jsonl --queries queries.jsonl \
-  --qrels qrels.tsv --tokenizer ascii --k 1 3 5 --output baseline.json
-evalforge-benchmark-beir --corpus corpus.jsonl --queries queries.jsonl \
-  --qrels qrels.tsv --tokenizer unicode --k 1 3 5 --output candidate.json
-evalforge-compare-beir baseline.json candidate.json --k 5 --max-drop 0.02
-```
-
-For reproducibility checks where the baseline and candidate are supposed to use
-the **same tokenizer**, add `--require-same-tokenizer`. This rejects accidental
-tokenizer drift with exit code **2** rather than reporting a misleading
-retrieval regression. Omit this flag when intentionally comparing ASCII and
-Unicode tokenization.
-
-```bash
-evalforge-compare-beir baseline.json candidate.json --all-k \
-  --require-same-tokenizer --max-drop 0.02
-```
-
-For a stricter CI check, **gate every reported cutoff** rather than selecting
-one favorable `k`. Both reports must contain the same nonempty set of cutoffs:
-
-```bash
-evalforge-compare-beir baseline.json candidate.json --all-k --max-drop 0.02 --output comparison.json
-```
-
-With `--output`, the comparator writes machine-readable evidence even when the
-quality gate fails (exit code 1). It refuses to overwrite an existing file;
-use a fresh artifact path for each run. Without `--output`, JSON is printed
-to stdout.
-
-The JSON output includes `by_top_k` results and fails if **any** cutoff
-regresses beyond the allowed absolute drop. This is a deterministic lexical
-regression check, not a statistical significance test. Each per-cutoff result
-retains the baseline and candidate scores and source fingerprints.
-
-The comparator emits a JSON summary with the conservative lexical hit-rate
-delta. Exit code **0** means no regression beyond the allowed absolute drop,
-**1** means a regression, and **2** means invalid or incomparable evidence.
-It does not compare embedding retrievers, generated answers, or safety
-outcomes. Reports are generated locally from data you supply; no independent
-benchmark scores are claimed.
-
-## What you can run
-
-| Installed CLI | Purpose |
-| --- | --- |
-| `evalforge-demo` | API-free quickstart and versioned JSON evidence |
-| `evalforge-bm25` | BM25 retrieval metrics at chosen k, including custom labeled datasets |
-| `evalforge-import-beir` | Convert locally obtained BEIR-style inputs into labeled EvalForge JSON |
-| `evalforge-benchmark-beir` | Evaluate locally obtained BEIR-style inputs directly with provenance and BM25 metrics |
-| `evalforge-compare-beir` | Compare conservative retrieval hit-rate reports on identical BEIR source files |
-| `evalforge-dataset-audit` | Dataset integrity and lexical label-coverage preflight |
-| `evalforge-custom-gate` | Dataset-aware lexical hit-rate CI gate |
-| `evalforge-custom-summary` | Human-readable Markdown from custom gate evidence |
-| `evalforge-validate` | Validate saved offline demo artifacts |
-| `evalforge-compare-artifacts` | Compare validated reports on identical fixtures |
-| `evalforge-compare-lexical` | Paired ASCII/Unicode tokenizer diagnostics |
-| `evalforge-report-md` | Export a Markdown summary of offline evidence |
-
-The bundled BM25 fixture contains **15 documents and 14 questions**. A second [customer-support example](examples/customer_support_corpus.json) is also hand-authored, not an independently sourced benchmark. See [custom dataset walkthrough](#evaluate-your-own-labeled-retrieval-dataset), [CI gate](#gate-a-custom-labeled-retrieval-dataset-in-ci), and [project status](#project-status). Provider-backed LLM/agent evaluations require configured credentials and are separate from these offline commands.
-
-## Benchmark locally obtained BEIR data
-
-The installed `evalforge-benchmark-beir` command evaluates a BEIR-style dataset directly without creating intermediate converted files. Supply your own legally obtained `corpus.jsonl`, `queries.jsonl`, and tab-separated `qrels/test.tsv`:
-
-```bash
-evalforge-benchmark-beir --corpus /path/to/corpus.jsonl \
-  --queries /path/to/queries.jsonl --qrels /path/to/qrels/test.tsv \
-  --k 1 3 5 --output beir-bm25-report.json
-```
-
-The JSON report contains BM25 lexical retrieval metrics, source-file SHA-256 fingerprints, and counts of excluded queries. Only queries with **positive qrels** are evaluated; unlabeled queries are excluded, never treated as unanswerable. The command does not download or redistribute benchmark data. This is a reproducible **lexical baseline**, not an LLM answer-quality, hallucination, or agent-safety measurement. No independent dataset scores are claimed until a real dataset is run and the result verified. The output file must not already exist.
-
-## Reproduce a benchmark on independent data
-
-The bundled fixtures are smoke tests, **not** evidence of real-world retrieval performance. To assess generalization, obtain a BEIR-format dataset from its original publisher under its applicable license. Keep the corpus, queries, and positive relevance judgments together, and record the dataset name, source URL, version or download date, split, and license alongside the resulting report.
-
-From a fresh installation, run the same dataset and cutoffs twice to check reproducibility:
-
-```bash
-python -m pip install "git+https://github.com/koushikchowdary6/EvalForge.git"
-evalforge-benchmark-beir --corpus /path/to/corpus.jsonl \
-  --queries /path/to/queries.jsonl --qrels /path/to/qrels/test.tsv \
-  --k 1 3 5 --output baseline-run-1.json
-evalforge-benchmark-beir --corpus /path/to/corpus.jsonl \
-  --queries /path/to/queries.jsonl --qrels /path/to/qrels/test.tsv \
-  --k 1 3 5 --output baseline-run-2.json
-```
-
-Check that both reports agree on input SHA-256 fingerprints, included/excluded query counts, and per-cutoff retrieval metrics. Use distinct output paths because the CLI deliberately refuses to overwrite existing reports. When comparing different retrieval systems, use the **same** data files, relevance labels, tokenizer policy, cutoffs, and query inclusion rules; otherwise score differences may reflect evaluation setup rather than model quality. Report the full per-cutoff metrics and excluded-query count, not only the best score. Do not publish source documents, queries, or detailed artifacts unless their license and privacy constraints allow it.
-
-This procedure has not yet been run against an independently sourced dataset in this repository. It measures a deterministic BM25 lexical baseline, **not** LLM answer quality or agent safety.
-
-## Evaluate your own dataset
-
-```bash
-git clone https://github.com/koushikchowdary6/EvalForge.git
-cd EvalForge
-python -m pip install -e .
-evalforge-dataset-audit --corpus examples/customer_support_corpus.json --questions examples/customer_support_questions.json --strict
-evalforge-custom-gate --corpus examples/customer_support_corpus.json --questions examples/customer_support_questions.json --k 3 --min-hit-rate 0.50 --output gate-evidence.json
-evalforge-custom-summary gate-evidence.json --output gate-summary.md
-```
-
-Custom corpora require `doc_id`, `title`, `text`; questions require `id`, `question`, `answerable`, and `relevant_doc_ids`. Answerable questions need at least one relevant document ID; unanswerable questions need none. Choose thresholds from representative labeled data, not from these synthetic fixtures. Detailed case exports may expose question text or document IDs; do not upload sensitive datasets to public CI artifacts.
-
-## Documentation and limitations
-
-- [Custom dataset evaluation](#evaluate-your-own-labeled-retrieval-dataset) and [CI gate](#gate-a-custom-labeled-retrieval-dataset-in-ci)
-- [Artifact comparison](#compare-two-offline-evaluation-runs) and [GitHub Actions evidence](#readable-github-actions-evidence-for-a-custom-retrieval-gate)
-- [Project status](#project-status) for provider-backed capabilities and limitations
-
-For source development, run `python -m pip install .` from the cloned repository. No PyPI release is published; `pip install evalforge-ai` is **not** a supported installation instruction for this repository.
-
-### Readable GitHub Actions evidence for a custom retrieval gate
-
-The installed `evalforge-custom-summary` command converts an existing
-`evalforge-custom-gate` JSON artifact into a small Markdown report containing
-the pass/fail result, observed versus required lexical hit rate and coverage,
-dataset SHA-256 fingerprints, and plain-English failure reasons. It rejects
-incompatible or malformed reports and refuses to overwrite an existing file.
-The [custom gate workflow](.github/workflows/custom-gate-demo.yml) publishes
-this report to the GitHub Actions job summary and retains the JSON and Markdown
-as artifacts.
-
-```bash
-evalforge-custom-gate --corpus examples/customer_support_corpus.json \
-  --questions examples/customer_support_questions.json \
-  --k 3 --min-hit-rate 0.50 --output gate-evidence.json
-evalforge-custom-summary gate-evidence.json --output gate-summary.md
-```
-
-This is a **lexical retrieval regression report**, not evidence of generated
-answer correctness, hallucination prevention, or production AI safety.
-
-### Preflight your labeled dataset before benchmarking
-
-The installed `evalforge-dataset-audit` command validates custom corpus/question JSON and reports deterministic SHA-256 fingerprints, label counts, unindexable documents, answerable queries without corpus-wide lexical overlap, and answerable queries with no token overlap in their **labeled relevant documents** (even if unrelated documents share query terms), and **tokenless questions** (including unanswerable labels that cannot be searched by the selected lexical tokenizer). It uses **no model API calls** and does not score retrieval accuracy or generated answers.
-
-```bash
-evalforge-dataset-audit --corpus examples/customer_support_corpus.json \
-  --questions examples/customer_support_questions.json --strict
-```
-
-The command prints machine-readable JSON. Exit code **0** means the dataset is structurally valid and (with `--strict`) no flagged lexical coverage problems were found, including labeled-document overlap and tokenless questions; **1** means strict coverage checks failed; **2** means invalid input. A clean preflight is **not** evidence of model quality, absence of data leakage, or semantic relevance. The `--tokenizer unicode` option uses a Unicode lexical baseline rather than the default ASCII tokenizer.
-
-### Evaluate your own labeled retrieval dataset
-
-The [customer-support corpus](examples/customer_support_corpus.json) and
-[labeled questions](examples/customer_support_questions.json) provide a second,
-small hand-authored fixture independent of the bundled security example. It
-includes four answerable queries and one deliberately unanswerable query.
-
-```bash
-evalforge-bm25 --corpus examples/customer_support_corpus.json \
-  --questions examples/customer_support_questions.json \
-  --k 1 3 --summary-only --output customer-support-report.json
-python -m pytest tests/test_customer_support_example.py -q
-```
-
-Each corpus entry needs `doc_id`, `title`, and `text`; each question
-needs `id`, `question`, `answerable` (boolean), and `relevant_doc_ids`
-(list of corpus IDs). Answerable questions need at least one relevant ID;
-unanswerable questions must have none. Run from the repository root after
-installation. Reports include dataset fingerprints and retrieval metrics,
-not generated answers. This synthetic fixture demonstrates custom dataset
-loading and validation; it is **not** a real-world generalization benchmark.
-Choose thresholds using separately collected, representative labeled data.
-
-### Gate a custom labeled retrieval dataset in CI
-
-The installed `evalforge-custom-gate` command combines dataset preflight and a BM25 lexical-evidence hit-rate threshold in one reproducible JSON report. It exits **0** for a passing gate, **1** for a failed quality/coverage gate (while still writing evidence), and **2** for invalid input or output errors. Reports refuse overwrite. It does not evaluate generated answers, hallucinations, or agent safety.
-
-```bash
-evalforge-custom-gate --corpus examples/customer_support_corpus.json \
-  --questions examples/customer_support_questions.json \
-  --k 3 --min-hit-rate 0.50 --output custom-gate.json
-```
-
-Set thresholds using your own representative labeled data, not this synthetic example. To prevent a misleading pass when a dataset contains too few labeled answerable queries, add `--min-answerable-questions N` (a nonnegative integer). The gate then fails with `insufficient_answerable_questions` in its machine-readable `failure_reasons`, even if the lexical score meets its threshold. The default of zero preserves existing behavior; set a meaningful minimum for your evaluation dataset. This is a dataset-size safeguard, not a statistical confidence guarantee. For negative-query coverage, add `--min-unanswerable-questions N` to require at least N labeled unanswerable questions. A dataset containing only answerable queries then fails with `insufficient_unanswerable_questions` rather than silently passing this coverage requirement. This counts negative examples; it does **not** measure abstention, refusal correctness, or hallucination resistance. The default is zero for backward compatibility. For label diversity, add `--min-distinct-relevant-docs N` to require at least N unique relevant document IDs across answerable questions; repeated questions labeled with the same document count only once. A failed gate reports `insufficient_distinct_relevant_documents` with observed and required counts, and optional GitHub Actions annotations. The default zero preserves existing behavior. This checks label coverage, not topical diversity, retrieval quality, or statistical independence. A zero-overlap relevant label fails the gate even if unrelated documents match the question. Add `--fail-on-ambiguous-ties` to reject positive-score BM25 ties at the requested cutoff that mix relevant and irrelevant documents. Such ties make top-k outcomes depend on deterministic but arbitrary document-ID ordering; the gate reports `ambiguous_relevance_cutoff_tie_count` even when this stricter option is off. This diagnostic is not semantic relevance or model-safety evaluation. The JSON contains corpus/question fingerprints, preflight warnings, and aggregate lexical retrieval metrics.
-
-For debugging individual retrieval misses, add `--include-cases` to include the evaluator's per-question, per-cutoff evidence in the JSON report. The default stays compact and retains its existing schema fields; this option is intended for local inspection or CI artifacts and may reveal question text or document IDs from your dataset. Do not upload sensitive datasets or detailed reports to public CI artifacts.
-
-In GitHub Actions, add `--github-annotations` to emit actionable `::error` diagnostics on stderr when the custom gate fails. The JSON evidence still goes to `--output` (or stdout), and exit codes are unchanged. Dataset IDs are escaped before becoming workflow commands. Upload the JSON report with `if: always()` so failed gates remain inspectable. This is an **opt-in** integration, not a guarantee that a lexical baseline measures LLM quality.
-
-### Export a human-readable benchmark summary
-
-Generate a Markdown table from a validated offline JSON artifact for a pull request, release notes, or a recruiter-facing demo. The reporter includes dataset SHA-256 provenance and explicitly labels lexical metrics; it does not claim to evaluate generated answers or model safety.
-
-```bash
-evalforge-demo --json --output evaluation.json
-evalforge-report-md evaluation.json --output evaluation-summary.md
-```
-
-The installed `evalforge-report-md` command rejects invalid artifacts and refuses to overwrite an existing summary. Omit `--output` to print Markdown to stdout. It requires no provider API keys.
-
-### Compare two offline evaluation runs
-
-Use the installed `evalforge-compare-artifacts` command to detect lexical retrieval regressions across two reports from **identical datasets**:
-
-```bash
-evalforge-compare-artifacts baseline.json candidate.json --tolerance 0.01 --output comparison.json
-```
-
-For GitHub Actions, add `--github-annotations` to emit `::error` annotations for each regressed BM25 cutoff **and** a failed `--min-hit-rate` floor (even when the candidate is unchanged) on stderr while retaining machine-readable JSON on stdout (or in `--output`). This flag is opt-in and has no effect on the regression exit codes. For example, `evalforge-compare-artifacts baseline.json candidate.json --github-annotations --output comparison.json` can be followed by an artifact-upload step configured with `if: always()` so failed-gate evidence remains inspectable.
-
-Exit code 0 means no BM25 lexical evidence hit-rate regression greater than the tolerance at k=1, 3, or 5; exit code 1 means a regression; exit code 2 means invalid or incomparable input. The command prints machine-readable JSON deltas by default, or writes them to a new file with `--output` (refusing overwrite). It saves the report even when the quality gate detects a regression (exit code 1), so CI can upload the failure evidence. It refuses comparisons when dataset fingerprints or question counts differ. The paired Unicode-minus-ASCII recall delta is reported as a diagnostic only, **not** treated as a quality score. The JSON output includes `absolute_scores` (baseline and candidate values for each metric and cutoff), `metric_deltas`, the applied `tolerance`, and dataset provenance so CI reviewers can audit the decision without reconstructing values from separate artifacts. These are small offline lexical fixtures, not production RAG or LLM safety measurements.
-
-### Run the verified two-benchmark quickstart
-
-For a single, API-free smoke test of the **installed package**, clone the repository and run the same public example exercised by the Python 3.10–3.12 GitHub Actions matrix:
-
-```bash
-git clone https://github.com/koushikchowdary6/EvalForge.git
-cd EvalForge
-python -m pip install .
+python -m evalforge.offline_rag_demo --k 1 3 5 --summary-only
 python examples/quickstart_demo.py
+python -m pytest -q
 ```
 
-The script invokes both the BM25 retrieval CLI and the paired ASCII/Unicode comparison, validates the compact JSON reports and SHA-256 dataset fingerprints, and prints a short summary. Reports live only in a temporary directory. It requires no API keys or paid model calls. [Read the demo source](examples/quickstart_demo.py) or [inspect the passing CI run](https://github.com/koushikchowdary6/EvalForge/actions/runs/43613086707). A passing demo validates packaging and deterministic lexical evaluation on small hand-authored fixtures; it does **not** establish production retrieval quality, LLM correctness, or hallucination resistance.
+`evalforge-bm25` reports ranked document IDs plus precision@k, recall@k, nDCG@k, AP@k, MRR, and hit rate on the bundled 15-document, 14-question set. These are lexical retrieval measurements, not LLM accuracy claims.
 
-### Try the offline benchmark first
+## Evaluate your own labeled dataset
+
+Custom corpora need `doc_id`, `title`, and `text`. Questions need `id`, `question`, `answerable`, and `relevant_doc_ids`. Answerable questions need at least one relevant document ID; unanswerable questions need none.
 
 ```bash
-git clone https://github.com/koushikchowdary6/EvalForge.git
-cd EvalForge
-python -m pip install -r requirements.txt
-python -m evalforge.offline_rag_demo --k 1 3 5
+evalforge-dataset-audit \
+  --corpus examples/customer_support_corpus.json \
+  --questions examples/customer_support_questions.json \
+  --strict
+evalforge-custom-gate \
+  --corpus examples/customer_support_corpus.json \
+  --questions examples/customer_support_questions.json \
+  --k 3 --min-hit-rate 0.50 \
+  --output gate-evidence.json
+evalforge-custom-summary gate-evidence.json --output gate-summary.md
 ```
 
-**For CI or a compact benchmark artifact**, omit the per-question records while retaining aggregate metrics, dataset fingerprints, tokenizer diagnostics, and coverage warnings:
+Choose thresholds from your own labeled data, not from these example fixtures. Do not upload sensitive datasets to public CI artifacts.
 
-```bash
-python -m evalforge.offline_rag_demo --k 1 3 5 --summary-only > benchmark-summary.json
-python -m evalforge.offline_rag_demo --k 1 3 5 --tokenizer unicode --summary-only > benchmark-unicode-summary.json
-python -m pytest tests/test_offline_rag_demo.py tests/test_offline_rag_evidence_metrics.py -q
-```
+## SciFact and BEIR
 
-The `--summary-only` flag removes the top-level `cases` array; it **does not** remove aggregate warnings or turn lexical retrieval scores into claims about LLM answer correctness. Compare reports only with matching corpus/question fingerprints, tokenizer settings, and top-k values. The bundled small, security-themed dataset is a demonstration fixture, not an external generalization benchmark.
+EvalForge can import and run a local BEIR SciFact directory (`evalforge-import-beir`, `evalforge-benchmark-beir`, `evalforge-run-scifact`, `evalforge-verify-scifact`, `evalforge-compare-beir`). The SciFact corpus is not bundled, and this repository does not contain a completed SciFact benchmark report. SciFact support exists, but it has not been benchmarked here yet. See `docs/REAL_BEIR_SCIFACT.md` for how to obtain the dataset and run it yourself.
 
-**What you get:** ranked document IDs, precision/recall@k, nDCG, average precision, MRR, hit rate, lexical-evidence diagnostics, and dataset SHA-256 fingerprints on the bundled 15-document / 14-question security benchmark. These are **lexical retrieval measurements**, not LLM accuracy claims. To verify the offline path, run `python -m pytest tests/test_offline_rag_demo.py tests/test_offline_rag_evidence_metrics.py -q`.
+## Other commands
 
-**Explore next:** [retrieval methodology](docs/PAIRED_LEXICAL_COMPARISON.md) · [multilingual fixture limitations](docs/MULTILINGUAL_LEXICAL_BASELINE.md) · [full project status and provider-backed setup](#project-status).
+These CLIs are also installed with the package:
 
+- `evalforge-compare-lexical` compares ASCII and Unicode lexical BM25 baselines
+- `evalforge-compare-artifacts` compares two saved offline evaluation reports
+- `evalforge-report-md` writes a markdown summary of a report
+- `evalforge-verify-evidence` checks a downloaded CI evidence bundle against its SHA-256 manifest (integrity only, not a signature or a quality judgement)
 
-**Reproducible multilingual lexical sanity check:** A small, hand-authored
-[English/Hindi/Japanese/Arabic/accented-French BM25 fixture](docs/MULTILINGUAL_LEXICAL_BASELINE.md)
-compares ASCII and Unicode tokenization using evidence-only retrieval metrics,
-with regression tests and dataset fingerprints. It is not independent sampling,
-translation, embedding evaluation, or a claim of deployment accuracy.
+## Results from committed runs
 
+The numbers below come from scripts and output files already in this repository. They are small, hand-authored evaluations, not independent public benchmarks. Reproduce them by running the same scripts.
 
-EvalForge also contains provider-backed LLM and agent evaluation experiments. Those paths require configured credentials and are separate from the deterministic, API-free lexical benchmark shown above.
+**LLM evaluation** (`python main.py`, output in `results/report.json`): 19 test cases, Claude Haiku 4.5 vs GPT-4o-mini, 38 evaluations total.
 
-## What is EvalForge?
+| Model | Exact match | Rule-based | LLM judge |
+| --- | --- | --- | --- |
+| Claude | 0.0% | 57.9% | 68.4% |
+| GPT | 0.0% | 47.4% | 68.4% |
 
-EvalForge automates the evaluation of AI systems. Instead of manually checking whether an LLM answered correctly, whether an agent used the right tools, or whether a RAG system found the right information, EvalForge does it for you — fast, consistently, and repeatably.
+This path needs provider API keys.
 
-Think of it like a grading system for AI homework. You write the test questions, tell EvalForge what correct answers look like, and it runs the tests against different models, grades the results, and tells you which models performed best and why others failed.
+**RAG evaluation** (`python main_rag.py`, output in `results/rag_report.json`): a 3-question, k=3 smoke run, not the full 14-question top-k sweep the harness can run. At k=3 the committed report records precision@3 of 44.4%, recall@3 of 100%, MRR of 1.0, and hit rate of 1.0. This path also needs API keys.
 
-## Why does evaluation matter?
+**Agent evaluation** (`python main_agent.py`, output in `results/agent_report.json`): a 6-task injection-resistance ablation with the injection-defense prompt disabled. It is not a result from the full 24-task suite. This path also needs API keys.
 
-- **Iteration**: Re-run the same prompt/model test cases automatically; speedups depend on the model, dataset, and judge configuration
-- **Confidence**: Know which changes actually improved your system (vs. gut feeling)
-- **Reproducibility**: Versioned test cases and deterministic rule-based graders support repeatable comparisons; LLM judges can still vary and inherit bias
-- **Debugging**: Understand *why* something failed, not just that it did
+If a metric is not in these files, it is not a reported result of this project.
 
-## Project Status
+## Limitations
 
-**v0.2**: LLM evaluation (dual-model: Claude vs GPT)
-- Real LLMJudgeGrader with actual Anthropic/OpenAI API calls
-- Dual-model comparison on 19 test cases
-- RuleBasedGrader with stopword filtering
-- 14 comprehensive unit tests
-
-**v0.3**: RAG evaluation (retrieval + generation; full benchmark suite implemented, tracked artifact below is a smoke run)
-- Security-themed 15-document corpus, 14 questions (incl. 2 unanswerable)
-- Embedding cache + cosine similarity (zero new dependencies)
-- Retrieval metrics: precision@k, recall@k, **nDCG@k**, **MAP@k**, MRR, hit rate
-- LLM-judged correctness and groundedness; hallucination detection via abstention
-- Top-k sweep support across k=1,3,5 to quantify precision/recall tradeoffs; precision@k uses the requested k as its denominator, including when fewer documents are returned
-- Binary-relevance nDCG@k discounts lower-ranked evidence, counts repeated document IDs only once, and is included in per-case JSON, aggregate reports, and the terminal summary; unanswerable cases are excluded from retrieval averages
-- Binary average precision at k (AP@k) measures precision at each newly found relevant document; duplicate hits consume rank slots without earning credit, and missed relevant documents reduce the denominator-normalized score. The report averages AP@k over answerable queries as MAP@k, excluding retrieval failures and unanswerable cases.
-- 38 comprehensive unit tests
-
-**v0.4**: Agent evaluation (tool-calling + safety; full task suite implemented, tracked artifact below is an ablation run)
-- 24 tool-calling tasks over 5 categories: single-tool, multi-tool, no-tool, destructive-refusal, injection-resistance
-- Trajectory grading: unsafe paths fail even with correct answers
-- **Tool-sequence accuracy**: measures whether expected tools were called in the required order, separately from set-based tool-selection accuracy; per-category and overall summaries exclude provider errors
-- Safety metrics: injection resistance, destructive refusal, unnecessary call rate
-- Failure categorization: 6 categories with safety violations ranked first
-- Token-based cost estimation (Claude vs GPT pricing)
-- Ablation: measures whether injection-defense system prompt has measurable effect
-- 58 comprehensive unit tests
-
-**v1.0 (Planned)**: Multi-agent systems, advanced safety evaluations.
-
-## Quick Start
-
-```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Create a .env file with your API keys
-echo "ANTHROPIC_API_KEY=your_key_here" > .env
-echo "OPENAI_API_KEY=your_key_here" >> .env
-
-# Run an evaluation
-python main.py
-```
-
-## Five-minute API-free retrieval demo
-
-To inspect real benchmark outputs **without API keys or paid model calls**:
-
-```bash
-pip install -r requirements.txt
-python -m evalforge.offline_rag_demo --k 1 3 5
-python -m pytest tests/test_offline_rag_demo.py tests/test_offline_rag_evidence_metrics.py -q
-```
-
-This deterministic **lexical BM25 baseline** reads the bundled 15-document
-corpus and 14-question RAG benchmark. It ranks documents by keyword
-statistics (k1=1.2, b=0.75), then reports per-question retrieved IDs and
-precision@k, recall@k, nDCG@k, AP@k, MRR, and hit rate using EvalForge's
-existing retrieval graders. It includes dataset SHA-256 fingerprints and
-excludes the two unanswerable questions from retrieval-quality averages.
-The CLI rejects duplicate JSON object keys (including nested metadata) and
-non-standard `NaN`/`Infinity` values rather than silently changing labels or
-publishing scores from ambiguous benchmark inputs.
-The offline evaluator uses the same visible, NFC-normalized, 256-character
-benchmark identifier contract as the embedding-backed RAG and agent evaluators.
-It rejects hidden Unicode controls, ambiguous non-NFC IDs, and oversized join
-keys before ranking or scoring. This validates identifier integrity, not the
-factual correctness of corpus evidence or relevance labels.
-
-The JSON report also exposes `lexical_positive_document_count` and
-`all_zero_score_ranking` for each case, plus separate zero-overlap counts for
-answerable and unanswerable questions at each cutoff. **Important:** BM25
-still returns all corpus IDs in score order, even when every score is zero;
-those IDs are deterministic tie-breaks, not evidence that the documents
-support the question. Use the diagnostics to spot unsupported retrieval and
-avoid mistaking arbitrary zero-score rankings for meaningful matches.
-
-To quantify this limitation, the report also supplies
-`positive_score_retrieved_ids` and `lexical_evidence_metrics` for each
-answerable case. The summary separates `lexical_evidence_hit_rate`,
-`lexical_evidence_recall_at_k`, `lexical_evidence_mrr`,
-`lexical_evidence_precision_at_k`, `lexical_evidence_ndcg_at_k`, and
-`lexical_evidence_average_precision_at_k` from the legacy
-all-ranked-ID metrics. `tie_only_hit_count` counts cases where a legacy
-hit came solely from zero-score documents. These are **lexical-overlap
-diagnostics**, not proof that matched documents are factually relevant; the
-original retrieval metrics remain unchanged for comparison.
-
-For **unanswerable** questions, the report records `unanswerable_positive_lexical_match`
-per case and summarizes its count and rate with
-`unanswerable_positive_lexical_match_count` and
-`unanswerable_positive_lexical_match_rate`. A positive BM25 score means some
-query token matched a document; it does **not** prove relevance,
-answerability, or an LLM hallucination. The rate is JSON `null` when no
-unanswerable questions are present. These are abstention diagnostics, not a
-measured hallucination rate.
-
-For a benchmark containing **only unanswerable questions**, the report keeps
-per-case rankings, zero-overlap counts, provenance hashes, and excluded-case
-coverage, but sets answerable-only retrieval-quality averages to JSON `null`
-instead of reporting zero accuracy or failing with a division-by-zero error.
-A `null` metric means *undefined because no answerable cases were evaluated*,
-not a successful or failed retrieval result.
-
-The output is a **retrieval-only baseline**, not an embedding model,
-generated-answer evaluation, or evidence of model correctness, groundedness,
-hallucination resistance, or production performance. Compare the same
-question/corpus hashes and top-k settings before contrasting this baseline
-with a provider-backed embedding run. Lexical tokenization is ASCII
-alphanumeric and may miss multilingual/semantic matches. The report now
-exposes `tokenizer_diagnostics` (queries with no ASCII tokens or with
-non-ASCII alphanumeric characters), per-case `query_ascii_token_count`,
-`query_has_no_ascii_tokens`, and `query_contains_non_ascii_alphanumeric`,
-and answerable/unanswerable no-ASCII-token counts by cutoff. These reveal
-when multilingual or mixed-script questions fall outside the baseline's
-lexical coverage; they do not change rankings or measure multilingual model
-performance. Tied rankings are ordered by document ID; no network or model
-calls occur. For positive-score BM25 ties, the report computes exact
-evidence-only **hit@k, precision@k, recall@k, nDCG@k, AP@k, and MRR
-lower/upper bounds** over possible equal-score orders. AP@k, MRR, and nDCG
-can vary even when a tie lies entirely *inside* top-k; a cutoff-tie flag
-alone misses this uncertainty. AP bounds use relevant-first/relevant-last
-permutations within each equal-score block and are checked against exhaustive
-small-ranking permutations in CI. Per-case bounds and answerable-only aggregate bounds appear in
-`by_top_k`, with metric-specific uncertainty-case counts. Zero-score IDs
-never count as lexical evidence. These deterministic tie-order bounds do
-**not** measure statistical confidence, semantic relevance, LLM answer
-quality, or independent benchmark validity.
-
-### Paired lexical retrieval audit
-
-Run `python -m evalforge.compare_lexical_baselines --k 1 3 5` for a
-**same-corpus, same-label** ASCII-versus-Unicode BM25 comparison. The
-deterministic JSON records per-query evidence-only recall changes, paired
-hit-rate deltas, both improvements **and regressions**, unanswerable lexical
-matches, and SHA-256 dataset fingerprints. It uses the hand-authored
-multilingual fixture by default; results are **not** independent model-accuracy
-or statistical-significance claims. See
-[the paired audit methodology](docs/PAIRED_LEXICAL_COMPARISON.md).
-
-### Opt-in Unicode lexical BM25 baseline
-
-The default offline demo retains its original **ASCII** tokenizer and existing
-benchmark output semantics. To compare a Unicode-aware **word-token** baseline
-on the exact same corpus and question labels:
-
-```bash
-python -m evalforge.offline_rag_demo --tokenizer ascii --k 1 3 5
-python -m evalforge.offline_rag_demo --tokenizer unicode --k 1 3 5
-```
-
-The opt-in `unicode` mode applies Unicode case-folding and NFC normalization,
-then matches Unicode alphanumeric word sequences. It can recover lexical
-overlap for identical Japanese strings or canonically equivalent accented
-words that the ASCII baseline drops. The report records the selected tokenizer
-in `parameters.tokenizer`, selected-token counts per question, and
-`selected_tokenizer_diagnostics`; corpus/question SHA-256 hashes remain
-comparable across modes. The original ASCII coverage diagnostics are retained
-to make legacy comparisons explicit.
-
-The `corpus_lexical_equivalence` report section identifies different document
-IDs with **identical BM25 token-count multisets** under the selected tokenizer.
-Such documents always receive equal BM25 scores; `answerable_cases_with_partial_equivalence_labels`
-flags questions that label only part of an indistinguishable group relevant.
-This is an audit of possible label/tie-break bias, **not** proof of duplicate
-source documents or train/test leakage. The audit does not alter rankings,
-relevance labels, or reported retrieval metrics.
-
-**Limitations:** This is still deterministic BM25 keyword matching, not
-language identification, morphological analysis, translation, CJK word
-segmentation, semantic retrieval, or an LLM evaluation. Longer CJK phrases
-may not match substrings. Any improvement on the tiny bundled benchmark is
-not evidence of multilingual production performance; use independent,
-labeled datasets before making effectiveness claims.
-
----
-
-## Reproducible embedding evaluation
-
-RAG embedding cache keys are SHA-256 digests of the **embedding model
-and input text**, rather than raw document/query strings. This prevents
-plaintext corpus content from appearing in JSON cache keys while still
-avoiding cross-model vector reuse. Existing plaintext-key cache entries are
-ignored; delete old `results/embedding_cache.json` files to remove previously
-written plaintext, or run a fresh evaluation and save the migrated cache.
-Re-embedding discarded entries requires a configured OpenAI API key.
-
-**This is not encryption:** predictable text may be guessed from its hash, and
-the embedding vectors themselves may be sensitive. Protect cache files with
-appropriate filesystem permissions and do not commit them. Offline tests
-cover cache hits, model isolation, legacy-key rejection, and non-disclosure of
-raw text in newly written keys. Embedding API responses must contain exactly
-one result for the single requested input (with index 0, when supplied);
-missing, duplicate, or misindexed results fail before entering the cache or
-retrieval ranking. These response-contract tests use mocked providers and do
-not claim any measured production failure rate.
-
----
-
-## Embedding request preflight
-
-Each RAG document is validated as **title + newline + text** before an index
-build starts. Inputs over **12,000 characters**, blank/invisible-only strings,
-and invalid Unicode surrogates are rejected before cache lookup or a paid
-embedding request. The same boundary applies to direct embedding calls and
-queries, including when a custom embedding client is supplied. Invalid corpus
-reloads preserve the previous in-memory corpus/index.
-
-This is a conservative character-based resource guard, **not** a provider
-token-count guarantee or proof of model accuracy. A larger corpus may require
-chunking documents rather than raising the limit. Offline regression tests
-exercise oversized later documents, query validation, cache/API non-use, and
-last-good index preservation.
-
-## Bounded RAG generation and judge evidence
-
-The RAG generator rejects malformed JSON evidence (including non-finite
-numbers, circular values, and incomplete document records) and serialized
-question/document payloads above **40,000 characters**, *before* a paid
-generation API call. These become generation errors excluded from answer
-quality metrics, not model failures or hallucinations. API-free tests cover
-both providers and valid small requests.
-
-Separately, correctness and groundedness judges reject serialized untrusted
-evidence above **40,000 characters** before making a paid judge API call.
-These cases are **unscored** (`score: null`, `parse_ok: false`) rather than
-silently truncating documents or assigning a low-quality grade. Aggregate
-coverage must be considered alongside scores. Both limits are practical
-character-based resource guards, **not** guarantees that shorter prompts fit
-every provider's context window.
-
-## RAG benchmark provenance
-
-Newly generated RAG summary reports include a `benchmark_provenance` object
-with SHA-256 fingerprints of the **validated, parsed** corpus and question
-datasets, plus the embedding and judge model identifiers. The fingerprints
-use canonical JSON (sorted object keys, preserved array order), so changing
-JSON indentation does not make the benchmark appear new, but editing evidence,
-case labels, or case order does. Failed validation or index construction
-cannot retain a previous dataset's fingerprints.
-
-Compare these identifiers alongside the generation model and top-k settings
-before attributing score changes to an AI system. Hashes are identifiers,
-**not proof of ground-truth quality, model determinism, or data secrecy**.
-Historical tracked reports predate this feature and must not be retroactively
-described as provenance-verified.
-
-## RAG rate uncertainty and coverage
-
-New RAG reports include **95% Wilson score intervals** for three binary rates:
-`retrieval.hit_rate_95ci`, `hallucination.hallucination_rate_95ci`, and
-`hallucination.over_abstention_rate_95ci`. Retrieval hit rate uses answerable
-questions with successful retrievals; unanswerable cases and retrieval
-failures do not enter that denominator. Hallucination rate uses unanswerable
-questions with a completed, nonempty generation. Over-abstention rate uses
-answerable questions with a completed, nonempty generation. Retrieval outages,
-generation errors, and empty answers are tracked separately and never counted
-as successful safety outcomes. Every rate has an explicit evaluated count;
-with zero eligible samples, its interval is `null` rather than an invented
-precision estimate.
-
-These intervals describe sampling uncertainty **under an independent-query
-assumption**. They do not guarantee performance on correlated questions,
-dataset shifts, mislabeled ground truth, or real-world safety. The small
-bundled benchmark is illustrative, not evidence of production performance.
-Offline tests cover zero, perfect, and partial rates, failed runs, and
-zero-coverage cases.
-
-## Paired top-k retrieval diagnostics
-
-New RAG reports include `paired_retrieval_comparisons` for every pair in a
-top-k sweep (for example, `1_to_3`). Each comparison matches the **same
-answerable question ID** at both cutoffs, then counts improved, regressed,
-and unchanged retrieval **hit rate** and **recall@k**. Case IDs with regressions
-are included for debugging. Missing, duplicated, unanswerable, failed, or
-invalid retrieval measurements are excluded and counted separately.
-
-Increasing k should not reduce recall for a stable ranked retrieval list, so
-regressions help identify inconsistent retrieval adapters or changing
-rankings. These are paired **descriptive diagnostics**, not statistical
-significance tests or claims of production accuracy. No generation/judge
-calls are needed to calculate the comparisons.
-
-## RAG corpus integrity
-
-Corpus JSON is decoded with duplicate-key rejection at every object depth.
-Without this check, standard JSON decoding silently takes the last value for
-repeated `doc_id`, `title`, or `text` keys, making retrieved evidence and
-evaluation results ambiguous. Corpus titles and document text must contain
-visible characters and valid Unicode: lone UTF-16 surrogates and invisible-only
-evidence fail at load time, before embedding or cache writes. Visible Unicode
-and adversarial text containing hidden controls remain supported for security
-evaluations. An invalid reload preserves the last-good in-memory corpus/index.
-This is an offline input-integrity control, not validation of whether the
-corpus evidence is factually correct.
-
-## RAG prompt-injection trust boundaries
-
-Retrieved documents and generated answers can contain adversarial text. The
-RAG generator now sends explicit untrusted-context rules in the **system**
-message for both Claude and GPT, rather than relying only on instructions
-embedded in the same user prompt as the retrieved content. The LLM judge
-likewise receives a higher-priority instruction to treat documents and model
-answers as evidence, not grading directives. API-free regression tests verify
-that these boundaries are present in both providers' request payloads.
-
-These controls are **defense in depth, not proof of prompt-injection immunity**.
-The project does not claim measured attack resistance without an adversarial
-benchmark and actual model-run results.
-
-## Agent benchmark input budgets
-
-Agent task prompts and simulated tool/retrieval responses are capped at **40,000
-characters per field**. Dataset validation rejects oversized evidence before
-creating a provider client or sending a paid evaluation request, including when
-an in-memory task list is changed after loading. Invalid reloads clear previous
-benchmark state. The bundled task dataset remains compatible.
-
-These are conservative **character** limits for cost and memory safety, not
-provider token limits, a prompt-injection defense, or proof that an otherwise
-valid request fits a particular model context. Large evidence should be
-chunked into deliberate test cases rather than silently truncated, since
-truncation can change the attack or grading ground truth. Offline tests cover
-exact boundaries, one-character overflow, and no-provider-call behavior.
-
-## Agent benchmark label validation
-
-The agent runner validates the complete task dataset **before** initializing
-a model client or sending paid requests. It rejects duplicate/empty case IDs,
-missing prompts, malformed tool lists and argument maps, and contradictory
-expected/forbidden tool labels. Injection-resistance and destructive-refusal
-cases must name at least one forbidden tool; otherwise a benchmark could
-report a misleading 100% safety rate without checking any prohibited action.
-
-For repeated tool calls, `expected_args` can specify a list of argument
-objects in invocation order, one per expected occurrence. This prevents two
-identical calls from receiving full argument credit when the benchmark expects
-different recipients, queries, or other action targets. Existing single-object
-argument expectations remain backward compatible. Validation rejects
-mismatched list lengths, unknown tool-parameter names, empty expectations,
-and non-string argument labels before any model/API requests. This prevents
-a benchmark typo from being misreported as an agent's argument failure.
-
-Validation also runs when a previously loaded task list is evaluated, and
-failed reloads clear stale benchmark state. The bundled 24-task dataset and
-malformed-label cases are covered by offline regression tests.
-
-## Agent tool-call precision and recall
-
-New agent reports include count-aware `tool_call_precision` and
-`tool_call_recall` in each graded trajectory and in overall/per-category
-summaries. Repeated calls are counted, not deduplicated: a second unnecessary
-email lowers precision; a missing second required lookup lowers recall.
-A no-tool task with no calls scores 100% on both metrics, while an agent
-that calls nothing when a tool was required scores 0% on both. When no
-calls are expected, recall is vacuously 100% even if the agent makes extra
-calls; precision and the existing unnecessary-call metric capture those.
-
-The original `tool_call_precision` and `tool_call_recall` are
-**macro-averages**: each completed trajectory contributes equally. New
-`tool_call_micro_precision` and `tool_call_micro_recall` pool matched,
-predicted, and required tool-call counts across completed trajectories.
-This exposes missed or repeated invocations on longer workflows that a
-macro-average can hide. Reports include the pooled counts and evaluated-case
-coverage, both overall and by category. A benchmark consisting entirely of
-successful no-tool decisions has 100% micro precision/recall; a category with
-only provider errors reports `null`, not 100%.
-
-**Tool-call F1:** Each completed trajectory now includes `tool_call_f1`,
-the harmonic mean of its count-aware precision and recall. The overall and
-per-category **macro F1** averages these per-trajectory F1 values; it is
-not the harmonic mean of macro precision and macro recall. The
-`tool_call_micro_f1` field is the harmonic mean of pooled micro precision
-and recall, weighting longer workflows by their observed/required calls.
-Zero matched calls yield F1=0 unless both predicted and required calls are
-empty (F1=1); provider failures remain `null` and are excluded from both
-aggregates. These are diagnostic metrics, not proof of correct tool ordering,
-argument values, or safe execution.
-
-Provider errors are excluded from both micro and macro rates and counted
-separately. Micro rates are call-weighted, not independent safety or model
-quality estimates. A correct tool set executed in the wrong order still has
-100% precision/recall but fails the sequence grader. The tracked historical
-agent ablation report predates these fields and has not been recalculated.
-
-## Agent cost measurement coverage
-
-Agent cost figures are **static token-based estimates**, not provider invoices.
-A run is priced only when both input and output token counts are present,
-including explicit zero counts. If any OpenAI round-trip omits usage, the
-trajectory remains gradable but its cost is **unavailable**, rather than
-silently treating the missing tokens as zero. Reports expose cost coverage,
-observed partial spend, and a full total only when every task has a measured
-estimate. A provider outage may still leave partial observed spend.
-
-The tracked historical agent ablation report predates this missing-usage
-contract and has **not** been rerun or retroactively recalculated. Model
-pricing and provider billing may change independently of these estimates.
-
-## Evaluation Methodology
-
-EvalForge uses **three independent grading methods** to triangulate response quality:
-
-1. **Exact Match**: Binary pass/fail on word-for-word comparison (case-insensitive). Best for factual recalls ("capital of Australia" → "Canberra"). Fails for elaborated answers.
-
-2. **Rule-Based**: Flexible scoring that extracts key concepts (nouns, verbs, important adjectives) from the expected answer and checks if the model's response contains them. Filters common stopwords to avoid penalizing for articles/prepositions. Better for real-world answers that elaborate.
-
-3. **LLM Judge**: Makes real API calls (Claude or GPT) with a category-specific rubric (factual/reasoning/instruction-following). The judge grades quality on a 0-10 scale converted to 0-1. Most sophisticated but slower and costlier.
-
-### General-purpose LLM judge coverage (current runner)
-
-The general LLM judge now marks each grade with `parse_ok`. Malformed,
-truncated, unavailable, or provider-error judgments are **missing measurements**,
-not failed model answers. In new `results/report.json` summaries,
-`llm_judge.evaluated` counts valid grades, `unavailable` counts missing
-grades, and the pass rate uses **evaluated**, not total cases, as its
-denominator. When no valid judge result exists, `pass_rate` is `N/A`
-rather than a misleading 0%. Exact-match and rule-based rates still use
-all completed model responses.
-
-General judge evidence is JSON-serialized with non-finite values rejected
-and capped at **40,000 characters** before paid requests. Invalid evidence
-is marked `parse_ok: false`; it is not a model-quality measurement. This
-limit is a resource guard, not a guarantee of provider context-window fit.
-The tracked v0.2 historical report below predates these coverage fields;
-its numbers have **not** been retroactively recomputed.
-
-## Results (v0.2) — Claude vs GPT
-
-Ran a head-to-head evaluation of **Claude Haiku 4.5** and **GPT-4o-mini** on the same 19 test cases (38 total evaluations). All numbers come from an actual `python main.py` run committed to `results/report.json` — reproduce them yourself.
-
-| Grader | Claude Haiku 4.5 | GPT-4o-mini |
-|--------|------------------|-------------|
-| **Exact Match** | 0/19 (0.0%) | 0/19 (0.0%) |
-| **Rule-Based** | 11/19 (57.9%) | 9/19 (47.4%) |
-| **LLM Judge** | 13/19 (68.4%) | 13/19 (68.4%) |
-| **Avg Latency** | 1558ms | 1443ms |
-
-**What the head-to-head shows:**
-
-1. **Exact match is useless for conversational models** — both score 0%. Both models elaborate ("The capital of Australia is Canberra..." instead of "Canberra"). This is expected, not a defect: it's exactly why rule-based and LLM-judge graders exist.
-
-2. **Claude edges out GPT on rule-based matching** (57.9% vs 47.4%). Claude's phrasing more often contains the expected key terms. This is a grading-method artifact, not necessarily a quality gap — the rule-based grader rewards lexical overlap, not correctness.
-
-3. **The two models tie on the LLM judge** (both 68.4%) — the grader that actually assesses answer quality rather than word overlap. When judged on substance, Claude and GPT-4o-mini are neck-and-neck on this dataset.
-
-4. **GPT is slightly faster on average** (1443ms vs 1558ms), though both sit in the 0.5–4s range per call.
-
-**Why the LLM Judge and Rule-Based graders disagree:** rule-based punishes stylistic variation (a correct answer worded differently fails); the LLM judge rewards conceptual correctness. The gap between them (e.g. Claude 57.9% rule-based vs 68.4% judge) is the single most useful signal here — it quantifies how much a keyword grader *under*-credits models that paraphrase. **No single grader is sufficient; the divergence between them is the finding.**
-
-> Note: `results/*.json` is gitignored to avoid committing API responses, but aggregate reports (`report.json`, `rag_report.json`, `agent_report.json`) are tracked so all numbers are auditable.
-
-**Artifact integrity:** General, RAG, and agent evaluation runners publish each JSON
-artifact through a flushed, fsynced temporary file and atomic replacement.
-Serialization errors (including `NaN`/`Infinity`) or a failed replacement do
-not truncate the previous artifact. A general evaluation aborted by a provider
-error removes its stale report when results are saved. The results and report
-are **separate atomic files**, not a cross-file transaction; consumers should
-not assume a pair was published together.
-
-## Results (v0.3) — RAG Evaluation
-
-The tracked artifact in `results/rag_report.json` is a **3-question k=3 smoke run**, not the full 14-question top-k sweep implemented by the evaluation harness. Publishing the artifact exactly as it exists keeps the benchmark provenance auditable.
-
-| Metric | Tracked k=3 smoke run |
-|--------|-----------------------|
-| Questions / evaluations | 3 / 3 |
-| Precision@3 | 44.4% |
-| Recall@3 | 100.0% |
-| MRR | 1.000 |
-| Hit Rate | 100.0% |
-| Correctness | 90.0% |
-| Groundedness | 93.3% |
-| Avg total latency | 1904ms |
-
-The tracked smoke-run artifact predates the fixed-k precision denominator change. Its historical values have not been recalculated; it also predates nDCG@k and MAP@k. Rerun the benchmark before comparing historical values to new retrieval reports.
-
-This sample is useful as an end-to-end pipeline check, but **three questions are too few for comparative retrieval claims**. The larger 14-question corpus and k=1/3/5 sweep remain implemented in the project; a full reproducible run should be committed before treating those results as benchmark evidence.
-
-## Results (v0.4) — Agent Evaluation
-
-The tracked `results/agent_report.json` is a targeted **6-task injection-resistance ablation with the explicit injection-defense prompt disabled**. It is not a 24-task full-suite result.
-
-| Metric | Tracked ablation |
-|--------|------------------|
-| Tasks | 6 injection-resistance tasks |
-| Task Success Rate | 100.0% (6/6) |
-| Tool Selection Accuracy | 100.0% |
-| Argument Accuracy | 100.0% |
-| Injection Resistance | 100.0% |
-| Unnecessary Call Rate | 0.0% |
-| Avg Latency | 2576ms |
-| Avg Turns | 2.0 |
-| Estimated Cost | $0.0167 |
-
-**What this run supports:** all six tested payloads were resisted even with the dedicated injection-defense instruction disabled. **What it does not support:** broad claims about destructive-action refusal, no-tool behavior, or the complete 24-task suite, because those categories are absent from this tracked artifact. The result also suggests these six payloads are not sufficiently discriminative for the tested model; stronger adversarial cases are needed for a meaningful defense ablation.
-
-## Project Structure
-
-```
-EvalForge/
-├── README.md                      # This file
-├── main.py                        # v0.2: LLM evaluation entry point
-├── main_rag.py                    # v0.3: RAG evaluation entry point
-├── main_agent.py                  # v0.4: Agent evaluation entry point
-├── requirements.txt               # Python dependencies
-├── pytest.ini                     # Test configuration
-├── evalforge/
-│   ├── __init__.py
-│   ├── runner.py                  # v0.2: LLM eval runner + model API clients
-│   ├── graders.py                 # v0.2: Grading logic (ExactMatch, RuleBased, LLMJudge)
-│   ├── rag.py                     # v0.3: RAG pipeline (embedding, retrieval, generation)
-│   ├── rag_graders.py             # v0.3: Retrieval metrics + LLM graders
-│   ├── rag_runner.py              # v0.3: RAG evaluation runner
-│   ├── agent.py                   # v0.4: Tool-calling agent
-│   ├── agent_tools.py             # v0.4: Mock tool registry
-│   ├── agent_graders.py           # v0.4: Trajectory graders
-│   └── agent_runner.py            # v0.4: Agent evaluation runner
-├── datasets/
-│   ├── questions.json             # v0.2: LLM eval dataset (19 cases)
-│   ├── rag_corpus.json            # v0.3: RAG corpus (15 security docs)
-│   ├── rag_questions.json         # v0.3: RAG questions (14 cases)
-│   └── agent_tasks.json           # v0.4: Agent tasks (24 cases)
-├── results/
-│   ├── report.json                # v0.2: LLM eval results (tracked)
-│   ├── rag_report.json            # v0.3: RAG eval results (tracked)
-│   └── agent_report.json          # v0.4: Agent eval results (tracked)
-├── tests/
-│   ├── test_graders.py            # v0.2: Grader unit tests (14 tests)
-│   ├── test_rag_graders.py        # v0.3: RAG grader unit tests (38 tests)
-│   └── test_agent_graders.py      # v0.4: Agent grader unit tests (58 tests)
-└── .github/workflows/
-    └── tests.yml                  # CI: runs pytest on push (Python 3.10/3.11/3.12)
-```
-
-## Contributing
-
-Built as a learning project to demonstrate LLM-evaluation engineering. Contributions and issues welcome.
+- Bundled datasets are small and hand-authored. Scores on them do not establish production retrieval quality or model safety.
+- The default offline path is BM25 lexical retrieval. It does not score generated answers, groundedness, or hallucinations.
+- Provider-backed LLM, RAG generation, and agent runs require credentials, cost money, and are separate from the API-free demo.
+- SciFact and other BEIR datasets are not shipped with the repo, and no SciFact scores are committed here.
+- Artifact verification checks file hashes against a local manifest. It does not prove benchmark quality or dataset authenticity.
+- There is no published PyPI release claimed here. Install from this GitHub repository or a local checkout.
+- EvalForge is an evaluation toolkit still in early development (package version 0.1.0).
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).
