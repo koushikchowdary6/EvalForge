@@ -23,7 +23,28 @@ def bundle(tmp_path):
         input_hashes[key] = _hash(data)
     output_hashes = {}
     for name in REPORTS:
-        data = json.dumps({"name": name}).encode()
+        if name == "scifact-comparison.json":
+            payload = {
+                "schema_version": 1,
+                "comparison_scope": "same_source_beir_lexical_evidence_all_cutoffs",
+                "passed": True,
+                "by_top_k": {
+                    str(k): {"k": k, "passed": True, "source_sha256": input_hashes}
+                    for k in (1, 3, 5, 10)
+                },
+            }
+        else:
+            tokenizer = name.removeprefix("scifact-").removesuffix(".json")
+            payload = {
+                "schema_version": 1,
+                "benchmark_scope": "offline_lexical_bm25_positive_qrels_only",
+                "source": {"source_sha256": input_hashes},
+                "evaluation": {
+                    "parameters": {"tokenizer": tokenizer},
+                    "by_top_k": {str(k): {} for k in (1, 3, 5, 10)},
+                },
+            }
+        data = json.dumps(payload).encode()
         (evidence / name).write_bytes(data)
         output_hashes[name] = _hash(data)
     (evidence / "manifest.json").write_text(json.dumps({
@@ -83,4 +104,32 @@ def test_duplicate_json_keys_rejected(tmp_path):
     manifest["output_sha256"][REPORTS[0]] = _hash(payload)
     manifest_path.write_text(json.dumps(manifest))
     with pytest.raises(ValueError, match="Duplicate JSON key"):
+        verify(evidence)
+
+
+@pytest.mark.parametrize("name", REPORTS)
+def test_hash_matching_nonbenchmark_json_rejected(tmp_path, name):
+    evidence, _ = bundle(tmp_path)
+    payload = b'{"unrelated":"valid JSON but not benchmark evidence"}'
+    (evidence / name).write_bytes(payload)
+    manifest_path = evidence / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["output_sha256"][name] = _hash(payload)
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ValueError, match="Invalid SciFact"):
+        verify(evidence)
+
+
+def test_hash_matching_comparison_outcome_inconsistency_rejected(tmp_path):
+    evidence, _ = bundle(tmp_path)
+    name = "scifact-comparison.json"
+    report = json.loads((evidence / name).read_text(encoding="utf-8"))
+    report["by_top_k"]["5"]["passed"] = False
+    payload = json.dumps(report).encode()
+    (evidence / name).write_bytes(payload)
+    manifest_path = evidence / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["output_sha256"][name] = _hash(payload)
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ValueError, match="outcome disagrees"):
         verify(evidence)
