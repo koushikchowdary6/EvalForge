@@ -96,6 +96,9 @@ def test_benchmark_subprocess_failure_uses_error_exit_code(tmp_path, monkeypatch
     assert "benchmark failed with exit 7" in capsys.readouterr().err
     assert (output / "manifest.json").is_file()
     assert not (output / "scifact-comparison.json").exists()
+    import json
+    manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+    assert "output_sha256" not in manifest, "Failed runs must not claim complete evidence"
 
 
 def test_benchmark_launch_oserror_is_reported(tmp_path, monkeypatch, capsys):
