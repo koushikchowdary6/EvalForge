@@ -91,7 +91,7 @@ def test_ranked_relevant_document_outside_cutoff(tmp_path):
         encoding="utf-8",
     )
     queries.write_text(json.dumps({"_id": "q1", "text": "alpha"}) + "\n", encoding="utf-8")
-    qrels.write_text("query-id\\tcorpus-id\\tscore\\nq1\\td2\\t1\\n".replace("\\\\t", "\\t").replace("\\\\n", "\\n"), encoding="utf-8")
+    qrels.write_text("query-id\tcorpus-id\tscore\nq1\td2\t1\n", encoding="utf-8")
     report = analyze(corpus, queries, qrels, k=1)
     assert report["queries_without_positive_relevant_hit"] == 1
     assert report["failure_reason_counts"]["relevant_docs_outside_top_k"] == 1
