@@ -77,6 +77,39 @@ jobs:
           with Path(__import__("os").environ["GITHUB_STEP_SUMMARY"]).open("a") as output:
               output.write(summary)
           PY
+      - name: Record verifiable demo provenance and artifact hashes
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import platform
+          from importlib.metadata import version
+          from pathlib import Path
+
+          folder = Path("demo-evidence")
+          names = ("baseline.json", "candidate.json", "comparison.json")
+          hashes = {}
+          for name in names:
+              data = (folder / name).read_bytes()
+              json.loads(data)
+              hashes[name] = hashlib.sha256(data).hexdigest()
+          manifest = {
+              "schema_version": 1,
+              "scope": "bundled hand-authored BM25 lexical retrieval fixture; not independent SciFact or LLM safety",
+              "git_revision": os.environ["GITHUB_SHA"],
+              "python_version": platform.python_version(),
+              "evalforge_distribution": "evalforge-ai",
+              "evalforge_version": version("evalforge-ai"),
+              "sha256": hashes,
+          }
+          (folder / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\\n")
+          loaded = json.loads((folder / "manifest.json").read_text())
+          for name, expected in loaded["sha256"].items():
+              actual = hashlib.sha256((folder / name).read_bytes()).hexdigest()
+              if actual != expected:
+                  raise SystemExit(f"Artifact checksum mismatch: {name}")
+          PY
       - name: Verify installed regression and absolute-quality gates
         run: python examples/reproduce_offline_benchmark.py
       - name: Upload developer-facing demo evidence
