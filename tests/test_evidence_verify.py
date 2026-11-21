@@ -81,3 +81,29 @@ def test_symlinked_report_rejected_even_with_matching_hash(bundle, tmp_path):
         pytest.skip("Symlinks unavailable on this platform")
     with pytest.raises(ValueError, match="symlink"):
         verify_bundle(bundle)
+
+
+@pytest.mark.parametrize("invalid", [[], None, "text", 42])
+def test_non_object_manifest_rejected(bundle, invalid):
+    (bundle / "manifest.json").write_text(json.dumps(invalid))
+    with pytest.raises(ValueError, match="JSON object"):
+        verify_bundle(bundle)
+
+
+@pytest.mark.parametrize("revision", ["z" * 40, "a" * 39, "a" * 41, 123, None])
+def test_invalid_git_revision_rejected(bundle, revision):
+    path = bundle / "manifest.json"
+    manifest = json.loads(path.read_text())
+    manifest["git_revision"] = revision
+    path.write_text(json.dumps(manifest))
+    with pytest.raises(ValueError, match="hexadecimal SHA"):
+        verify_bundle(bundle)
+
+
+def test_boolean_schema_version_rejected(bundle):
+    path = bundle / "manifest.json"
+    manifest = json.loads(path.read_text())
+    manifest["schema_version"] = True
+    path.write_text(json.dumps(manifest))
+    with pytest.raises(ValueError, match="schema"):
+        verify_bundle(bundle)
