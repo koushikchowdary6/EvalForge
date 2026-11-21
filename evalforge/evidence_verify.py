@@ -15,6 +15,8 @@ REQUIRED = ("baseline.json", "candidate.json", "comparison.json")
 def verify_bundle(directory: Path) -> dict:
     directory = Path(directory)
     manifest_path = directory / "manifest.json"
+    if manifest_path.is_symlink() or not manifest_path.is_file():
+        raise ValueError("Evidence manifest is missing or a symlink")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if manifest.get("schema_version") != 1:
         raise ValueError("Unsupported evidence manifest schema")
