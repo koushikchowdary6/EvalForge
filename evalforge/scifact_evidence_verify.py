@@ -6,6 +6,7 @@ an attacker. Compare fingerprints with a trusted acquisition record.
 import argparse
 import hashlib
 import json
+import math
 from pathlib import Path
 
 REPORTS = ("scifact-ascii.json", "scifact-unicode.json", "scifact-comparison.json")
@@ -29,6 +30,17 @@ def _read_object(path):
 
     data = json.loads(path.read_text(encoding="utf-8"),
                       object_pairs_hook=unique, parse_constant=reject_constant)
+    def reject_nonfinite(value):
+        if isinstance(value, float) and not __import__("math").isfinite(value):
+            raise ValueError(f"Non-finite JSON number: {path.name}")
+        if isinstance(value, dict):
+            for item in value.values():
+                reject_nonfinite(item)
+        elif isinstance(value, list):
+            for item in value:
+                reject_nonfinite(item)
+
+    reject_nonfinite(data)
     if not isinstance(data, dict):
         raise ValueError(f"Expected JSON object: {path.name}")
     return data
