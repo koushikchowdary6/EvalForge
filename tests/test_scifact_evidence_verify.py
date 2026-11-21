@@ -45,7 +45,7 @@ def bundle(tmp_path):
                 "source": {"source_sha256": input_hashes},
                 "evaluation": {
                     "parameters": {"tokenizer": tokenizer},
-                    "by_top_k": {str(k): {} for k in (1, 3, 5, 10)},
+                    "by_top_k": {str(k): {"lexical_evidence_hit_lower_bound": 0.7} for k in (1, 3, 5, 10)},
                 },
             }
         data = json.dumps(payload).encode()
@@ -171,4 +171,38 @@ def test_hash_matching_fabricated_comparison_rejected(tmp_path, field, value):
     manifest["output_sha256"][name] = _hash(payload)
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     with pytest.raises(ValueError, match="SciFact comparison"):
+        verify(evidence)
+
+
+@pytest.mark.parametrize("tokenizer,field", [
+    ("ascii", "baseline_hit_lower_bound"),
+    ("unicode", "candidate_hit_lower_bound"),
+])
+def test_hash_matching_fabricated_retrieval_score_rejected(tmp_path, tokenizer, field):
+    evidence, _ = bundle(tmp_path)
+    name = f"scifact-{tokenizer}.json"
+    report = json.loads((evidence / name).read_text(encoding="utf-8"))
+    report["evaluation"]["by_top_k"]["5"]["lexical_evidence_hit_lower_bound"] = 0.2
+    payload = json.dumps(report).encode()
+    (evidence / name).write_bytes(payload)
+    manifest_path = evidence / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["output_sha256"][name] = _hash(payload)
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ValueError, match="comparison score disagrees"):
+        verify(evidence)
+
+
+def test_hash_matching_missing_retrieval_metric_rejected(tmp_path):
+    evidence, _ = bundle(tmp_path)
+    name = "scifact-ascii.json"
+    report = json.loads((evidence / name).read_text(encoding="utf-8"))
+    del report["evaluation"]["by_top_k"]["3"]["lexical_evidence_hit_lower_bound"]
+    payload = json.dumps(report).encode()
+    (evidence / name).write_bytes(payload)
+    manifest_path = evidence / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["output_sha256"][name] = _hash(payload)
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ValueError, match="retrieval score"):
         verify(evidence)
