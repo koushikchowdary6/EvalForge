@@ -39,16 +39,48 @@ jobs:
           from importlib.metadata import distribution
           pkg = distribution("evalforge-ai")
           scripts = {e.name for e in pkg.entry_points if e.group == "console_scripts"}
-          required = {"evalforge-demo", "evalforge-bm25", "evalforge-validate", "evalforge-dataset-audit", "evalforge-custom-gate"}
+          required = {
+              "evalforge-bm25", "evalforge-import-beir", "evalforge-benchmark-beir",
+              "evalforge-run-scifact", "evalforge-compare-beir",
+              "evalforge-compare-lexical", "evalforge-demo", "evalforge-validate",
+              "evalforge-compare-artifacts", "evalforge-report-md",
+              "evalforge-dataset-audit", "evalforge-custom-gate",
+              "evalforge-custom-summary", "evalforge-verify-evidence",
+          }
           assert required <= scripts, required - scripts
           data = files("evalforge").joinpath("data")
           assert data.is_dir()
           assert list(data.glob("*.json")), "No bundled JSON datasets in installed wheel"
           PY
-          "$VENV/bin/evalforge-demo" --help
-          "$VENV/bin/evalforge-bm25" --help
-          "$VENV/bin/evalforge-dataset-audit" --help
-          "$VENV/bin/evalforge-custom-gate" --help
+          # Exercise every published entry point from the isolated wheel, not
+          # just a hand-picked subset. A broken import or missing dependency
+          # must block the distributable before it is uploaded.
+          "$VENV/bin/python" - <<'PY'
+          import subprocess
+          from importlib.metadata import distribution
+          from pathlib import Path
+
+          bin_dir = Path("/tmp/evalforge-wheel-smoke/venv/bin")
+          scripts = sorted(
+              entry.name for entry in distribution("evalforge-ai").entry_points
+              if entry.group == "console_scripts" and entry.name.startswith("evalforge-")
+          )
+          assert scripts, "No EvalForge console scripts installed"
+          for name in scripts:
+              command = bin_dir / name
+              assert command.is_file(), f"Missing installed command: {name}"
+              result = subprocess.run(
+                  [str(command), "--help"], capture_output=True, text=True,
+                  timeout=30, check=False,
+              )
+              assert result.returncode == 0, (
+                  f"{name} --help exited {result.returncode}: {result.stderr}"
+              )
+              assert "usage:" in result.stdout.lower(), (
+                  f"{name} --help produced no usage text"
+              )
+          print(f"Verified {len(scripts)} installed EvalForge CLI entry points")
+          PY
 
       - name: Verify installed SciFact runner CLI contract
         working-directory: /tmp/evalforge-wheel-smoke
