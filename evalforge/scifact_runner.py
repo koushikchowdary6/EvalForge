@@ -224,6 +224,19 @@ def main(argv=None):
         except (OSError, ValueError, TypeError) as exc:
             print(f"Comparison produced invalid JSON evidence: {exc}", file=sys.stderr)
             return 2
+    if completed.returncode in (0, 1):
+        # Bind the final reports to the input provenance, including valid gate failures.
+        # A partial or invalid run keeps its original input-only manifest.
+        try:
+            manifest["output_sha256"] = {
+                name: sha256(args.output_dir / name)
+                for name in ("scifact-ascii.json", "scifact-unicode.json", "scifact-comparison.json")
+            }
+            manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+        except OSError as exc:
+            print(f"Cannot finalize SciFact evidence manifest: {exc}", file=sys.stderr)
+            return 2
+
     if completed.returncode == 1:
         print("Comparison quality gate failed; evidence retained (this may be a valid finding).", file=sys.stderr)
     elif completed.returncode:
