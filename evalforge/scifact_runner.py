@@ -84,6 +84,12 @@ def main(argv=None):
     except ValueError:
         parser.error("--download-date must be a valid calendar date")
 
+    try:
+        input_fingerprints = {key: sha256(path) for key, path in files.items()}
+    except OSError as exc:
+        print(f"Cannot fingerprint SciFact inputs: {exc}", file=sys.stderr)
+        return 2
+
     manifest = {
         "dataset": "BEIR SciFact",
         "split": "test",
@@ -91,7 +97,7 @@ def main(argv=None):
         "download_date": args.download_date,
         "evalforge_revision": args.evalforge_revision,
         "python_version": platform.python_version(),
-        "input_sha256": {key: sha256(path) for key, path in files.items()},
+        "input_sha256": input_fingerprints,
         "cutoffs": [1, 3, 5, 10],
         "tokenizers": ["ascii", "unicode"],
         "comparison_max_drop": args.max_drop,
