@@ -131,8 +131,8 @@ verifying a downloaded copy:
 
 ```bash
 sha256sum scifact-evidence/manifest.json
-evalforge-verify-scifact scifact-evidence \\
-  --dataset /path/to/scifact \\
+evalforge-verify-scifact scifact-evidence \
+  --dataset /path/to/scifact \
   --expected-manifest-sha256 YOUR_RECORDED_64_CHARACTER_SHA256
 ```
 
