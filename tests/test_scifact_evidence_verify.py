@@ -239,3 +239,16 @@ def test_matching_hashes_cannot_relax_manifest_comparison_threshold(tmp_path):
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     with pytest.raises(ValueError, match="threshold differs"):
         verify(evidence)
+
+
+def test_verifier_streams_hashes_without_loading_entire_files(tmp_path, monkeypatch):
+    """Large BEIR corpora should not be loaded into memory just for hashing."""
+    from pathlib import Path
+
+    evidence, dataset = bundle(tmp_path)
+
+    def forbid_read_bytes(self):
+        raise AssertionError(f"Unbounded read_bytes while hashing: {self}")
+
+    monkeypatch.setattr(Path, "read_bytes", forbid_read_bytes)
+    assert verify(evidence, dataset)["dataset"] == "BEIR SciFact"
