@@ -23,6 +23,24 @@ evalforge-validate evaluation.json --min-hit-rate 0.50
 
 The optional hit-rate floor applies **only to lexical evidence at k=3 on the bundled fixture**; it is not a production acceptance threshold. Output commands refuse to overwrite existing files. Use new paths for subsequent runs.
 
+## Reproduce an exact revision
+
+For a review, interview, or CI reproduction, pin the source revision instead of
+installing a moving `main` branch. For example, the revision below is a
+previously tested commit; substitute the commit recorded with the evidence you
+are reproducing:
+
+```bash
+python -m pip install "evalforge-ai @ git+https://github.com/koushikchowdary6/EvalForge.git@bd9034c3e76b4419f2e9268ee323458a3997c425"
+evalforge-demo --json --output evalforge-demo.json
+evalforge-validate evalforge-demo.json --min-hit-rate 0.50
+```
+
+The JSON report is from the **bundled synthetic fixture**, not an independent
+SciFact or production benchmark. Record the installed Git commit alongside any
+shared output. A successful install and offline validation demonstrate that
+this local example works; they do not establish performance on other datasets.
+
 ## Debug missed retrieval queries
 
 For a local BEIR-format dataset, inspect which positively labeled queries BM25
