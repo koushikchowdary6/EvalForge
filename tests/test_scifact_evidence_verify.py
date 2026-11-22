@@ -219,7 +219,7 @@ def test_manifest_comparison_threshold_invalid_rejected(tmp_path, invalid):
     else:
         manifest["comparison_max_drop"] = invalid
     path.write_text(json.dumps(manifest), encoding="utf-8")
-    with pytest.raises(ValueError, match="manifest comparison threshold|comparison threshold differs"):
+    with pytest.raises(ValueError, match="manifest comparison threshold|comparison threshold differs|Non-finite JSON constant"):
         verify(evidence)
 
 
