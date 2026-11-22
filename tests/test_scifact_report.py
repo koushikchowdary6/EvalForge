@@ -27,6 +27,7 @@ def test_render_uses_verified_comparison_scores(tmp_path, monkeypatch):
         "source_url": "https://example.org/scifact",
         "evalforge_revision": "abc123",
         "download_date": "2026-11-21",
+        "input_sha256": {"corpus": "a" * 64, "queries": "b" * 64, "qrels": "c" * 64},
     }
     calls = []
     def fake_verify(path, dataset):
@@ -37,6 +38,10 @@ def test_render_uses_verified_comparison_scores(tmp_path, monkeypatch):
     assert len(calls) == 1
     assert "| 1 | 0.7000 | 0.6000 | -0.1000 | FAIL |" in text
     assert "Overall gate: FAIL" in text
+    assert "| `corpus` | `" + "a" * 64 + "` |" in text
+    assert "| `queries` | `" + "b" * 64 + "` |" in text
+    assert "| `qrels` | `" + "c" * 64 + "` |" in text
+    assert "do not authenticate the dataset publisher" in text
     assert "not generated-answer quality" in text
 
 
