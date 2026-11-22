@@ -125,6 +125,22 @@ not the authenticity of the dataset, the correctness of reported metrics, or
 independent SciFact performance. Preserve a trusted copy of the source
 fingerprints separately when sharing evidence.
 
+For stronger tamper detection, record the manifest's SHA-256 **outside** the
+artifact bundle when the run completes, then provide that trusted digest when
+verifying a downloaded copy:
+
+```bash
+sha256sum scifact-evidence/manifest.json
+evalforge-verify-scifact scifact-evidence \\
+  --dataset /path/to/scifact \\
+  --expected-manifest-sha256 YOUR_RECORDED_64_CHARACTER_SHA256
+```
+
+The expected digest must come from a trusted, independently retained record;
+copying it from the same untrusted bundle offers no additional assurance.
+This detects replacement of the manifest and its hash-linked reports, but is
+not a digital signature or proof of dataset origin.
+
 ## Share a verified SciFact result as Markdown
 
 After completing the real-data run above, render a compact score table from the
