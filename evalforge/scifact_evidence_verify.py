@@ -35,8 +35,11 @@ def _read_object(path):
         raw = stream.read(max_json_bytes + 1)
     if len(raw) > max_json_bytes:
         raise ValueError(f"Oversized SciFact evidence JSON: {path.name}")
-    data = json.loads(raw.decode("utf-8"),
-                      object_pairs_hook=unique, parse_constant=reject_constant)
+    try:
+        data = json.loads(raw.decode("utf-8"),
+                          object_pairs_hook=unique, parse_constant=reject_constant)
+    except RecursionError as exc:
+        raise ValueError(f"Excessively nested SciFact evidence JSON: {path.name}") from exc
     def reject_nonfinite(value):
         if isinstance(value, float) and not __import__("math").isfinite(value):
             raise ValueError(f"Non-finite JSON number: {path.name}")
@@ -47,7 +50,10 @@ def _read_object(path):
             for item in value:
                 reject_nonfinite(item)
 
-    reject_nonfinite(data)
+    try:
+        reject_nonfinite(data)
+    except RecursionError as exc:
+        raise ValueError(f"Excessively nested SciFact evidence JSON: {path.name}") from exc
     if not isinstance(data, dict):
         raise ValueError(f"Expected JSON object: {path.name}")
     return data
