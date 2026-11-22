@@ -27,7 +27,7 @@ def render(directory: Path, dataset: Path | None = None) -> str:
     # another engineer can check that a reproduction used identical inputs.
     fingerprints = manifest.get("input_sha256", {})
     fingerprint_rows = [
-        f"| \`{label}\` | \`{fingerprints[label]}\` |"
+        f"| `{label}` | `{fingerprints[label]}` |"
         for label in ("corpus", "queries", "qrels")
         if label in fingerprints
     ]
