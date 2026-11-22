@@ -263,3 +263,14 @@ def test_oversized_evidence_json_rejected_before_parsing(tmp_path):
         stream.truncate(64 * 1024 * 1024 + 1)
     with pytest.raises(ValueError, match="Oversized SciFact evidence JSON"):
         _read_object(oversized)
+
+
+def test_deeply_nested_untrusted_json_exits_cleanly(tmp_path, capsys):
+    """Malformed evidence must not leak a Python recursion traceback."""
+    evidence, _ = bundle(tmp_path)
+    manifest = evidence / "manifest.json"
+    manifest.write_text('{"nested":' + "[" * 1500 + "0" + "]" * 1500 + "}", encoding="utf-8")
+    with pytest.raises(SystemExit) as error:
+        main([str(evidence)])
+    assert error.value.code == 2
+    assert "Excessively nested SciFact evidence JSON" in capsys.readouterr().err
