@@ -23,6 +23,14 @@ def render(directory: Path, dataset: Path | None = None) -> str:
             f"{item['candidate_hit_lower_bound']:.4f} | {item['delta']:+.4f} | "
             f"{'PASS' if item['passed'] else 'FAIL'} |"
         )
+    # Expose verified source-file fingerprints in the human-readable report so
+    # another engineer can check that a reproduction used identical inputs.
+    fingerprints = manifest.get("input_sha256", {})
+    fingerprint_rows = [
+        f"| \`{label}\` | \`{fingerprints[label]}\` |"
+        for label in ("corpus", "queries", "qrels")
+        if label in fingerprints
+    ]
     source = str(manifest["source_url"]).replace("|", "%7C").replace("\n", " ")
     revision = str(manifest["evalforge_revision"]).replace("|", "%7C").replace("\n", " ")
     return "\n".join([
@@ -36,6 +44,15 @@ def render(directory: Path, dataset: Path | None = None) -> str:
         f"- Acquisition date declared by operator: {manifest['download_date']}",
         f"- EvalForge revision declared by operator: `{revision}`",
         f"- Original dataset files re-hashed: {'yes' if dataset is not None else 'no'}",
+        "",
+        "## Reproducibility fingerprints",
+        "",
+        "These SHA-256 values identify the input files used by this run; "
+        "they do not authenticate the dataset publisher.",
+        "",
+        "| Input | SHA-256 |",
+        "| :--- | :--- |",
+        *fingerprint_rows,
         "",
         "| k | ASCII BM25 | Unicode BM25 | Unicode minus ASCII | Gate |",
         "| ---: | ---: | ---: | ---: | :---: |",
