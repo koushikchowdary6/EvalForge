@@ -125,6 +125,10 @@ jobs:
         working-directory: /tmp/evalforge-wheel-smoke
         run: |
           VENV=/tmp/evalforge-wheel-smoke/venv
+          # The runner invokes sibling console scripts by name. Make the
+          # isolated wheel environment discoverable without activating the
+          # source checkout or installing EvalForge globally.
+          export PATH="$VENV/bin:$PATH"
           "$VENV/bin/python" - <<'PY'
           import hashlib
           import json
