@@ -51,7 +51,11 @@ def _check_hash(path, expected):
         raise ValueError(f"Invalid SHA-256 digest: {path.name}")
     if path.is_symlink() or not path.is_file():
         raise ValueError(f"Missing or symlinked evidence file: {path.name}")
-    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    hasher = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            hasher.update(chunk)
+    digest = hasher.hexdigest()
     if digest != expected:
         raise ValueError(f"SHA-256 mismatch: {path.name}")
 
