@@ -10,6 +10,7 @@ import argparse
 import csv
 import hashlib
 import json
+import math
 from pathlib import Path
 import sys
 
@@ -32,10 +33,16 @@ def _jsonl(path: Path):
             def reject_constant(value):
                 raise ValueError(f"nonstandard JSON constant: {value}")
 
+            def finite_float(value):
+                number = float(value)
+                if not math.isfinite(number):
+                    raise ValueError(f"non-finite JSON number: {value}")
+                return number
+
             try:
                 record = json.loads(
                     line, object_pairs_hook=unique_pairs,
-                    parse_constant=reject_constant,
+                    parse_constant=reject_constant, parse_float=finite_float,
                 )
             except (json.JSONDecodeError, ValueError) as exc:
                 raise ValueError(f"{path.name}:{line_no}: invalid JSON: {exc}") from exc
