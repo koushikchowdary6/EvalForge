@@ -37,6 +37,10 @@ jobs:
 
           url = os.environ["SCIFACT_URL"]
           archive = Path("scifact.zip")
+          evidence = Path("scifact-evidence")
+          evidence.mkdir(exist_ok=True)
+          acquisition_log = evidence / "dataset-acquisition.txt"
+          acquisition_log.write_text("Source: " + url + "\nStatus: attempted\n", encoding="utf-8")
           maximum = 50 * 1024 * 1024
           request = urllib.request.Request(url, headers={"User-Agent": "EvalForge-benchmark/0.1"})
           digest = hashlib.sha256()
@@ -60,11 +64,15 @@ jobs:
                   break
               except (URLError, TimeoutError, ConnectionError) as exc:
                   archive.unlink(missing_ok=True)
+                  with acquisition_log.open("a", encoding="utf-8") as log:
+                      log.write(f"Attempt {attempt}/3 failed: {type(exc).__name__}\n")
                   if attempt == 3:
                       raise SystemExit(f"SciFact download failed after 3 attempts: {exc}") from exc
                   delay = 10 * attempt
                   print(f"SciFact download attempt {attempt} failed: {exc}; retrying in {delay}s", flush=True)
                   time.sleep(delay)
+          with acquisition_log.open("a", encoding="utf-8") as log:
+              log.write("Download: completed\nArchive SHA-256: " + digest.hexdigest() + "\n")
           print("SciFact source archive SHA-256:", digest.hexdigest())
           expected = {"corpus.jsonl", "queries.jsonl", "qrels/test.tsv"}
           with zipfile.ZipFile(archive) as bundle:
