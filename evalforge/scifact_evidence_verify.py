@@ -129,6 +129,12 @@ def verify(directory, dataset=None):
 
     # Recompute the quality gate; a matching hash does not prove arithmetic integrity.
     threshold = comparison.get("max_allowed_drop")
+    # A valid comparison must use the tolerance recorded before the run.
+    # Otherwise edited reports can silently relax the declared regression gate.
+    if type(manifest.get("comparison_max_drop")) not in (int, float) or not math.isfinite(manifest["comparison_max_drop"]):
+        raise ValueError("Invalid SciFact manifest comparison threshold")
+    if threshold != manifest["comparison_max_drop"]:
+        raise ValueError("SciFact comparison threshold differs from run manifest")
     if type(threshold) not in (int, float) or not math.isfinite(threshold) or not 0 <= threshold <= 1:
         raise ValueError("Invalid SciFact comparison drop threshold")
     for cutoff, item in by_k.items():
