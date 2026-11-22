@@ -274,3 +274,29 @@ def test_deeply_nested_untrusted_json_exits_cleanly(tmp_path, capsys):
         main([str(evidence)])
     assert error.value.code == 2
     assert "Excessively nested SciFact evidence JSON" in capsys.readouterr().err
+
+
+
+def test_trusted_manifest_digest_accepts_unchanged_bundle(tmp_path):
+    evidence, dataset = bundle(tmp_path)
+    digest = _hash((evidence / "manifest.json").read_bytes())
+    assert verify(evidence, dataset, digest)["dataset"] == "BEIR SciFact"
+    assert main([str(evidence), "--expected-manifest-sha256", digest]) == 0
+
+
+def test_trusted_manifest_digest_rejects_rewritten_bundle(tmp_path):
+    evidence, _ = bundle(tmp_path)
+    manifest_path = evidence / "manifest.json"
+    trusted_digest = _hash(manifest_path.read_bytes())
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["source_note"] = "rewritten after digest recorded"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ValueError, match="SHA-256 mismatch"):
+        verify(evidence, expected_manifest_sha256=trusted_digest)
+
+
+@pytest.mark.parametrize("invalid", ["", "0" * 63, "G" * 64])
+def test_invalid_trusted_manifest_digest_rejected(tmp_path, invalid):
+    evidence, _ = bundle(tmp_path)
+    with pytest.raises(ValueError, match="Invalid SHA-256 digest"):
+        verify(evidence, expected_manifest_sha256=invalid)
