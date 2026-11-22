@@ -73,9 +73,14 @@ def _check_hash(path, expected):
         raise ValueError(f"SHA-256 mismatch: {path.name}")
 
 
-def verify(directory, dataset=None):
+def verify(directory, dataset=None, expected_manifest_sha256=None):
     directory = Path(directory)
-    manifest = _read_object(directory / "manifest.json")
+    manifest_path = directory / "manifest.json"
+    if expected_manifest_sha256 is not None:
+        # A separately retained digest can detect wholesale replacement of the
+        # manifest and reports, which self-referential output hashes cannot.
+        _check_hash(manifest_path, expected_manifest_sha256)
+    manifest = _read_object(manifest_path)
     if manifest.get("dataset") != "BEIR SciFact" or manifest.get("split") != "test":
         raise ValueError("Not a SciFact test-split manifest")
     outputs = manifest.get("output_sha256")
@@ -183,9 +188,9 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directory", type=Path, help="Completed SciFact evidence directory")
     parser.add_argument("--dataset", type=Path, help="Optional original extracted SciFact dataset to fingerprint")
-    args = parser.parse_args(argv)
+    parser.add_argument("--expected-manifest-sha256", metavar="SHA256",\n                        help="Trusted SHA-256 of manifest.json recorded outside the evidence bundle")\n    args = parser.parse_args(argv)
     try:
-        verify(args.directory, args.dataset)
+        verify(args.directory, args.dataset, args.expected_manifest_sha256)
     except (OSError, ValueError, UnicodeError) as exc:
         parser.exit(2, f"SciFact evidence verification failed: {exc}\n")
     print("SciFact report hashes verified" + (" against dataset inputs" if args.dataset else "") + ".")
