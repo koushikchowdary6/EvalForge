@@ -107,6 +107,8 @@ def test_source_fingerprint_changes_when_qrels_change(tmp_path):
     '{"_id":"d1","text":"safe","metadata":{"x":1,"x":2}}',
     '{"_id":"d1","text":"safe","weight":NaN}',
     '{"_id":"d1","text":"safe","weight":Infinity}',
+    '{"_id":"d1","text":"safe","weight":1e999}',
+    '{"_id":"d1","text":"safe","metadata":{"weight":-1e999}}',
 ])
 def test_ambiguous_or_nonstandard_jsonl_is_rejected(tmp_path, bad_record):
     corpus, queries, qrels = fixture(tmp_path)
