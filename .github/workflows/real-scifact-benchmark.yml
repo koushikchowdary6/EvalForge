@@ -2,6 +2,15 @@ name: Real SciFact benchmark (manual)
 
 on:
   workflow_dispatch:
+    inputs:
+      dataset_url:
+        description: 'Optional HTTPS BEIR-format SciFact ZIP URL (requires SHA-256)'
+        required: false
+        type: string
+      dataset_sha256:
+        description: 'Expected ZIP SHA-256; mandatory for custom URL'
+        required: false
+        type: string
   # Run against the public dataset automatically; manual runs remain available.
   schedule:
     - cron: '17 9 * * 1'
@@ -26,7 +35,8 @@ jobs:
         run: python -m pip install .
       - name: Download official BEIR SciFact data with bounded extraction
         env:
-          SCIFACT_URL: https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/scifact.zip
+          SCIFACT_URL: ${{ inputs.dataset_url || 'https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/scifact.zip' }}
+          SCIFACT_SHA256: ${{ inputs.dataset_sha256 || '' }}
         run: |
           python - <<'PY'
           import hashlib
@@ -35,7 +45,20 @@ jobs:
           import zipfile
           from pathlib import Path
 
+          import hmac
+          import re
+          from urllib.parse import urlsplit
+
           url = os.environ["SCIFACT_URL"]
+          expected_sha = os.environ.get("SCIFACT_SHA256", "").strip().lower()
+          official_url = "https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/scifact.zip"
+          parsed = urlsplit(url)
+          if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password or parsed.fragment:
+              raise SystemExit("Dataset URL must be a valid HTTPS URL without credentials or fragment")
+          if url != official_url and not expected_sha:
+              raise SystemExit("A custom dataset URL requires dataset_sha256")
+          if expected_sha and not re.fullmatch(r"[0-9a-f]{64}", expected_sha):
+              raise SystemExit("dataset_sha256 must be exactly 64 hexadecimal characters")
           archive = Path("scifact.zip")
           diagnostics = Path("scifact-acquisition")
           diagnostics.mkdir(exist_ok=True)
@@ -71,6 +94,9 @@ jobs:
                   delay = 10 * attempt
                   print(f"SciFact download attempt {attempt} failed: {exc}; retrying in {delay}s", flush=True)
                   time.sleep(delay)
+          if expected_sha and not hmac.compare_digest(digest.hexdigest(), expected_sha):
+              archive.unlink(missing_ok=True)
+              raise SystemExit("Dataset archive SHA-256 does not match the pinned checksum")
           with acquisition_log.open("a", encoding="utf-8") as log:
               log.write("Download: completed\nArchive SHA-256: " + digest.hexdigest() + "\n")
           print("SciFact source archive SHA-256:", digest.hexdigest())
@@ -104,7 +130,7 @@ jobs:
         id: benchmark
         continue-on-error: true
         env:
-          SCIFACT_URL: https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/scifact.zip
+          SCIFACT_URL: ${{ inputs.dataset_url || 'https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/scifact.zip' }}
         run: |
           mkdir -p scifact-evidence
           evalforge-run-scifact --dataset scifact --output-dir scifact-evidence \
