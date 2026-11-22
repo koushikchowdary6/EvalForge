@@ -54,6 +54,7 @@ def bundle(tmp_path):
     (evidence / "manifest.json").write_text(json.dumps({
         "dataset": "BEIR SciFact", "split": "test",
         "input_sha256": input_hashes, "output_sha256": output_hashes,
+        "comparison_max_drop": 0.02,
     }), encoding="utf-8")
     return evidence, dataset
 
@@ -205,4 +206,36 @@ def test_hash_matching_missing_retrieval_metric_rejected(tmp_path):
     manifest["output_sha256"][name] = _hash(payload)
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     with pytest.raises(ValueError, match="retrieval score"):
+        verify(evidence)
+
+
+@pytest.mark.parametrize("invalid", [None, -0.01, 1.01, "0.02", float("inf")])
+def test_manifest_comparison_threshold_invalid_rejected(tmp_path, invalid):
+    evidence, _ = bundle(tmp_path)
+    path = evidence / "manifest.json"
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    if invalid is None:
+        del manifest["comparison_max_drop"]
+    else:
+        manifest["comparison_max_drop"] = invalid
+    path.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ValueError, match="manifest comparison threshold|comparison threshold differs"):
+        verify(evidence)
+
+
+def test_matching_hashes_cannot_relax_manifest_comparison_threshold(tmp_path):
+    evidence, _ = bundle(tmp_path)
+    name = "scifact-comparison.json"
+    path = evidence / name
+    report = json.loads(path.read_text(encoding="utf-8"))
+    report["max_allowed_drop"] = 0.5
+    for row in report["by_top_k"].values():
+        row["max_allowed_drop"] = 0.5
+    payload = json.dumps(report).encode("utf-8")
+    path.write_bytes(payload)
+    manifest_path = evidence / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["output_sha256"][name] = _hash(payload)
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ValueError, match="threshold differs"):
         verify(evidence)
