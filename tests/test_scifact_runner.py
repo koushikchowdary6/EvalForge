@@ -149,3 +149,33 @@ def test_unreadable_input_fingerprint_returns_error_without_evidence(tmp_path, m
     assert result == 2
     assert "Cannot fingerprint SciFact inputs" in capsys.readouterr().err
     assert list(output.iterdir()) == []
+
+
+def test_dataset_mutation_during_benchmark_invalidates_evidence(tmp_path, monkeypatch, capsys):
+    """A benchmark cannot certify results against inputs changed after fingerprinting."""
+    import json
+    from evalforge import scifact_runner
+
+    dataset = tmp_path / "scifact"
+    (dataset / "qrels").mkdir(parents=True)
+    for filename in ("corpus.jsonl", "queries.jsonl", "qrels/test.tsv"):
+        (dataset / filename).write_text("original\\n", encoding="utf-8")
+    output = tmp_path / "evidence"
+    output.mkdir()
+
+    def mutate_input(command, **kwargs):
+        assert command[0] == "evalforge-benchmark-beir"
+        (dataset / "queries.jsonl").write_text("changed\\n", encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(scifact_runner.subprocess, "run", mutate_input)
+    status = scifact_runner.main([
+        "--dataset", str(dataset), "--output-dir", str(output),
+        "--evalforge-revision", "test", "--source-url", "https://example.org/dataset",
+        "--download-date", "2026-11-20",
+    ])
+    assert status == 2
+    assert "input changed during evaluation" in capsys.readouterr().err
+    manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+    assert "output_sha256" not in manifest
+    assert not (output / "scifact-comparison.json").exists()
