@@ -252,3 +252,14 @@ def test_verifier_streams_hashes_without_loading_entire_files(tmp_path, monkeypa
 
     monkeypatch.setattr(Path, "read_bytes", forbid_read_bytes)
     assert verify(evidence, dataset)["dataset"] == "BEIR SciFact"
+
+
+def test_oversized_evidence_json_rejected_before_parsing(tmp_path):
+    from evalforge.scifact_evidence_verify import _read_object
+
+    oversized = tmp_path / "manifest.json"
+    # Sparse allocation avoids keeping a 64 MiB fixture in test memory.
+    with oversized.open("wb") as stream:
+        stream.truncate(64 * 1024 * 1024 + 1)
+    with pytest.raises(ValueError, match="Oversized SciFact evidence JSON"):
+        _read_object(oversized)
