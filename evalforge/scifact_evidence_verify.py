@@ -28,7 +28,14 @@ def _read_object(path):
     def reject_constant(value):
         raise ValueError(f"Non-finite JSON constant: {value}")
 
-    data = json.loads(path.read_text(encoding="utf-8"),
+    # Evidence is untrusted input. Bound JSON parsing memory independently of
+    # the streamed SHA-256 checks (which also support large source datasets).
+    max_json_bytes = 64 * 1024 * 1024
+    with path.open("rb") as stream:
+        raw = stream.read(max_json_bytes + 1)
+    if len(raw) > max_json_bytes:
+        raise ValueError(f"Oversized SciFact evidence JSON: {path.name}")
+    data = json.loads(raw.decode("utf-8"),
                       object_pairs_hook=unique, parse_constant=reject_constant)
     def reject_nonfinite(value):
         if isinstance(value, float) and not __import__("math").isfinite(value):
