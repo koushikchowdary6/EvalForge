@@ -1,6 +1,6 @@
 # Run a real SciFact benchmark in GitHub Actions
 
-The [Real SciFact benchmark workflow](../.github/workflows/real-scifact-benchmark.yml) is **manual only**. It does not run on every push or pull request, and it does not publish any fabricated scores.
+The [Real SciFact benchmark workflow](../.github/workflows/real-scifact-benchmark.yml) supports manual runs, a weekly Monday schedule (09:17 UTC), and pushes that modify its workflow definition. It does not run on every source-code push or pull request, and it does not publish fabricated scores.
 
 ## Run it
 
@@ -11,7 +11,7 @@ The [Real SciFact benchmark workflow](../.github/workflows/real-scifact-benchmar
 
 **What the numbers mean:** This measures lexical BM25 retrieval on SciFact relevance judgments. It is not an embedding-model benchmark, generated-answer evaluation, hallucination assessment, or AI-agent safety result. The 0.02 comparison tolerance is illustrative, not a validated production threshold.
 
-**Failures are informative:** A failed comparison quality gate is preserved as evidence and causes a red workflow result; a download, parsing, or verification error also causes a red result. The workflow retains partial artifacts for debugging. Do not describe any failed or incomplete run as a successful benchmark.
+**Failures are informative:** A failed comparison quality gate is preserved as evidence and causes a red workflow result; a download, parsing, or verification error also causes a red result. The workflow retains partial artifacts for debugging, including `scifact-evidence/dataset-acquisition.txt` when the source download fails. This file records the source URL, failed attempt counts and exception types, without pretending a failed download produced benchmark evidence. Do not describe any failed or incomplete run as a successful benchmark.
 
 **Data and reproducibility:** The workflow fetches an upstream third-party dataset at execution time, so availability and upstream contents can change. It caps the download size, extracts only the three required SciFact files, and records an archive SHA-256; it does not pin or independently authenticate a publisher-signed dataset checksum. Review the upstream dataset's license and terms before redistribution. Artifacts expire after 14 days. To publish reproducible results long-term, preserve the exact source digests, EvalForge revision, measured report, and license-compatible dataset acquisition instructions.
 
