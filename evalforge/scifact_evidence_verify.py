@@ -188,7 +188,9 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directory", type=Path, help="Completed SciFact evidence directory")
     parser.add_argument("--dataset", type=Path, help="Optional original extracted SciFact dataset to fingerprint")
-    parser.add_argument("--expected-manifest-sha256", metavar="SHA256",\n                        help="Trusted SHA-256 of manifest.json recorded outside the evidence bundle")\n    args = parser.parse_args(argv)
+    parser.add_argument("--expected-manifest-sha256", metavar="SHA256",
+                        help="Trusted SHA-256 of manifest.json recorded outside the evidence bundle")
+    args = parser.parse_args(argv)
     try:
         verify(args.directory, args.dataset, args.expected_manifest_sha256)
     except (OSError, ValueError, UnicodeError) as exc:
