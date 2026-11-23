@@ -45,9 +45,9 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dataset", type=Path, required=True, help="Extracted BEIR SciFact directory")
     parser.add_argument("--output-dir", type=Path, help="Existing empty output directory (required for full runs, not preflight)")
-    parser.add_argument("--evalforge-revision", required=True, help="Installed EvalForge commit or release identifier")
-    parser.add_argument("--source-url", required=True, help="Upstream dataset source URL")
-    parser.add_argument("--download-date", required=True, help="Date dataset was obtained (YYYY-MM-DD)")
+    parser.add_argument("--evalforge-revision", help="Installed EvalForge commit or release identifier")
+    parser.add_argument("--source-url", help="Upstream dataset source URL")
+    parser.add_argument("--download-date", help="Date dataset was obtained (YYYY-MM-DD)")
     parser.add_argument("--max-drop", type=float, default=0.02,
                         help="Maximum permitted absolute lexical hit-rate drop at each cutoff (default: 0.02)")
     parser.add_argument("--timeout-seconds", type=float, default=1800,
@@ -57,6 +57,13 @@ def main(argv=None):
     parser.add_argument("--preflight-only", action="store_true",
                         help="Validate input paths and print source SHA-256 fingerprints without running benchmarks or writing artifacts")
     args = parser.parse_args(argv)
+    if not args.preflight_only:
+        for option, value in (("--evalforge-revision", args.evalforge_revision),
+                              ("--source-url", args.source_url),
+                              ("--download-date", args.download_date)):
+            if not value:
+                parser.error(f"{option} is required for full benchmark runs")
+
     if args.preflight_validate_schema and not args.preflight_only:
         parser.error("--preflight-validate-schema requires --preflight-only")
 
@@ -84,12 +91,13 @@ def main(argv=None):
     # versions. Require the documented format for stable provenance metadata.
     import re
     from datetime import date
-    if not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", args.download_date):
+    if args.download_date is not None and not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", args.download_date):
         parser.error("--download-date must use YYYY-MM-DD")
-    try:
-        date.fromisoformat(args.download_date)
-    except ValueError:
-        parser.error("--download-date must be a valid calendar date")
+    if args.download_date is not None:
+        try:
+            date.fromisoformat(args.download_date)
+        except ValueError:
+            parser.error("--download-date must be a valid calendar date")
 
     try:
         input_fingerprints = {key: sha256(path) for key, path in files.items()}
