@@ -112,6 +112,16 @@ jobs:
               entries = {}
               for member in bundle.infolist():
                   normalized = member.filename.replace("\\", "/")
+                  # Only accept regular files for required dataset members.
+                  # ZIP Unix mode bits can encode symlinks or special files.
+                  import stat
+                  mode = (member.external_attr >> 16) & 0xFFFF
+                  file_type = stat.S_IFMT(mode)
+                  if any(normalized == suffix or normalized.endswith("/" + suffix) for suffix in expected):
+                      if member.is_dir() or file_type not in (0, stat.S_IFREG):
+                          raise SystemExit(f"SciFact member is not a regular file: {normalized}")
+                      if member.flag_bits & 0x1:
+                          raise SystemExit(f"Encrypted SciFact member is unsupported: {normalized}")
                   for suffix in expected:
                       if normalized == suffix or normalized.endswith("/" + suffix):
                           if suffix in entries:
