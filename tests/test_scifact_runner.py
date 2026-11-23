@@ -366,3 +366,17 @@ def test_full_run_rejects_symlinked_output_ancestor(tmp_path):
     assert result.returncode == 2
     assert "symlink" in result.stderr
     assert not list(output.iterdir())
+
+
+def test_evidence_loader_rejects_overflowing_json_numbers(tmp_path):
+    """A syntactically valid JSON exponent must not become Infinity in evidence."""
+    import pytest
+    from evalforge.scifact_runner import load_json_object
+
+    report = tmp_path / "report.json"
+    report.write_text('{"score": 1e999}\n', encoding="utf-8")
+    with pytest.raises(ValueError, match="Non-finite JSON number"):
+        load_json_object(report)
+
+    report.write_text('{"score": 0.125}\n', encoding="utf-8")
+    assert load_json_object(report) == {"score": 0.125}
