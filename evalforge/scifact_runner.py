@@ -82,6 +82,11 @@ def main(argv=None):
     missing = [str(path) for path in files.values() if not path.is_file()]
     if missing:
         parser.error("Missing SciFact input files: " + ", ".join(missing))
+    # Refuse links and special files: a dataset must consist of stable regular files.
+    # This also avoids hashing FIFOs or devices that may block indefinitely.
+    unsafe = [str(path) for path in files.values() if path.is_symlink() or not path.is_file()]
+    if unsafe:
+        parser.error("SciFact inputs must be regular files, not links or special files: " + ", ".join(unsafe))
     if not args.preflight_only:
         if args.output_dir is None or not args.output_dir.is_dir():
             parser.error("--output-dir must be an existing directory for full runs")
