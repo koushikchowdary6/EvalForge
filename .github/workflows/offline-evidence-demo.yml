@@ -124,7 +124,7 @@ jobs:
               bundle = Path(temporary) / "evidence"
               shutil.copytree("demo-evidence", bundle)
               baseline = bundle / "baseline.json"
-              baseline.write_bytes(baseline.read_bytes() + b"\\n ")
+              baseline.write_bytes(baseline.read_bytes() + b"\n ")
               result = subprocess.run(
                   ["evalforge-verify-evidence", str(bundle)],
                   capture_output=True,
