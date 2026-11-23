@@ -13,8 +13,13 @@ REPORTS = ("scifact-ascii.json", "scifact-unicode.json", "scifact-comparison.jso
 INPUTS = {"corpus": "corpus.jsonl", "queries": "queries.jsonl", "qrels": "qrels/test.tsv"}
 
 
+def _has_linked_component(path):
+    """Reject symlinked files and ancestor directories before reading evidence."""
+    return any(component.is_symlink() for component in (path, *path.parents))
+
+
 def _read_object(path):
-    if path.is_symlink() or not path.is_file():
+    if _has_linked_component(path) or not path.is_file():
         raise ValueError(f"Missing or symlinked evidence file: {path.name}")
 
     def unique(pairs):
@@ -62,7 +67,7 @@ def _read_object(path):
 def _check_hash(path, expected):
     if not isinstance(expected, str) or len(expected) != 64 or any(c not in "0123456789abcdef" for c in expected):
         raise ValueError(f"Invalid SHA-256 digest: {path.name}")
-    if path.is_symlink() or not path.is_file():
+    if _has_linked_component(path) or not path.is_file():
         raise ValueError(f"Missing or symlinked evidence file: {path.name}")
     hasher = hashlib.sha256()
     with path.open("rb") as stream:
