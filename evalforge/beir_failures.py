@@ -90,11 +90,14 @@ def main(argv=None):
     parser.add_argument("--k", type=int, default=5)
     parser.add_argument("--tokenizer", choices=("ascii", "unicode"), default="ascii")
     parser.add_argument("--limit", type=int, default=20)
+    parser.add_argument("--min-hit-rate", type=float, help="Fail with exit code 1 when the positive-qrel hit@k rate is below this 0..1 floor; still emit the JSON report")
     parser.add_argument("--output", type=Path, help="New JSON report; never overwrite")
     args = parser.parse_args(argv)
     try:
         if args.k < 1 or args.limit < 1:
             raise ValueError("k and limit must be positive")
+        if args.min_hit_rate is not None and not (0.0 <= args.min_hit_rate <= 1.0):
+            raise ValueError("min-hit-rate must be finite and between 0 and 1")
         if args.output and args.output.resolve() in {
             args.corpus.resolve(), args.queries.resolve(), args.qrels.resolve()
         }:
@@ -119,6 +122,14 @@ def main(argv=None):
     except (OSError, UnicodeError, ValueError, TypeError, RecursionError) as exc:
         print(f"BEIR failure analysis rejected: {exc}", file=sys.stderr)
         return 2
+    if args.min_hit_rate is not None:
+        if report["labeled_queries"] == 0:
+            print("BEIR failure analysis gate rejected: no labeled queries", file=sys.stderr)
+            return 2
+        hit_rate = report["queries_with_positive_relevant_hit"] / report["labeled_queries"]
+        if hit_rate < args.min_hit_rate:
+            print(f"BEIR hit@{args.k} gate failed: {hit_rate:.6f} < {args.min_hit_rate:.6f}", file=sys.stderr)
+            return 1
     return 0
 
 
