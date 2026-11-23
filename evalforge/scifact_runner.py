@@ -44,7 +44,7 @@ def load_json_object(path):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dataset", type=Path, required=True, help="Extracted BEIR SciFact directory")
-    parser.add_argument("--output-dir", type=Path, required=True, help="Existing empty output directory")
+    parser.add_argument("--output-dir", type=Path, help="Existing empty output directory (required for full runs, not preflight)")
     parser.add_argument("--evalforge-revision", required=True, help="Installed EvalForge commit or release identifier")
     parser.add_argument("--source-url", required=True, help="Upstream dataset source URL")
     parser.add_argument("--download-date", required=True, help="Date dataset was obtained (YYYY-MM-DD)")
@@ -71,10 +71,11 @@ def main(argv=None):
     missing = [str(path) for path in files.values() if not path.is_file()]
     if missing:
         parser.error("Missing SciFact input files: " + ", ".join(missing))
-    if not args.output_dir.is_dir():
-        parser.error("Output directory must already exist")
-    if any(args.output_dir.iterdir()):
-        parser.error("Output directory must be empty to avoid overwriting evidence")
+    if not args.preflight_only:
+        if args.output_dir is None or not args.output_dir.is_dir():
+            parser.error("--output-dir must be an existing directory for full runs")
+        if any(args.output_dir.iterdir()):
+            parser.error("Output directory must be empty to avoid overwriting evidence")
     # date.fromisoformat also accepts compact YYYYMMDD on supported Python
     # versions. Require the documented format for stable provenance metadata.
     import re
