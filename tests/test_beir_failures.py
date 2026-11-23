@@ -120,5 +120,5 @@ def test_invalid_hit_rate_threshold_never_writes(tmp_path):
             "--qrels", str(qrels)]
     for invalid in ("nan", "inf", "-inf", "-0.01", "1.01"):
         output = tmp_path / "invalid.json"
-        assert main(base + ["--min-hit-rate", invalid, "--output", str(output)]) == 2
+        assert main(base + [f"--min-hit-rate={invalid}", "--output", str(output)]) == 2
         assert not output.exists()
