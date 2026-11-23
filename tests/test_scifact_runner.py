@@ -273,3 +273,47 @@ def test_full_run_rejects_symlinked_inputs_without_artifacts(tmp_path):
     assert result.returncode == 2
     assert "not links or special files" in result.stderr
     assert not list(output.iterdir())
+
+
+
+def test_preflight_rejects_symlinked_dataset_root(tmp_path):
+    """A linked dataset directory must not bypass leaf-file checks."""
+    actual = tmp_path / "actual"
+    (actual / "qrels").mkdir(parents=True)
+    for filename in ("corpus.jsonl", "queries.jsonl", "qrels/test.tsv"):
+        (actual / filename).write_text("", encoding="utf-8")
+    linked = tmp_path / "linked"
+    linked.symlink_to(actual, target_is_directory=True)
+
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "--dataset", str(linked), "--preflight-only"],
+        capture_output=True, text=True, check=False,
+    )
+    assert result.returncode == 2
+    assert "not links or special files" in result.stderr
+    assert not result.stdout
+
+
+def test_full_run_rejects_symlinked_qrels_directory(tmp_path):
+    """Reject a linked subdirectory before writing any benchmark evidence."""
+    dataset = tmp_path / "scifact"
+    dataset.mkdir()
+    external = tmp_path / "external_qrels"
+    external.mkdir()
+    (external / "test.tsv").write_text("", encoding="utf-8")
+    (dataset / "qrels").symlink_to(external, target_is_directory=True)
+    for filename in ("corpus.jsonl", "queries.jsonl"):
+        (dataset / filename).write_text("", encoding="utf-8")
+    output = tmp_path / "evidence"
+    output.mkdir()
+
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "--dataset", str(dataset),
+         "--output-dir", str(output), "--evalforge-revision", "test",
+         "--source-url", "https://example.org/dataset",
+         "--download-date", "2026-11-23"],
+        capture_output=True, text=True, check=False,
+    )
+    assert result.returncode == 2
+    assert "not links or special files" in result.stderr
+    assert not list(output.iterdir())
