@@ -94,6 +94,10 @@ def main(argv=None):
     if not args.preflight_only:
         if args.output_dir is None or not args.output_dir.is_dir():
             parser.error("--output-dir must be an existing directory for full runs")
+        # An empty symlinked output directory can redirect evidence outside the
+        # operator-selected location. Reject linked ancestors as well as the leaf.
+        if any(parent.is_symlink() for parent in (args.output_dir, *args.output_dir.parents)):
+            parser.error("Output directory must not be a symlink or contain symlinked ancestors")
         if any(args.output_dir.iterdir()):
             parser.error("Output directory must be empty to avoid overwriting evidence")
     # date.fromisoformat also accepts compact YYYYMMDD on supported Python
