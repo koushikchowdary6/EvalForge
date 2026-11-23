@@ -49,3 +49,22 @@ def test_schema_validation_requires_preflight(tmp_path):
     with pytest.raises(SystemExit) as exc:
         main([arg for arg in _args(dataset) if arg != "--preflight-only"])
     assert exc.value.code == 2
+
+
+def test_preflight_needs_only_dataset_and_preserves_unknown_provenance(tmp_path, capsys):
+    dataset = _fixture(tmp_path)
+    assert main(["--dataset", str(dataset), "--preflight-only", "--preflight-validate-schema"]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["status"] == "inputs_schema_validated"
+    assert report["source_url"] is None
+    assert report["download_date"] is None
+    assert report["schema_validation"]["corpus_documents"] == 1
+
+
+def test_full_benchmark_still_requires_provenance(tmp_path, capsys):
+    dataset = _fixture(tmp_path)
+    import pytest
+    with pytest.raises(SystemExit) as exc:
+        main(["--dataset", str(dataset)])
+    assert exc.value.code == 2
+    assert "--evalforge-revision is required" in capsys.readouterr().err
