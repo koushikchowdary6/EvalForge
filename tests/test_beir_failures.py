@@ -35,6 +35,7 @@ def test_failure_reasons_and_no_fabricated_hits(tmp_path):
     assert report["labeled_queries"] == 3
     assert report["queries_with_positive_relevant_hit"] == 1
     assert report["queries_without_positive_relevant_hit"] == 2
+    assert report["positive_relevant_hit_rate_at_k"] == 1 / 3
     failures = {item["query_id"]: item for item in report["shown_failures"]}
     assert failures["q2"]["reason"] == "no_positive_relevant_overlap"
     assert failures["q2"]["top_k_positive_results"][0]["doc_id"] == "d2"
