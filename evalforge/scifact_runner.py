@@ -52,6 +52,8 @@ def main(argv=None):
                         help="Maximum permitted absolute lexical hit-rate drop at each cutoff (default: 0.02)")
     parser.add_argument("--timeout-seconds", type=float, default=1800,
                         help="Per-command timeout in seconds (default: 1800)")
+    parser.add_argument("--preflight-only", action="store_true",
+                        help="Validate input paths and print source SHA-256 fingerprints without running benchmarks or writing artifacts")
     args = parser.parse_args(argv)
 
     import math
@@ -89,6 +91,17 @@ def main(argv=None):
     except OSError as exc:
         print(f"Cannot fingerprint SciFact inputs: {exc}", file=sys.stderr)
         return 2
+
+    if args.preflight_only:
+        print(json.dumps({
+            "dataset": "BEIR SciFact",
+            "split": "test",
+            "source_sha256": input_fingerprints,
+            "source_url": args.source_url,
+            "download_date": args.download_date,
+            "status": "inputs_fingerprinted_only",
+        }, sort_keys=True))
+        return 0
 
     manifest = {
         "dataset": "BEIR SciFact",
