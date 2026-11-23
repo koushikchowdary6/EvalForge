@@ -84,7 +84,11 @@ def main(argv=None):
         parser.error("Missing SciFact input files: " + ", ".join(missing))
     # Refuse links and special files: a dataset must consist of stable regular files.
     # This also avoids hashing FIFOs or devices that may block indefinitely.
-    unsafe = [str(path) for path in files.values() if path.is_symlink() or not path.is_file()]
+    # Reject symlinks in dataset directory components too: checking only leaf files
+    # would allow a linked dataset root or qrels directory to escape the supplied tree.
+    unsafe = [str(path) for path in files.values()
+              if path.is_symlink() or not path.is_file()
+              or any(parent.is_symlink() for parent in (path.parent, *path.parents))]
     if unsafe:
         parser.error("SciFact inputs must be regular files, not links or special files: " + ", ".join(unsafe))
     if not args.preflight_only:
