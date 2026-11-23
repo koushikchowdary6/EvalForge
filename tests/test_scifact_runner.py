@@ -317,3 +317,52 @@ def test_full_run_rejects_symlinked_qrels_directory(tmp_path):
     assert result.returncode == 2
     assert "not links or special files" in result.stderr
     assert not list(output.iterdir())
+
+
+
+def test_full_run_rejects_symlinked_output_directory(tmp_path):
+    """Never redirect benchmark artifacts through an empty output symlink."""
+    dataset = tmp_path / "scifact"
+    (dataset / "qrels").mkdir(parents=True)
+    for filename in ("corpus.jsonl", "queries.jsonl", "qrels/test.tsv"):
+        (dataset / filename).write_text("", encoding="utf-8")
+    actual_output = tmp_path / "elsewhere"
+    actual_output.mkdir()
+    linked_output = tmp_path / "evidence"
+    linked_output.symlink_to(actual_output, target_is_directory=True)
+
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "--dataset", str(dataset),
+         "--output-dir", str(linked_output), "--evalforge-revision", "test",
+         "--source-url", "https://example.org/dataset",
+         "--download-date", "2026-11-23"],
+        capture_output=True, text=True, check=False,
+    )
+    assert result.returncode == 2
+    assert "symlink" in result.stderr
+    assert not list(actual_output.iterdir())
+
+
+def test_full_run_rejects_symlinked_output_ancestor(tmp_path):
+    """A real leaf beneath a linked parent is also unsafe for evidence."""
+    dataset = tmp_path / "scifact"
+    (dataset / "qrels").mkdir(parents=True)
+    for filename in ("corpus.jsonl", "queries.jsonl", "qrels/test.tsv"):
+        (dataset / filename).write_text("", encoding="utf-8")
+    actual_parent = tmp_path / "actual"
+    output = actual_parent / "evidence"
+    output.mkdir(parents=True)
+    linked_parent = tmp_path / "linked"
+    linked_parent.symlink_to(actual_parent, target_is_directory=True)
+
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "--dataset", str(dataset),
+         "--output-dir", str(linked_parent / "evidence"),
+         "--evalforge-revision", "test",
+         "--source-url", "https://example.org/dataset",
+         "--download-date", "2026-11-23"],
+        capture_output=True, text=True, check=False,
+    )
+    assert result.returncode == 2
+    assert "symlink" in result.stderr
+    assert not list(output.iterdir())
