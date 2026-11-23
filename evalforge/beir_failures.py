@@ -102,8 +102,8 @@ def main(argv=None):
             args.corpus.resolve(), args.queries.resolve(), args.qrels.resolve()
         }:
             raise ValueError("output cannot overwrite input")
-        if args.output and args.output.exists():
-            raise ValueError("output already exists")
+        if args.output and (args.output.exists() or args.output.is_symlink()):
+            raise ValueError("output already exists or is a symlink")
         report = analyze(args.corpus, args.queries, args.qrels,
                          k=args.k, tokenizer=args.tokenizer, limit=args.limit)
         payload = json.dumps(report, indent=2, ensure_ascii=False, allow_nan=False) + "\n"
