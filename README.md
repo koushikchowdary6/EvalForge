@@ -78,10 +78,8 @@ check that the required files exist and record their exact SHA-256 fingerprints
 before spending time on retrieval evaluation:
 
 ```bash
-mkdir scifact-evidence
 evalforge-run-scifact \
   --dataset /path/to/scifact \
-  --output-dir scifact-evidence \
   --evalforge-revision YOUR_INSTALLED_COMMIT \
   --source-url YOUR_ACTUAL_DATASET_SOURCE_URL \
   --download-date YYYY-MM-DD \
@@ -89,7 +87,7 @@ evalforge-run-scifact \
 ```
 
 The command prints machine-readable JSON with input hashes and
-`status: inputs_fingerprinted_only`; it does not write evidence files or
+`status: inputs_fingerprinted_only`; it needs no output directory and does not write evidence files or
 execute the benchmark. It checks paths and readability, **not** dataset
 authenticity, licensing, BEIR schema correctness, or model quality.
 Run the full workflow below to produce measured results.
