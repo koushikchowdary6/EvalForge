@@ -52,9 +52,13 @@ def main(argv=None):
                         help="Maximum permitted absolute lexical hit-rate drop at each cutoff (default: 0.02)")
     parser.add_argument("--timeout-seconds", type=float, default=1800,
                         help="Per-command timeout in seconds (default: 1800)")
+    parser.add_argument("--preflight-validate-schema", action="store_true",
+                        help="With --preflight-only, parse BEIR inputs and check document, query and qrel references (uses memory proportional to dataset size)")
     parser.add_argument("--preflight-only", action="store_true",
                         help="Validate input paths and print source SHA-256 fingerprints without running benchmarks or writing artifacts")
     args = parser.parse_args(argv)
+    if args.preflight_validate_schema and not args.preflight_only:
+        parser.error("--preflight-validate-schema requires --preflight-only")
 
     import math
     if not math.isfinite(args.max_drop) or not 0 <= args.max_drop <= 1:
@@ -94,13 +98,30 @@ def main(argv=None):
         return 2
 
     if args.preflight_only:
+        schema_report = None
+        if args.preflight_validate_schema:
+            from .beir_import import convert
+            try:
+                _, _, schema_report = convert(files["corpus"], files["queries"], files["qrels"])
+            except (OSError, UnicodeError, ValueError, TypeError, RecursionError) as exc:
+                print(f"SciFact schema preflight rejected: {exc}", file=sys.stderr)
+                return 2
+            # Detect input mutation between fingerprinting and schema validation.
+            try:
+                if any(sha256(path) != input_fingerprints[key] for key, path in files.items()):
+                    print("SciFact inputs changed during schema preflight", file=sys.stderr)
+                    return 2
+            except OSError as exc:
+                print(f"SciFact input unreadable during schema preflight: {exc}", file=sys.stderr)
+                return 2
         print(json.dumps({
             "dataset": "BEIR SciFact",
             "split": "test",
             "source_sha256": input_fingerprints,
             "source_url": args.source_url,
             "download_date": args.download_date,
-            "status": "inputs_fingerprinted_only",
+            "status": "inputs_schema_validated" if schema_report is not None else "inputs_fingerprinted_only",
+            **({"schema_validation": schema_report} if schema_report is not None else {}),
         }, sort_keys=True))
         return 0
 
