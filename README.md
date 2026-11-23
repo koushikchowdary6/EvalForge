@@ -71,6 +71,29 @@ evalforge-verify-evidence /path/to/extracted/offline-evaluation-evidence
 
 A successful verification means the three JSON files match the manifest's hashes; a mismatch or malformed bundle exits with code 2. **This is an integrity check, not a digital signature or independent confirmation of benchmark quality.** Artifacts expire after 14 days, and the included dataset is hand-authored.
 
+## Preflight a local SciFact dataset without running benchmarks
+
+After obtaining and extracting the publisher's BEIR-format SciFact files, you can
+check that the required files exist and record their exact SHA-256 fingerprints
+before spending time on retrieval evaluation:
+
+```bash
+mkdir scifact-evidence
+evalforge-run-scifact \
+  --dataset /path/to/scifact \
+  --output-dir scifact-evidence \
+  --evalforge-revision YOUR_INSTALLED_COMMIT \
+  --source-url YOUR_ACTUAL_DATASET_SOURCE_URL \
+  --download-date YYYY-MM-DD \
+  --preflight-only
+```
+
+The command prints machine-readable JSON with input hashes and
+`status: inputs_fingerprinted_only`; it does not write evidence files or
+execute the benchmark. It checks paths and readability, **not** dataset
+authenticity, licensing, BEIR schema correctness, or model quality.
+Run the full workflow below to produce measured results.
+
 ## Run the SciFact reproducibility workflow
 
 The installed `evalforge-run-scifact` command orchestrates two **BM25 lexical**
