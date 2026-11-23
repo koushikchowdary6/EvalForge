@@ -18,6 +18,13 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/real-scifact-benchmark.yml'
+      - 'evalforge/scifact_runner.py'
+      - 'evalforge/scifact_evidence_verify.py'
+      - 'evalforge/scifact_report.py'
+      - 'evalforge/beir_benchmark.py'
+      - 'evalforge/beir_import.py'
+      - 'evalforge/compare_beir.py'
+      - 'pyproject.toml'
 
 permissions:
   contents: read
@@ -126,6 +133,11 @@ jobs:
                           target.write(chunk)
           Path("scifact-archive-sha256.txt").write_text(digest.hexdigest() + "  scifact.zip\n")
           PY
+      - name: Validate acquired SciFact schema before benchmarking
+        run: |
+          evalforge-run-scifact --dataset scifact --preflight-only --preflight-validate-schema \
+            > scifact-acquisition/schema-preflight.json
+          cat scifact-acquisition/schema-preflight.json >> "$GITHUB_STEP_SUMMARY"
       - name: Run two actual BM25 retrieval baselines
         id: benchmark
         continue-on-error: true
