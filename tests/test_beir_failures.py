@@ -98,3 +98,27 @@ def test_ranked_relevant_document_outside_cutoff(tmp_path):
     failure = report["shown_failures"][0]
     assert failure["first_positive_relevant_rank"] == 2
     assert failure["first_positive_relevant_score"] > 0
+
+
+def test_hit_rate_gate_reports_results_before_failing(tmp_path, capsys):
+    corpus, queries, qrels = sources(tmp_path)
+    base = ["--corpus", str(corpus), "--queries", str(queries),
+            "--qrels", str(qrels), "--k", "1"]
+    output = tmp_path / "gate.json"
+    assert main(base + ["--min-hit-rate", "0.5", "--output", str(output)]) == 1
+    report = json.loads(output.read_text(encoding="utf-8"))
+    assert report["queries_with_positive_relevant_hit"] == 1
+    assert report["labeled_queries"] == 3
+    assert "gate failed" in capsys.readouterr().err
+    assert main(base + ["--min-hit-rate", "0.3333333333333333"]) == 0
+    assert main(base + ["--min-hit-rate", "0"]) == 0
+
+
+def test_invalid_hit_rate_threshold_never_writes(tmp_path):
+    corpus, queries, qrels = sources(tmp_path)
+    base = ["--corpus", str(corpus), "--queries", str(queries),
+            "--qrels", str(qrels)]
+    for invalid in ("nan", "inf", "-inf", "-0.01", "1.01"):
+        output = tmp_path / "invalid.json"
+        assert main(base + ["--min-hit-rate", invalid, "--output", str(output)]) == 2
+        assert not output.exists()
