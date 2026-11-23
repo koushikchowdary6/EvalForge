@@ -60,10 +60,10 @@ For example, require at least 80% of labeled queries to retrieve a positively
 scored relevant document in the top five:
 
 ```bash
-evalforge-beir-failures \\
-  --corpus /path/to/corpus.jsonl \\
-  --queries /path/to/queries.jsonl \\
-  --qrels /path/to/qrels/test.tsv \\
+evalforge-beir-failures \
+  --corpus /path/to/corpus.jsonl \
+  --queries /path/to/queries.jsonl \
+  --qrels /path/to/qrels/test.tsv \
   --k 5 --min-hit-rate 0.80 --output beir-failures.json
 ```
 
