@@ -86,6 +86,15 @@ evalforge-run-scifact \
   --preflight-only
 ```
 
+To additionally parse the dataset and check BEIR document/query IDs, qrel references,
+and positive-label coverage before running a benchmark, append
+`--preflight-validate-schema` to that command. This optional check reports
+document, query, and positive-qrel counts in `schema_validation`, returns
+`status: inputs_schema_validated`, and rejects malformed or dangling references
+with exit code 2. It loads the dataset into memory, so allow sufficient RAM for
+large corpora. It still does not download or authenticate SciFact or measure
+retrieval performance.
+
 The command prints machine-readable JSON with input hashes and
 `status: inputs_fingerprinted_only`; it needs no output directory and does not write evidence files or
 execute the benchmark. It checks paths and readability, **not** dataset
