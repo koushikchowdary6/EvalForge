@@ -34,8 +34,17 @@ def load_json_object(path):
             result[key] = value
         return result
 
+    def reject_overflow(value):
+        # JSON numeric exponents can overflow Python floats without using NaN/Infinity literals.
+        import math
+        parsed = float(value)
+        if not math.isfinite(parsed):
+            raise ValueError(f"Non-finite JSON number: {value}")
+        return parsed
+
     with path.open(encoding="utf-8") as source:
-        data = json.load(source, parse_constant=reject_constant, object_pairs_hook=reject_duplicates)
+        data = json.load(source, parse_constant=reject_constant,
+                         parse_float=reject_overflow, object_pairs_hook=reject_duplicates)
     if not isinstance(data, dict):
         raise ValueError("Expected a JSON object report")
     return data
