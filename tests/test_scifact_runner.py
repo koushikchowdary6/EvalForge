@@ -179,3 +179,54 @@ def test_dataset_mutation_during_benchmark_invalidates_evidence(tmp_path, monkey
     manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
     assert "output_sha256" not in manifest
     assert not (output / "scifact-comparison.json").exists()
+
+
+def test_preflight_fingerprints_inputs_without_writing_evidence(tmp_path):
+    """Preflight is a safe reproducibility check, not a benchmark result."""
+    import hashlib
+    import json
+
+    dataset = tmp_path / "scifact"
+    (dataset / "qrels").mkdir(parents=True)
+    for filename in ("corpus.jsonl", "queries.jsonl", "qrels/test.tsv"):
+        (dataset / filename).write_text("fixture\\n", encoding="utf-8")
+    output = tmp_path / "evidence"
+    output.mkdir()
+    result = subprocess.run(
+        [
+            sys.executable, str(SCRIPT), "--dataset", str(dataset),
+            "--output-dir", str(output), "--evalforge-revision", "test",
+            "--source-url", "https://example.org/dataset",
+            "--download-date", "2026-11-22", "--preflight-only",
+        ],
+        capture_output=True, text=True, check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    report = json.loads(result.stdout)
+    assert report["status"] == "inputs_fingerprinted_only"
+    assert report["source_sha256"] == {
+        key: hashlib.sha256((dataset / filename).read_bytes()).hexdigest()
+        for key, filename in (
+            ("corpus", "corpus.jsonl"),
+            ("queries", "queries.jsonl"),
+            ("qrels", "qrels/test.tsv"),
+        )
+    }
+    assert list(output.iterdir()) == []
+
+
+def test_preflight_rejects_missing_dataset_without_evidence(tmp_path):
+    output = tmp_path / "evidence"
+    output.mkdir()
+    result = subprocess.run(
+        [
+            sys.executable, str(SCRIPT), "--dataset", str(tmp_path / "missing"),
+            "--output-dir", str(output), "--evalforge-revision", "test",
+            "--source-url", "https://example.org/dataset",
+            "--download-date", "2026-11-22", "--preflight-only",
+        ],
+        capture_output=True, text=True, check=False,
+    )
+    assert result.returncode == 2
+    assert "Missing SciFact input files" in result.stderr
+    assert not list(output.iterdir())
