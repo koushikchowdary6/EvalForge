@@ -78,13 +78,12 @@ check that the required files exist and record their exact SHA-256 fingerprints
 before spending time on retrieval evaluation:
 
 ```bash
-evalforge-run-scifact \
-  --dataset /path/to/scifact \
-  --evalforge-revision YOUR_INSTALLED_COMMIT \
-  --source-url YOUR_ACTUAL_DATASET_SOURCE_URL \
-  --download-date YYYY-MM-DD \
-  --preflight-only
+evalforge-run-scifact --dataset /path/to/scifact --preflight-only
 ```
+
+Preflight does not require a source URL, download date, or installed revision. When
+omitted, source provenance fields are reported as null rather than invented.
+Full benchmark runs still require all three provenance arguments.
 
 To additionally parse the dataset and check BEIR document/query IDs, qrel references,
 and positive-label coverage before running a benchmark, append
