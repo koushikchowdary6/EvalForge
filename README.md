@@ -55,6 +55,23 @@ evalforge-beir-failures \
   --k 5 --limit 20 --output failures.json
 ```
 
+For CI, use the same diagnostic as an explicit positive-qrel hit@k gate.
+For example, require at least 80% of labeled queries to retrieve a positively
+scored relevant document in the top five:
+
+```bash
+evalforge-beir-failures \\
+  --corpus /path/to/corpus.jsonl \\
+  --queries /path/to/queries.jsonl \\
+  --qrels /path/to/qrels/test.tsv \\
+  --k 5 --min-hit-rate 0.80 --output beir-failures.json
+```
+
+The command writes the full diagnostic report even when the floor is missed
+(exit 1). Invalid thresholds or input errors exit 2; existing output files
+are never overwritten. This gate measures labeled **lexical retrieval
+hit@k**, not generated-answer correctness or a model's safety.
+
 The JSON includes source-file SHA-256 fingerprints, total failed-query count,
 positive-score top-k results, and failure reasons. `--limit` truncates only
 the displayed examples, not the totals. A zero BM25 score is **not** counted
