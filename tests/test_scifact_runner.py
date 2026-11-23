@@ -230,3 +230,46 @@ def test_preflight_rejects_missing_dataset_without_evidence(tmp_path):
     assert result.returncode == 2
     assert "Missing SciFact input files" in result.stderr
     assert not list(output.iterdir())
+
+
+def test_preflight_rejects_symlinked_inputs(tmp_path):
+    """Dataset preflight must not follow links to unrelated local files."""
+    dataset = tmp_path / "scifact"
+    (dataset / "qrels").mkdir(parents=True)
+    outside = tmp_path / "outside.jsonl"
+    outside.write_text('{"_id": "outside"}\\n', encoding="utf-8")
+    (dataset / "corpus.jsonl").symlink_to(outside)
+    (dataset / "queries.jsonl").write_text("", encoding="utf-8")
+    (dataset / "qrels" / "test.tsv").write_text("", encoding="utf-8")
+
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "--dataset", str(dataset), "--preflight-only"],
+        capture_output=True, text=True, check=False,
+    )
+    assert result.returncode == 2
+    assert "not links or special files" in result.stderr
+    assert not result.stdout
+
+
+def test_full_run_rejects_symlinked_inputs_without_artifacts(tmp_path):
+    """A linked corpus must be rejected before the provenance manifest is written."""
+    dataset = tmp_path / "scifact"
+    (dataset / "qrels").mkdir(parents=True)
+    target = tmp_path / "outside.jsonl"
+    target.write_text("", encoding="utf-8")
+    (dataset / "corpus.jsonl").symlink_to(target)
+    (dataset / "queries.jsonl").write_text("", encoding="utf-8")
+    (dataset / "qrels" / "test.tsv").write_text("", encoding="utf-8")
+    output = tmp_path / "evidence"
+    output.mkdir()
+
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "--dataset", str(dataset),
+         "--output-dir", str(output), "--evalforge-revision", "test",
+         "--source-url", "https://example.org/dataset",
+         "--download-date", "2026-11-22"],
+        capture_output=True, text=True, check=False,
+    )
+    assert result.returncode == 2
+    assert "not links or special files" in result.stderr
+    assert not list(output.iterdir())
